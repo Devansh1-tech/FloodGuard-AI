@@ -1,0 +1,79 @@
+# =============================================================================
+# FloodGuard AI — Local Development & Deployment Docker Compose
+# Services: FastAPI Backend + PostGIS (Spatial Postgres) + Redis (Task Cache)
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ── Spatial Database: PostGIS on PostgreSQL 16 ──────────────────────────────
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: floodguard_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-floodguard_db}
+      POSTGRES_USER: ${POSTGRES_USER:-floodguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-floodguard_secret}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-floodguard} -d ${POSTGRES_DB:-floodguard_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Cache & Message Broker: Redis 7 ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: floodguard_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend Application: FastAPI ────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: floodguard_backend
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8000}:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
+      - USE_SQLITE=False
+      - POSTGRES_SERVER=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-floodguard_db}
+      - POSTGRES_USER=${POSTGRES_USER:-floodguard}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-floodguard_secret}
+      - EE_PROJECT_ID=${EE_PROJECT_ID:-home-credit-505106}
+      - STORAGE_LOCAL_ROOT=/app/outputs
+      - LOG_FILE_PATH=/app/logs/backend.log
+    volumes:
+      - ./app:/app/app
+      - ./main.py:/app/main.py
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

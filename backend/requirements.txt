@@ -1,12 +1,35 @@
-# FloodGuard-AI Backend Dependencies
+# =============================================================================
+# FloodGuard-AI Backend Foundation Dependencies
+# =============================================================================
+
+# Core Web Framework & Server
 fastapi>=0.110.0
 uvicorn[standard]>=0.28.0
+python-multipart>=0.0.9
+
+# Data Validation & Centralized Configuration
 pydantic>=2.6.0
+pydantic-settings>=2.2.0
+email-validator>=2.1.0
 python-dotenv>=1.0.1
-numpy>=1.26.0
-pandas>=2.2.0
-geopandas>=0.14.3
-rasterio>=1.3.9
-shapely>=2.0.3
-requests>=2.31.0
+
+# Database & ORM (Async SQLAlchemy 2.x + PostgreSQL/PostGIS)
+sqlalchemy>=2.0.28
+greenlet>=3.0.0
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.9
+geoalchemy2>=0.14.0
+alembic>=1.13.0
+aiosqlite>=0.20.0
+
+# Security & Authentication
+pyjwt>=2.8.0
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.1.0
+
+# HTTP Client & Utilities
+httpx>=0.27.0
+
+# Testing & QA
 pytest>=8.0.0
+pytest-asyncio>=0.23.0
