@@ -10,6 +10,16 @@ and modular REST API routing.
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
+
+# Ensure backend root and workspace root are always discoverable on sys.path
+_backend_dir = str(Path(__file__).resolve().parent)
+_workspace_dir = str(Path(__file__).resolve().parent.parent)
+for _path in [_backend_dir, _workspace_dir]:
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
