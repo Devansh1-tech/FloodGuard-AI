@@ -164,7 +164,7 @@ class LogTimer:
         self.elapsed: float = 0.0
 
     def __enter__(self) -> "LogTimer":
-        self.logger.info("▶ %s — started", self.label)
+        self.logger.info("[>] %s - started", self.label)
         self._start = time.perf_counter()
         return self
 
@@ -172,7 +172,7 @@ class LogTimer:
         self.elapsed = time.perf_counter() - self._start
         if exc_type is not None:
             self.logger.error(
-                "✖ %s — failed after %.2f s (%s: %s)",
+                "[x] %s - failed after %.2f s (%s: %s)",
                 self.label,
                 self.elapsed,
                 exc_type.__name__,
@@ -180,7 +180,7 @@ class LogTimer:
             )
         else:
             self.logger.info(
-                "✔ %s — completed in %.2f s",
+                "[+] %s - completed in %.2f s",
                 self.label,
                 self.elapsed,
             )

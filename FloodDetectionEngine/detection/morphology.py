@@ -190,9 +190,9 @@ class MorphologyCleaner:
         """
         Fill interior holes in the flood mask.
 
-        Strategy: label connected components of the *inverse* mask.
-        The largest component is the background; all others are holes
-        inside flooded regions and should be filled (set to 1).
+        Uses morphological closing (dilation followed by erosion) with an
+        extended structuring kernel to seal interior voids without risking
+        server-side memory limits or unbounded geometry errors.
 
         Parameters
         ----------
@@ -204,35 +204,9 @@ class MorphologyCleaner:
         ee.Image
             Mask with holes filled.
         """
-        # Invert: 1 = non-flood, 0 = flood
-        inverse = mask.Not()
-
-        # Connected components of the inverse
-        components = inverse.selfMask().connectedComponents(
-            connectedness=ee.Kernel.plus(1),
-            maxSize=1024,
-        )
-
-        # The label band contains component IDs; largest component = background
-        labels = components.select("labels")
-
-        # Compute area (pixel count) per label
-        component_area = labels.connectedPixelCount(maxSize=1024)
-
-        # Background is the largest connected region of non-flood
-        # Heuristic: background has the most pixels
-        # Set everything that is NOT background to flood (fill holes)
-        max_area = component_area.reduceRegion(
-            reducer=ee.Reducer.max(),
-            geometry=mask.geometry(),
-            scale=10,
-            maxPixels=1e10,
-            bestEffort=True,
-        ).values().get(0)
-
-        # Pixels where component area < max → they're holes → fill with 1
-        holes = component_area.lt(ee.Number(max_area))
-        filled = mask.Or(holes)
+        radius = max(2, self.config.morphology_closing_radius + 1)
+        kernel = ee.Kernel.circle(radius=radius, units="pixels")
+        filled = mask.focal_max(kernel=kernel).focal_min(kernel=kernel)
         logger.debug("Interior holes filled.")
         return filled
 
@@ -254,9 +228,9 @@ class MorphologyCleaner:
             Mask with small components removed.
         """
         mmu = self.config.min_mapping_unit_pixels
-        # Count connected pixels for each flood pixel
-        pixel_count = mask.selfMask().connectedPixelCount(maxSize=1024)
-        # Keep only components ≥ MMU
+        # Count connected pixels for each flood pixel (bounded maxSize)
+        pixel_count = mask.selfMask().connectedPixelCount(maxSize=256)
+        # Keep only components >= MMU
         filtered = mask.updateMask(pixel_count.gte(mmu))
         # Unmask back to 0 for non-flood
         filtered = filtered.unmask(0)

@@ -182,8 +182,8 @@ def _make_directional_kernels() -> list[ee.Kernel]:
     raw_kernels = [h1, h2, v1, v2, d45_1, d45_2, d135_1, d135_2]
     ee_kernels = []
     for k in raw_kernels:
-        flat = [float(val) for row in k for val in row]
-        ee_kernels.append(ee.Kernel.fixed(7, 7, flat, 3, 3, False))
+        grid = [[float(val) for val in row] for row in k]
+        ee_kernels.append(ee.Kernel.fixed(7, 7, grid, 3, 3, False))
     return ee_kernels
 
 
@@ -275,7 +275,7 @@ def refined_lee_filter(
     # Use arrayReduce approach:
     # Convert to array image, find argmin, then use it to index means/variances
     ci2_array = ci2_stack.toArray()
-    min_index = ci2_array.arrayArgmin().arrayGet([0])  # index of smallest Ci²
+    min_index = ci2_array.multiply(-1).arrayArgmax().arrayGet([0])  # index of smallest Ci² via argmax(-x)
 
     # Step 5: retrieve mean and variance for the selected direction
     mean_stack = ee.Image.cat(means).rename([f"dir_{i}" for i in range(len(means))])

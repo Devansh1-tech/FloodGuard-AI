@@ -65,6 +65,7 @@ class Vectorizer:
         self,
         flood_mask: ee.Image,
         aoi: ee.Geometry,
+        scale: Optional[int] = None,
     ) -> ee.FeatureCollection:
         """
         Convert a binary flood mask to an ``ee.FeatureCollection``
@@ -78,16 +79,19 @@ class Vectorizer:
             Clean binary mask (band ``"flood_mask"``).
         aoi : ee.Geometry
             Region to vectorise within.
+        scale : int | None
+            Resolution in metres (defaults to config.export_scale).
 
         Returns
         -------
         ee.FeatureCollection
             Flood polygons.
         """
+        eff_scale = scale or self.config.export_scale
         with LogTimer("EE vectorization", logger):
             vectors = flood_mask.selfMask().reduceToVectors(
                 geometry=aoi,
-                scale=self.config.export_scale,
+                scale=eff_scale,
                 geometryType="polygon",
                 eightConnected=True,
                 bestEffort=True,
@@ -95,7 +99,7 @@ class Vectorizer:
                 labelProperty="flood",
             )
             count = vectors.size().getInfo()
-            logger.info("EE vectorization produced %d polygon(s).", count)
+            logger.info("EE vectorization produced %d polygon(s) at scale %dm.", count, eff_scale)
             return vectors
 
     # ── Local (post-download) vectorization ─────────────────────────────

@@ -1,0 +1,31 @@
+# =============================================================================
+# SettlementImpactEngine — Python Dependencies
+# =============================================================================
+
+# Core Geospatial & Vector Processing
+geopandas>=1.0.0
+shapely>=2.0.0
+pyproj>=3.6.0
+pyogrio>=0.8.0
+
+# Raster Analysis & Zonal Statistics
+rasterio>=1.3.0
+scipy>=1.10.0
+
+# Numerical & Tabular Data
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Transportation Network Graph Analysis
+networkx>=3.0.0
+osmnx>=1.9.0
+
+# Cartography & Visualization
+matplotlib>=3.7.0
+
+# Configuration & Utilities
+python-dotenv>=1.0.0
+
+# Testing & Quality Assurance
+pytest>=7.4.0
+pytest-cov>=4.1.0

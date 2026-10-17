@@ -120,7 +120,7 @@ def otsu_threshold(
                 sharedInputs=True,
             ),
             geometry=region,
-            scale=config.export_scale,
+            scale=max(30, config.export_scale),
             maxPixels=1e10,
             bestEffort=True,
         )
@@ -157,7 +157,7 @@ def otsu_threshold(
             .subtract(cum_means)
             .pow(2)
         )
-        denominator = omega0.multiply(omega1).max(ee.Array([1e-10]))  # avoid div/0
+        denominator = omega0.multiply(omega1).add(1e-10)  # avoid div/0
         sigma_b_sq = numerator.divide(denominator)
 
         # Step 6: argmax → optimal threshold

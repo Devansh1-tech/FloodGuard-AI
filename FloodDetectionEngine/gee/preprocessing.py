@@ -250,11 +250,21 @@ class Preprocessor:
             Radiometrically normalised image in dB.
         """
         with LogTimer("Radiometric normalisation", logger):
+            try:
+                available_bands = image.bandNames().getInfo()
+            except Exception:
+                available_bands = []
+
+            if "angle" not in available_bands:
+                logger.info(
+                    "Angle band not in image (bands: %s) - skipping radiometric normalisation.",
+                    available_bands,
+                )
+                return image
+
             band_name = image.bandNames().get(0)
             reference_angle_deg = 37.0  # typical S1 IW mid-range incidence angle
 
-            # Try to use the angle band from the original S1 product
-            # If not available (e.g., after compositing loses it), skip
             try:
                 angle_band = image.select("angle")
                 ref_cos = ee.Image(
@@ -268,13 +278,12 @@ class Preprocessor:
                 normalised = image.select([band_name]).add(correction_db)
                 normalised = normalised.rename([band_name])
                 logger.info(
-                    "Radiometric normalisation applied (ref angle=%.1f°).",
+                    "Radiometric normalisation applied (ref angle=%.1f deg).",
                     reference_angle_deg,
                 )
                 return normalised
-            except Exception:
+            except Exception as exc:
                 logger.warning(
-                    "Angle band not available — skipping radiometric normalisation. "
-                    "This is expected when working with composited images."
+                    "Radiometric normalisation skipped: %s", exc
                 )
                 return image

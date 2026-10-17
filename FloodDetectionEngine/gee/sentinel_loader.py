@@ -64,7 +64,7 @@ class SentinelLoader:
         coords = config.get_aoi_coordinates()
         self.aoi: ee.Geometry = ee.Geometry.Polygon([coords])
         logger.info(
-            "SentinelLoader initialised — AOI: %s, Before: %s→%s, After: %s→%s",
+            "SentinelLoader initialised - AOI: %s, Before: %s -> %s, After: %s -> %s",
             config.aoi_name,
             config.before_start,
             config.before_end,
