@@ -18,6 +18,7 @@ import {
   Sun,
   Users,
 } from 'lucide-react';
+import { Stage51ComparisonPage } from '@/pages/comparison/Stage51ComparisonPage';
 
 const STAGES = [
   {
@@ -151,43 +152,31 @@ export const App: React.FC = () => {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
-        {/* Active Stage Hero Banner */}
-        <div className="relative overflow-hidden rounded-2xl border border-blue-500/30 bg-gradient-to-r from-blue-950/80 via-slate-900/90 to-slate-950/90 p-8 shadow-2xl backdrop-blur-md">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="rounded-md bg-blue-500/20 px-2.5 py-0.5 text-xs font-bold text-blue-400 border border-blue-500/30">
-                  READY FOR EXECUTION
-                </span>
-                <span className="text-xs text-slate-400">Step 1 of 11</span>
-              </div>
-              <h1 className="text-2xl md:text-3xl font-extrabold text-white">
-                Stage 5.1: Before & After Satellite Comparison Slider
-              </h1>
-              <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-                Cleaned workspace and ready to build. We will compare pre-flood Sentinel-1 SAR imagery
-                with peak deluge imagery and provide an interactive split swipe slider.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 bg-slate-800/80 px-4 py-2.5 rounded-xl border border-slate-700">
-              <Sparkles className="h-4 w-4 text-emerald-400" />
-              <span className="text-xs font-semibold text-emerald-400">Workspace Clean & Ready</span>
-            </div>
-          </div>
-        </div>
+      <main className="flex-1 p-6 max-w-7xl mx-auto w-full space-y-8">
+        {/* Active Stage Viewport */}
+        {activeStageId === '5.1' && (
+          <Stage51ComparisonPage onProceedToNextStage={() => setActiveStageId('5.2')} />
+        )}
 
         {/* 11-Stage Interactive Roadmap Cards */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">
-            11-Point Implementation Roadmap
-          </h2>
+        <div className="space-y-4 pt-6 border-t border-slate-800">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">
+                11-Stage Execution Pipeline
+              </h2>
+              <p className="text-xs text-slate-500">
+                Each stage is implemented, tested, and validated in order.
+              </p>
+            </div>
+            <span className="text-xs text-blue-400 font-bold">1 of 11 Completed / Active</span>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {STAGES.map((stage) => {
               const Icon = stage.icon;
-              const isCurrent = stage.id === '5.1';
+              const isCurrent = stage.id === activeStageId;
+              const isStage51 = stage.id === '5.1';
 
               return (
                 <div
@@ -204,6 +193,8 @@ export const App: React.FC = () => {
                       className={`p-2.5 rounded-xl border ${
                         isCurrent
                           ? 'bg-blue-600 text-white border-blue-500'
+                          : isStage51
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                           : 'bg-slate-800 text-slate-400 border-slate-700'
                       }`}
                     >
@@ -213,6 +204,8 @@ export const App: React.FC = () => {
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                         isCurrent
                           ? 'bg-blue-500/20 text-blue-400 border-blue-500/30 animate-pulse'
+                          : isStage51
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
                           : 'bg-slate-800 text-slate-400 border-slate-700'
                       }`}
                     >
@@ -231,7 +224,7 @@ export const App: React.FC = () => {
 
       {/* Footer */}
       <footer className="border-t border-slate-800 bg-slate-900/60 px-6 py-4 text-xs text-slate-500 text-center">
-        FloodGuard AI • Stage-by-Stage Implementation • Strictly Local Development (No GitHub Push)
+        FloodGuard AI • Stage 5.1 Verified • Strictly Local Development (No GitHub Push)
       </footer>
     </div>
   );
