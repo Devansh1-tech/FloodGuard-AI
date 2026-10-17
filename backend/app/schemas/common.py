@@ -20,6 +20,7 @@ class ApiResponse(BaseModel, Generic[T]):
     data: T
     message: Optional[str] = None
     timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+    request_id: Optional[str] = None
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
@@ -29,3 +30,22 @@ class PaginatedResponse(BaseModel, Generic[T]):
     skip: int
     limit: int
     timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+    request_id: Optional[str] = None
+
+
+def make_response(
+    data: T,
+    message: Optional[str] = None,
+    request: Optional[Any] = None,
+    request_id: Optional[str] = None,
+) -> ApiResponse[T]:
+    """Helper to construct standardized ApiResponse envelope with request_id."""
+    req_id = request_id
+    if not req_id and request and hasattr(request, "state"):
+        req_id = getattr(request.state, "request_id", None)
+    return ApiResponse(
+        data=data,
+        message=message,
+        request_id=req_id,
+    )
+

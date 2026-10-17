@@ -109,6 +109,11 @@ class Settings(BaseSettings):
         )
 
     @property
+    def DATABASE_URL(self) -> str:
+        """Uppercase alias for database connection URI."""
+        return self.database_url
+
+    @property
     def cors_origins_list(self) -> List[str]:
         return self.CORS_ORIGINS
 

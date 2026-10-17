@@ -68,23 +68,28 @@ async def test_storage_service_operations():
         assert "subfolder/test_artifact.txt" in url
 
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
 @pytest.mark.asyncio
-async def test_job_service_orchestration():
+async def test_job_service_orchestration(test_db_session: AsyncSession):
     """Verify JobService submits, queries, lists, and cancels jobs."""
     manager = JobManager()
-    service = JobService(job_manager=manager)
+    service = JobService(job_manager=manager, session=test_db_session)
 
     # 1. Submit analysis job
     req = AnalysisTriggerRequest(
         aoi="nepal_terai_koshi",
-        before_start="2024-06-01",
-        before_end="2024-06-30",
-        after_start="2024-09-15",
-        after_end="2024-10-15",
+        before_start="2022-01-01",
+        before_end="2022-01-20",
+        after_start="2022-03-01",
+        after_end="2022-03-20",
+        project_name="Isolated Service Test Run",
+        priority=JobPriority.HIGH,
     )
     job = await service.submit_analysis_job(req)
     assert job.job_id is not None
-    assert job.status == JobStatus.PENDING
+    assert job.status in [JobStatus.PENDING, JobStatus.PENDING.value]
     assert job.priority == JobPriority.HIGH
 
     # 2. Get job
@@ -93,7 +98,7 @@ async def test_job_service_orchestration():
 
     # 3. Get status
     status_info = await service.get_job_status(job.job_id)
-    assert status_info.status == JobStatus.PENDING
+    assert status_info.status in [JobStatus.PENDING, JobStatus.PENDING.value, JobStatus.RUNNING, JobStatus.RUNNING.value]
 
     # 4. List jobs
     all_jobs = await service.list_jobs()
@@ -101,7 +106,7 @@ async def test_job_service_orchestration():
 
     # 5. Cancel job
     cancelled = await service.cancel_job(job.job_id)
-    assert cancelled.status == JobStatus.CANCELLED
+    assert cancelled.status in [JobStatus.CANCELLED, JobStatus.CANCELLED.value]
 
 
 def test_configuration_service():

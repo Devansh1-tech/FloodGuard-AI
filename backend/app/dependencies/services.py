@@ -3,14 +3,20 @@ services.py — Service Layer Dependency Injection
 =================================================
 
 FastAPI dependency providers instantiating and injecting service layer
-singletons or instances into route controllers.
+components with scoped database sessions and singletons into route controllers.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Optional
 
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.dependencies.database import get_db
 from app.jobs.manager import JobManager
+from app.services.artifact import ArtifactService
 from app.services.configuration import ConfigurationService
 from app.services.health import HealthService
 from app.services.job import JobService
@@ -43,23 +49,30 @@ def get_pipeline_service() -> PipelineService:
 
 
 @lru_cache(maxsize=1)
-def get_report_service() -> ReportService:
-    """Dependency injecting ReportService."""
-    return ReportService()
-
-
-@lru_cache(maxsize=1)
 def get_storage_service() -> StorageService:
     """Dependency injecting StorageService."""
     return StorageService()
 
 
-def get_job_service() -> JobService:
-    """Dependency injecting JobService backed by the shared JobManager."""
-    return JobService(job_manager=get_shared_job_manager())
+def get_report_service(db: AsyncSession = Depends(get_db)) -> ReportService:
+    """Dependency injecting ReportService with scoped database session."""
+    return ReportService(session=db)
 
 
-@lru_cache(maxsize=1)
-def get_configuration_service() -> ConfigurationService:
-    """Dependency injecting ConfigurationService."""
-    return ConfigurationService()
+def get_artifact_service(db: AsyncSession = Depends(get_db)) -> ArtifactService:
+    """Dependency injecting ArtifactService with scoped database session."""
+    return ArtifactService(session=db)
+
+
+def get_job_service(db: AsyncSession = Depends(get_db)) -> JobService:
+    """Dependency injecting JobService backed by the shared JobManager and session."""
+    return JobService(
+        session=db,
+        job_manager=get_shared_job_manager(),
+        pipeline_service=get_pipeline_service(),
+    )
+
+
+def get_configuration_service(db: AsyncSession = Depends(get_db)) -> ConfigurationService:
+    """Dependency injecting ConfigurationService with scoped database session."""
+    return ConfigurationService(session=db)

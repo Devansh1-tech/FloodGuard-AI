@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.v1.analysis import router as analysis_router
+from app.api.v1.artifacts import router as artifacts_router
 from app.api.v1.downloads import router as downloads_router
 from app.api.v1.health import router as health_router
 from app.api.v1.jobs import router as jobs_router
@@ -23,5 +24,6 @@ api_v1_router.include_router(health_router)
 api_v1_router.include_router(analysis_router)
 api_v1_router.include_router(jobs_router)
 api_v1_router.include_router(reports_router)
+api_v1_router.include_router(artifacts_router)
 api_v1_router.include_router(downloads_router)
 api_v1_router.include_router(system_router)
