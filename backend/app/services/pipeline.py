@@ -228,11 +228,16 @@ class PipelineService(BaseService):
                     job.completed_at = datetime.datetime.now(datetime.timezone.utc)
                     job.duration = duration_sec
 
-                # B. Create PipelineRun
+                # B. Create PipelineRun with collision-safe unique execution_id
                 meta = res.metadata if hasattr(res, "metadata") else {}
+                base_exec_id = res.execution_id or f"run_{uuid.uuid4().hex[:12]}"
+                stmt_check_exec = select(PipelineRun.id).where(PipelineRun.execution_id == base_exec_id)
+                collision = (await session.execute(stmt_check_exec)).scalars().first()
+                final_exec_id = f"{base_exec_id}_{uuid.uuid4().hex[:6]}" if collision else base_exec_id
+
                 pipeline_run = PipelineRun(
                     job_id=job_id,
-                    execution_id=res.execution_id or f"run_{uuid.uuid4().hex[:12]}",
+                    execution_id=final_exec_id,
                     pipeline_version=meta.get("pipeline_version", "1.0.0"),
                     stage2_version=meta.get("stage2_version", "1.0.0"),
                     stage3_version=meta.get("stage3_version", "1.0.0"),
@@ -440,20 +445,15 @@ class PipelineService(BaseService):
 
                 # I. Create GeneratedArtifact records with typed discrimination
                 def _resolve_artifact_type(key: str, path: str) -> ArtifactType:
-                    lk = key.lower()
                     lp = path.lower()
-                    if "building" in lk or "building" in lp:
-                        return ArtifactType.AFFECTED_BUILDINGS_GEOJSON
-                    if "road" in lk or "road" in lp:
-                        return ArtifactType.AFFECTED_ROADS_GEOJSON
-                    if "hospital" in lk or "school" in lk or "police" in lk or "infra" in lk:
-                        return ArtifactType.INFRASTRUCTURE_GEOJSON
                     if lp.endswith(".tif") or lp.endswith(".tiff"):
-                        return ArtifactType.FLOOD_EXTENT_TIFF
+                        return ArtifactType.FLOOD_MASK_GEOTIFF
                     if lp.endswith(".png") or lp.endswith(".jpg"):
                         return ArtifactType.CARTOGRAPHIC_MAP_PNG
                     if lp.endswith(".csv"):
                         return ArtifactType.IMPACT_CSV
+                    if lp.endswith(".json") and not lp.endswith(".geojson"):
+                        return ArtifactType.AUDIT_METADATA_JSON
                     return ArtifactType.FLOOD_POLYGON_GEOJSON
 
                 all_artifact_sources = [
