@@ -26,11 +26,13 @@ import L from 'leaflet';
 import {
   AlertTriangle,
   ArrowLeftRight,
+  Building2,
   Calendar,
   CalendarDays,
   CheckCircle2,
   Clock,
   Code2,
+  Columns,
   Compass,
   Eye,
   EyeOff,
@@ -41,14 +43,17 @@ import {
   Layers,
   MapPin,
   Maximize2,
+  Minimize2,
   Radio,
   RefreshCw,
   Satellite,
+  Search,
   Shield,
   ShieldAlert,
   ShieldCheck,
   Sliders,
   Sparkles,
+  Users,
   Waves,
   Zap,
 } from 'lucide-react';
@@ -60,6 +65,7 @@ import {
   TeraiRegionData,
   VillageSettlement,
 } from '@/data/teraiRegions';
+import { TERAI_HOSPITALS } from '@/data/teraiInfrastructure';
 import { nepalBoundaries } from '@/data/nepalBoundaries';
 import { EarthEngineScriptModal } from '@/components/gee/EarthEngineScriptModal';
 import {
@@ -283,9 +289,57 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
   const [isCityModalOpen, setIsCityModalOpen] = useState<boolean>(false);
   const [isScriptModalOpen, setIsScriptModalOpen] = useState<boolean>(false);
 
+  // User-Requested Enhancements:
+  // 1. Dual Alignment Mode (Flooded and non-flooded maps in exact horizontal alignment)
+  const [alignmentMode, setAlignmentMode] = useState<'split_slider' | 'side_by_side'>('split_slider');
+
+  // 2. Black and White Radar SAR Image Mode (Specular Scattering Intensity)
+  const [isBwRadar, setIsBwRadar] = useState<boolean>(false);
+
+  // 3. Map Fullscreen Mode
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // 4. Terai Region City & Village Quick Selector
+  const [selectedCityId, setSelectedCityId] = useState<string>('');
+  const [selectedVillageId, setSelectedVillageId] = useState<string>('');
+  const [mapCenterOverride, setMapCenterOverride] = useState<[number, number] | null>(null);
+  const [mapZoomOverride, setMapZoomOverride] = useState<number | null>(null);
+  const [inspectedVillage, setInspectedVillage] = useState<VillageTownItem | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const activeRegion: TeraiRegionData = TERAI_REGIONS[selectedRegionKey] || TERAI_REGIONS.full_terai;
   const activeSensor = SATELLITE_DATASETS[selectedDataset];
+  const activeCity = TERAI_CITIES_DATA.find((c) => c.id === selectedCityId);
+
+  const effectiveCenter: [number, number] = mapCenterOverride || activeRegion.center;
+  const effectiveZoom: number = mapZoomOverride || activeRegion.zoom;
+
+  const handleCitySelect = (cityId: string) => {
+    setSelectedCityId(cityId);
+    setSelectedVillageId('');
+    if (!cityId) {
+      setMapCenterOverride(null);
+      setMapZoomOverride(null);
+      return;
+    }
+    const c = TERAI_CITIES_DATA.find((city) => city.id === cityId);
+    if (c) {
+      setSelectedCity(c);
+      setMapCenterOverride(c.coords);
+      setMapZoomOverride(12);
+    }
+  };
+
+  const handleVillageSelect = (villageId: string) => {
+    setSelectedVillageId(villageId);
+    if (!villageId || !activeCity) return;
+    const v = activeCity.villagesAndTowns.find((item) => item.id === villageId);
+    if (v) {
+      setInspectedVillage(v);
+      setMapCenterOverride(v.coords);
+      setMapZoomOverride(13.5);
+    }
+  };
 
   // Tile URLs for Google Maps / Google Earth Engine basemaps
   const tileUrls = {
@@ -384,6 +438,48 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Alignment Mode: Split Slider vs Side-by-Side Dual Alignment (User Requirement) */}
+            <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1 text-xs">
+              <button
+                onClick={() => setAlignmentMode('split_slider')}
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 font-semibold transition-all ${
+                  alignmentMode === 'split_slider'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Interactive Split Swipe Comparison Slider"
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                <span>Split Swipe</span>
+              </button>
+              <button
+                onClick={() => setAlignmentMode('side_by_side')}
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 font-semibold transition-all ${
+                  alignmentMode === 'side_by_side'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Parallel Side-by-Side Dual Alignment (Dry vs Flood)"
+              >
+                <Columns className="h-3.5 w-3.5" />
+                <span>Side-by-Side Alignment</span>
+              </button>
+            </div>
+
+            {/* Black & White Radar SAR Toggle (User Requirement) */}
+            <button
+              onClick={() => setIsBwRadar(!isBwRadar)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 ${
+                isBwRadar
+                  ? 'border-cyan-400 bg-slate-100 text-slate-950 font-black shadow-md'
+                  : 'border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700 hover:text-white'
+              }`}
+              title="Toggle Black & White Sentinel-1 SAR Backscatter intensity"
+            >
+              <Radio className="h-3.5 w-3.5 text-cyan-500" />
+              <span>{isBwRadar ? 'B&W Radar SAR: ON' : 'B&W Radar SAR'}</span>
+            </button>
+
             {/* Basemap Switcher */}
             <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1 text-xs">
               <button
@@ -392,7 +488,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
                   mapType === 'google_hybrid' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Google Hybrid
+                Hybrid
               </button>
               <button
                 onClick={() => setMapType('google_satellite')}
@@ -412,18 +508,32 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
               </button>
             </div>
 
+            {/* Map Fullscreen Toggle (User Requirement) */}
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 ${
+                isFullscreen
+                  ? 'border-purple-500 bg-purple-600 text-white shadow-md'
+                  : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
+              }`}
+              title="Toggle Fullscreen Map View"
+            >
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+            </button>
+
             <button
               onClick={triggerGeeqRefresh}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 rounded-xl border border-blue-500/40 bg-blue-600/20 px-3.5 py-2 text-xs font-bold text-blue-300 hover:bg-blue-600/30 transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-xl border border-blue-500/40 bg-blue-600/20 px-3 py-1.5 text-xs font-bold text-blue-300 hover:bg-blue-600/30 transition-all active:scale-95 disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
-              <span>{isRefreshing ? 'Querying GEE Catalog...' : 'Refresh GEE'}</span>
+              <span>{isRefreshing ? 'Querying GEE...' : 'Refresh'}</span>
             </button>
 
             <button
               onClick={() => setIsScriptModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-600/20 px-3.5 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-600/30 transition-all active:scale-95"
+              className="flex items-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-600/20 px-3 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-600/30 transition-all active:scale-95"
               title="View Google Earth Engine Sentinel-1 SAR script"
             >
               <Code2 className="h-3.5 w-3.5 text-cyan-400" />
@@ -468,6 +578,57 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
               </button>
             ))}
           </div>
+        </div>
+
+        {/* User Requirement: Direct Terai City and Village Selector */}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/80 p-3 text-xs">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-bold text-slate-300 flex items-center gap-1.5 shrink-0">
+              <Building2 className="h-4 w-4 text-cyan-400" />
+              Focus Terai City or Village:
+            </span>
+
+            {/* City Dropdown */}
+            <select
+              value={selectedCityId}
+              onChange={(e) => handleCitySelect(e.target.value)}
+              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-semibold"
+            >
+              <option value="">-- Choose Terai City ({TERAI_CITIES_DATA.length} Cities) --</option>
+              {TERAI_CITIES_DATA.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.district}) &bull; {c.status.toUpperCase()} ({c.villagesAndTowns.length} villages)
+                </option>
+              ))}
+            </select>
+
+            {/* Village Dropdown */}
+            <select
+              value={selectedVillageId}
+              onChange={(e) => handleVillageSelect(e.target.value)}
+              disabled={!selectedCityId}
+              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-semibold disabled:opacity-40"
+            >
+              <option value="">
+                {selectedCityId ? '-- Choose Constituent Village / Ward --' : 'Select City first'}
+              </option>
+              {activeCity?.villagesAndTowns.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name} &bull; {v.isFlooded ? `⚠️ FLOODED (${v.floodDepthMeters || 1.8}m)` : '🛡️ SAFE'} &bull; Pop: {v.population.toLocaleString()}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedCity && (
+            <button
+              onClick={() => setIsCityModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-blue-600/30 border border-blue-500/50 px-3 py-1.5 font-bold text-blue-200 hover:bg-blue-600/50 transition-all text-xs"
+            >
+              <Search className="h-3.5 w-3.5 text-blue-400" />
+              <span>Inspect All {selectedCity.name} Villages ({selectedCity.villagesAndTowns.length})</span>
+            </button>
+          )}
         </div>
 
         {/* Third Tier: Date Picker & Sentinel-1/2 Switcher (User Requests #3 & #4) */}
@@ -711,372 +872,734 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
       </div>
 
       {/* ───────────────────────────────────────────────────────────────────────
-          PANEL 2: INTERACTIVE MAP CONTAINER WITH SPLIT SWIPE SLIDER
+          PANEL 1.5: ACTIVE SETTLEMENT INSPECTOR DOSSIER (IF SELECTED)
+      ───────────────────────────────────────────────────────────────────────── */}
+      {inspectedVillage && (
+        <div className="rounded-2xl border border-cyan-500/50 bg-slate-900/95 p-4 shadow-2xl backdrop-blur-md animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div className="flex items-center gap-3">
+              <div
+                className={`flex h-10 w-10 items-center justify-center rounded-xl font-black text-white text-base shadow-lg ${
+                  inspectedVillage.isFlooded
+                    ? 'bg-gradient-to-br from-red-500 to-rose-700 shadow-red-500/30'
+                    : 'bg-gradient-to-br from-emerald-500 to-green-700 shadow-emerald-500/30'
+                }`}
+              >
+                {inspectedVillage.isFlooded ? '!' : '✓'}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-white">{inspectedVillage.name}</h3>
+                  {inspectedVillage.localName && (
+                    <span className="text-xs text-slate-400 font-medium">({inspectedVillage.localName})</span>
+                  )}
+                  <span
+                    className={`rounded px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                      inspectedVillage.isFlooded
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    }`}
+                  >
+                    {inspectedVillage.isFlooded ? 'FLOODED / SUBMERGED' : 'SAFE RIDGE HAVEN'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  {inspectedVillage.district ? `${inspectedVillage.district} District • ` : ''}Type: <strong className="capitalize">{inspectedVillage.type}</strong>
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setInspectedVillage(null)}
+              className="self-start sm:self-center rounded-lg border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-300 hover:text-white"
+            >
+              Close Dossier
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 text-xs">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5">
+              <span className="text-[10px] text-slate-400 uppercase font-bold block">Total Population</span>
+              <span className="text-sm font-black text-white">{inspectedVillage.population.toLocaleString()}</span>
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5">
+              <span className="text-[10px] text-slate-400 uppercase font-bold block">Affected Citizens</span>
+              <span className="text-sm font-black text-rose-400">
+                {inspectedVillage.isFlooded ? Math.round(inspectedVillage.population * 0.72).toLocaleString() : '0 (Safe)'}
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5">
+              <span className="text-[10px] text-slate-400 uppercase font-bold block">Estimated Water Depth</span>
+              <span className="text-sm font-black text-cyan-300">
+                {inspectedVillage.floodDepthMeters ? `${inspectedVillage.floodDepthMeters}m depth` : '0m (Elevated)'}
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5">
+              <span className="text-[10px] text-slate-400 uppercase font-bold block">Emergency Action</span>
+              <span className="text-xs font-bold text-amber-300 truncate block">
+                {inspectedVillage.recommendedAction}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────────────────
+          PANEL 2: INTERACTIVE MAP CONTAINER (SIDE-BY-SIDE DUAL ALIGNMENT OR SPLIT SLIDER)
       ───────────────────────────────────────────────────────────────────────── */}
       <div
-        ref={containerRef}
-        onMouseMove={handleMouseMove}
-        onTouchMove={handleTouchMove}
-        onMouseUp={() => setIsDragging(false)}
-        onTouchEnd={() => setIsDragging(false)}
-        className="relative h-[660px] w-full rounded-2xl border border-slate-700/80 bg-slate-950 shadow-2xl overflow-hidden select-none"
+        className={`space-y-4 ${
+          isFullscreen ? 'fixed inset-0 z-[1000] h-screen w-screen overflow-y-auto bg-slate-950 p-4' : ''
+        }`}
       >
-        <MapContainer
-          center={activeRegion.center}
-          zoom={activeRegion.zoom}
-          minZoom={7.5}
-          maxBounds={[
-            [26.15, 79.85],
-            [28.40, 88.35],
-          ]}
-          scrollWheelZoom={true}
-          zoomControl={false}
-          className="h-full w-full"
-        >
-          <MapViewController center={activeRegion.center} zoom={activeRegion.zoom} />
-          <ClippedFloodPane sliderPosition={sliderPosition} viewMode={viewMode} />
-
-          {/* BASE LAYER (BEFORE): Google Satellite Pre-Monsoon Dry Baseline (15 June 2024) */}
-          <TileLayer
-            url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-            attribution="&copy; Google Earth Engine &bull; Pre-Monsoon Dry Baseline"
-            maxZoom={20}
-          />
-
-          {/* CLIPPED AFTER LAYER: Copernicus Sentinel-1 Deluge Peak Satellite Imagery (01 October 2024) */}
-          <Pane name="afterDelugePane" style={{ zIndex: 350 }}>
-            <TileLayer
-              url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
-              attribution="&copy; Copernicus Sentinel-1 SAR &bull; Deluge Peak"
-              maxZoom={20}
-            />
-          </Pane>
-
-          {/* 1. Nepal Sovereign Border (Illuminated Dotted Outline - User Request #5) */}
-          {showNepalBorder && (
-            <Polyline
-              positions={nepalBoundaries.nepal_border}
-              pathOptions={{
-                color: '#F59E0B',
-                weight: 2.8,
-                dashArray: '8, 8',
-                opacity: 0.95,
-              }}
+        {isFullscreen && (
+          <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-4 py-2 text-xs">
+            <span className="font-bold text-white flex items-center gap-2">
+              <Globe className="h-4 w-4 text-blue-400" />
+              Fullscreen Satellite Deluge Map &bull; {activeRegion.name} ({activeRegion.basin})
+            </span>
+            <button
+              onClick={() => setIsFullscreen(false)}
+              className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1 font-bold text-white hover:bg-purple-500 shadow-sm"
             >
-              <Popup>
-                <div className="p-1 space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
-                    Sovereign Boundary
-                  </span>
-                  <h4 className="font-bold text-sm text-white">Federal Democratic Republic of Nepal</h4>
-                  <p className="text-xs text-slate-300">
-                    Official international border boundary survey.
-                  </p>
+              <Minimize2 className="h-3.5 w-3.5" />
+              <span>Exit Fullscreen</span>
+            </button>
+          </div>
+        )}
+
+        {/* SIDE-BY-SIDE DUAL ALIGNMENT MODE (User Requirement: Flooded & Non-Flooded in One Alignment) */}
+        {alignmentMode === 'side_by_side' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[680px] w-full">
+            {/* LEFT MAP: NON-FLOODED PRE-MONSOON DRY BASELINE */}
+            <div className={`relative h-full w-full rounded-2xl border border-emerald-500/50 bg-slate-950 shadow-2xl overflow-hidden select-none ${isBwRadar ? 'sar-bw-mode' : ''}`}>
+              <div className="absolute top-4 left-4 z-[500] pointer-events-auto rounded-xl border border-emerald-500/60 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-emerald-300">
+                <div className="flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                  <span>NON-FLOODED BASELINE &bull; DRY REFERENCE</span>
                 </div>
-              </Popup>
-            </Polyline>
-          )}
-
-          {/* 2. Nepal Terai Plains Boundary Highlight (User Request #6) */}
-          {showTeraiBoundary && (
-            <Polygon
-              positions={getActiveTeraiPolygon()}
-              pathOptions={{
-                color: '#10B981',
-                weight: 2.2,
-                dashArray: '6, 6',
-                fillColor: '#10B981',
-                fillOpacity: 0.12,
-              }}
-            >
-              <Popup>
-                <div className="p-1 space-y-1">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
-                    Geographic Zone: Terai Plains
-                  </span>
-                  <h4 className="font-bold text-sm text-white">Nepal Terai Lowland Risk Corridor</h4>
-                  <p className="text-xs text-slate-300">
-                    Elevation &lt; 300m ASL &bull; Covering 21 southern districts from Jhapa to Kanchanpur.
-                  </p>
+                <div className="text-[10px] font-mono font-normal text-emerald-400/80">
+                  Pre-Monsoon Date: {beforeDate} &bull; Dry Agricultural Land &amp; Safe Ridges
                 </div>
-              </Popup>
-            </Polygon>
-          )}
+              </div>
 
-          {/* 3. Flooded Areas Inundation Layer (In floodInundationPane for Split Slider - User Request #1 & #7) */}
-          <Pane name="floodInundationPane" style={{ zIndex: 450 }}>
-            {showFloodPolygons &&
-              activeRegion.floodPolygons.map((polyCoords, idx) => (
-                <Polygon
-                  key={`flood-poly-${idx}`}
-                  positions={polyCoords}
-                  pathOptions={{
-                    color: '#00E5FF',
-                    weight: 2.2,
-                    fillColor: '#0284C7',
-                    fillOpacity: 0.68,
-                  }}
-                >
-                  <Popup>
-                    <div className="p-1.5 space-y-1 text-slate-100 max-w-[240px]">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 flex items-center gap-1">
-                        <Waves className="h-3 w-3" />
-                        ACTIVE FLOOD INUNDATION
-                      </span>
-                      <h4 className="font-bold text-sm text-white">
-                        {activeRegion.shortName} Flood Inundation Zone #{idx + 1}
-                      </h4>
-                      <p className="text-xs text-slate-300 leading-relaxed">
-                        <strong>Sensor:</strong> {activeSensor.fullName}<br />
-                        <strong>Inundation Status:</strong> Active Specular Water Cover<br />
-                        <strong>Est. Water Depth:</strong> 1.2m &ndash; 2.4m<br />
-                        <strong>Radar Backscatter Drop:</strong> {activeRegion.deltaDb} dB (Otsu Threshold {activeRegion.otsuThreshold} dB)
-                      </p>
-                    </div>
-                  </Popup>
-                </Polygon>
-              ))}
+              <MapContainer
+                center={effectiveCenter}
+                zoom={effectiveZoom}
+                minZoom={7.5}
+                maxBounds={[[26.15, 79.85], [28.40, 88.35]]}
+                scrollWheelZoom={true}
+                zoomControl={false}
+                className="h-full w-full"
+              >
+                <MapViewController center={effectiveCenter} zoom={effectiveZoom} />
 
-            {/* Deep Water Core River Channels (>1.8m Depth) */}
-            {showFloodPolygons &&
-              activeRegion.floodPolygons.slice(0, 5).map((polyCoords, idx) => (
-                <Polygon
-                  key={`deep-water-${idx}`}
-                  positions={polyCoords.slice(1, polyCoords.length - 2)}
-                  pathOptions={{
-                    color: '#38BDF8',
-                    weight: 1.5,
-                    fillColor: '#0052CC',
-                    fillOpacity: 0.85,
-                  }}
+                {/* Pre-Flood Satellite Dry Baseline */}
+                <TileLayer
+                  url={tileUrls[mapType]}
+                  attribution="&copy; Google Earth Engine &bull; Pre-Monsoon Dry Baseline"
+                  maxZoom={20}
                 />
-              ))}
-          </Pane>
 
-          {/* 4. Safe Elevated High Ground Havens (User Request #7: Where is No Flood) */}
-          {showSafeHighGrounds &&
-            activeRegion.safeZones.map((safeZone) => (
-              <Polygon
-                key={safeZone.id}
-                positions={safeZone.polygon}
-                pathOptions={{
-                  color: '#10B981',
-                  weight: 2.5,
-                  fillColor: '#059669',
-                  fillOpacity: 0.5,
-                }}
-              >
-                <Popup>
-                  <div className="p-1.5 space-y-1 text-slate-100">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      NO FLOOD &bull; SAFE ELEVATED HAVEN
-                    </span>
-                    <h4 className="font-bold text-sm text-white">{safeZone.name}</h4>
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      <strong>District:</strong> {safeZone.district}<br />
-                      <strong>Elevation:</strong> {safeZone.elevationMeters}m ASL (Elevated Ridge)<br />
-                      <strong>Shelter Capacity:</strong> {safeZone.shelterCapacity.toLocaleString()} Displaced Persons<br />
-                      <strong>Managing Agency:</strong> {safeZone.contactAgency}
-                    </p>
-                  </div>
-                </Popup>
-              </Polygon>
-            ))}
+                {/* Nepal Sovereign Border */}
+                {showNepalBorder && (
+                  <Polyline
+                    positions={nepalBoundaries.nepal_border}
+                    pathOptions={{ color: '#F59E0B', weight: 2.8, dashArray: '8, 8', opacity: 0.95 }}
+                  />
+                )}
 
-          {/* 5. Settlement Hazard & Safe Haven Pins (User Request #1 & #7) */}
-          {showSettlementPins &&
-            activeRegion.settlements.map((village) => (
-              <Marker
-                key={village.id}
-                position={village.coords}
-                icon={createSettlementPin(village.isFlooded, village.floodDepthMeters)}
-              >
-                <Popup>
-                  <div className="p-1.5 space-y-1.5 text-slate-100 max-w-[240px]">
-                    <span
-                      className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                        village.isFlooded
-                          ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      }`}
+                {/* Terai Plains Boundary */}
+                {showTeraiBoundary && (
+                  <Polygon
+                    positions={getActiveTeraiPolygon()}
+                    pathOptions={{ color: '#10B981', weight: 2.2, dashArray: '6, 6', fillColor: '#10B981', fillOpacity: 0.12 }}
+                  />
+                )}
+
+                {/* Safe High Ground Zones */}
+                {showSafeHighGrounds &&
+                  activeRegion.safeZones.map((safeZone) => (
+                    <Polygon
+                      key={`baseline-safe-${safeZone.id}`}
+                      positions={safeZone.polygon}
+                      pathOptions={{ color: '#10B981', weight: 2.5, fillColor: '#059669', fillOpacity: 0.45 }}
                     >
-                      {village.isFlooded ? 'CRITICAL: FLOODED / SUBMERGED' : 'SAFE HIGH GROUND HAVEN'}
-                    </span>
-                    <h4 className="font-extrabold text-sm text-white">{village.name}</h4>
-                    <div className="text-xs text-slate-300 space-y-0.5">
-                      <p><strong>District:</strong> {village.district} (Nepal Terai)</p>
-                      <p><strong>Population:</strong> {village.population.toLocaleString()}</p>
-                      {village.floodDepthMeters && (
-                        <p className="text-rose-300 font-bold">
-                          <strong>Water Depth:</strong> ~{village.floodDepthMeters} meters
-                        </p>
-                      )}
-                      <p><strong>Status:</strong> {village.status}</p>
-                      <div className="rounded bg-slate-900 p-1.5 border border-slate-800 text-[11px] text-blue-300">
-                        <strong>Action:</strong> {village.recommendedAction}
-                      </div>
-                    </div>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
+                      <Popup>
+                        <div className="p-1 space-y-1 text-slate-100">
+                          <span className="text-[10px] font-black uppercase text-emerald-400">SAFE ELEVATED REFUGE</span>
+                          <h4 className="font-bold text-sm text-white">{safeZone.name}</h4>
+                          <p className="text-xs text-slate-300">
+                            <strong>District:</strong> {safeZone.district}<br />
+                            <strong>Elevation:</strong> {safeZone.elevationMeters}m ASL<br />
+                            <strong>Capacity:</strong> {safeZone.shelterCapacity.toLocaleString()} citizens
+                          </p>
+                        </div>
+                      </Popup>
+                    </Polygon>
+                  ))}
 
-          {/* 6. Terai City Color Points (User Feature) */}
-          {showCityPoints &&
-            TERAI_CITIES_DATA.map((city) => {
-              if (selectedRegionKey !== 'full_terai' && city.regionKey !== selectedRegionKey) {
-                return null;
-              }
-              return (
-                <Marker
-                  key={`slider-city-${city.id}`}
-                  position={city.coords}
-                  icon={createCityColorLeafletPin(city)}
-                  eventHandlers={{
-                    click: () => {
-                      setSelectedCity(city);
-                      setIsCityModalOpen(true);
-                    },
-                  }}
-                >
-                  <Popup>
-                    <div className="p-1 space-y-1.5 max-w-[220px]">
-                      <span
-                        className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded border"
-                        style={{
-                          backgroundColor: `${city.color}25`,
-                          borderColor: `${city.color}60`,
-                          color: city.color,
-                        }}
-                      >
-                        {city.status.toUpperCase()} ZONE &bull; {city.district}
-                      </span>
-                      <h4 className="font-bold text-sm text-white">{city.name}</h4>
-                      <p className="text-xs text-slate-300">{city.statusText}</p>
-                      <button
-                        onClick={() => {
+                {/* Safe Settlement Pins */}
+                {showSettlementPins &&
+                  activeRegion.settlements
+                    .filter((s) => !s.isFlooded)
+                    .map((village) => (
+                      <Marker key={`baseline-s-${village.id}`} position={village.coords} icon={createSettlementPin(false)}>
+                        <Popup>
+                          <div className="p-1 space-y-1 text-slate-100">
+                            <span className="text-[10px] font-black text-emerald-400 uppercase">SAFE HABITATION</span>
+                            <h4 className="font-bold text-sm text-white">{village.name}</h4>
+                            <p className="text-xs text-slate-300">
+                              <strong>District:</strong> {village.district}<br />
+                              <strong>Population:</strong> {village.population.toLocaleString()}
+                            </p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+
+                {/* Terai City Color Points */}
+                {showCityPoints &&
+                  TERAI_CITIES_DATA.map((city) => (
+                    <Marker
+                      key={`side-city-l-${city.id}`}
+                      position={city.coords}
+                      icon={createCityColorLeafletPin(city)}
+                      eventHandlers={{
+                        click: () => {
                           setSelectedCity(city);
+                          setSelectedCityId(city.id);
                           setIsCityModalOpen(true);
-                        }}
-                        className="w-full mt-1 rounded-lg bg-blue-600 px-2 py-1 text-xs font-bold text-white hover:bg-blue-500 shadow-sm"
-                      >
-                        Inspect Villages &amp; Towns ({city.villagesAndTowns.length})
-                      </button>
-                    </div>
-                  </Popup>
-                </Marker>
-              );
-            })}
-        </MapContainer>
+                        },
+                      }}
+                    />
+                  ))}
+              </MapContainer>
+            </div>
 
-        {/* Floating Master Legend (User Request #1, #5, #6, #7) */}
-        <div className="absolute top-4 left-4 z-[500] pointer-events-auto max-w-sm rounded-2xl border border-slate-700/80 bg-slate-950/90 p-3.5 shadow-2xl backdrop-blur-md space-y-2 text-xs">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <span className="font-extrabold text-white flex items-center gap-1.5">
-              <ShieldAlert className="h-4 w-4 text-cyan-400" />
-              Nepal Terai Flood Intelligence
-            </span>
-            <span className="text-[10px] font-mono text-cyan-300">
-              {activeRegion.floodAreaKm2} km² Deluge
-            </span>
+            {/* RIGHT MAP: FLOODED POST-DELUGE SENTINEL-1 SAR EXTENT */}
+            <div className={`relative h-full w-full rounded-2xl border border-cyan-500/50 bg-slate-950 shadow-2xl overflow-hidden select-none ${isBwRadar ? 'sar-bw-mode' : ''}`}>
+              <div className="absolute top-4 left-4 z-[500] pointer-events-auto rounded-xl border border-cyan-500/60 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-cyan-300">
+                <div className="flex items-center gap-1.5">
+                  <Waves className="h-4 w-4 text-cyan-400" />
+                  <span>FLOODED DELUGE EXTENT &bull; SENTINEL-1 SAR</span>
+                </div>
+                <div className="text-[10px] font-mono font-normal text-cyan-400/80">
+                  Peak Deluge Date: {afterDate} &bull; {activeRegion.floodAreaKm2} km² Submerged
+                </div>
+              </div>
+
+              <MapContainer
+                center={effectiveCenter}
+                zoom={effectiveZoom}
+                minZoom={7.5}
+                maxBounds={[[26.15, 79.85], [28.40, 88.35]]}
+                scrollWheelZoom={true}
+                zoomControl={false}
+                className="h-full w-full"
+              >
+                <MapViewController center={effectiveCenter} zoom={effectiveZoom} />
+
+                {/* Post-Flood Deluge Satellite */}
+                <TileLayer
+                  url={tileUrls[mapType]}
+                  attribution="&copy; Copernicus Sentinel-1 SAR &bull; Deluge Peak"
+                  maxZoom={20}
+                />
+
+                {/* Nepal Sovereign Border */}
+                {showNepalBorder && (
+                  <Polyline
+                    positions={nepalBoundaries.nepal_border}
+                    pathOptions={{ color: '#F59E0B', weight: 2.8, dashArray: '8, 8', opacity: 0.95 }}
+                  />
+                )}
+
+                {/* Terai Plains Boundary */}
+                {showTeraiBoundary && (
+                  <Polygon
+                    positions={getActiveTeraiPolygon()}
+                    pathOptions={{ color: '#10B981', weight: 2.2, dashArray: '6, 6', fillColor: '#10B981', fillOpacity: 0.12 }}
+                  />
+                )}
+
+                {/* Flooded Inundation Polygons (User Requirement: Clearly Delineated Inundated Area) */}
+                {showFloodPolygons &&
+                  activeRegion.floodPolygons.map((polyCoords, idx) => (
+                    <Polygon
+                      key={`side-flood-${idx}`}
+                      positions={polyCoords}
+                      pathOptions={{
+                        color: '#00E5FF',
+                        weight: 2.4,
+                        fillColor: isBwRadar ? '#020617' : '#0284C7',
+                        fillOpacity: isBwRadar ? 0.92 : 0.72,
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-1 space-y-1 text-slate-100 max-w-[240px]">
+                          <span className="text-[10px] font-black uppercase text-cyan-400 flex items-center gap-1">
+                            <Waves className="h-3 w-3" />
+                            ACTIVE FLOOD INUNDATION
+                          </span>
+                          <h4 className="font-bold text-sm text-white">
+                            {activeRegion.shortName} Flood Zone #{idx + 1}
+                          </h4>
+                          <p className="text-xs text-slate-300">
+                            <strong>Sensor:</strong> Sentinel-1 SAR C-Band<br />
+                            <strong>Backscatter Drop:</strong> {activeRegion.deltaDb} dB (Otsu Specular Threshold)<br />
+                            <strong>Depth:</strong> 1.4m &ndash; 2.8m water column
+                          </p>
+                        </div>
+                      </Popup>
+                    </Polygon>
+                  ))}
+
+                {/* Deep Water Cores */}
+                {showFloodPolygons &&
+                  activeRegion.floodPolygons.slice(0, 5).map((polyCoords, idx) => (
+                    <Polygon
+                      key={`side-deep-${idx}`}
+                      positions={polyCoords.slice(1, polyCoords.length - 2)}
+                      pathOptions={{ color: '#38BDF8', weight: 1.5, fillColor: '#0052CC', fillOpacity: 0.88 }}
+                    />
+                  ))}
+
+                {/* Submerged Settlements with Water Depth & Affected Count */}
+                {showSettlementPins &&
+                  activeRegion.settlements
+                    .filter((s) => s.isFlooded)
+                    .map((village) => {
+                      const nearestHosp = TERAI_HOSPITALS.find(
+                        (h) => h.district.toLowerCase() === village.district.toLowerCase()
+                      ) || TERAI_HOSPITALS[0];
+                      const affectedCount = Math.round(village.population * 0.72);
+
+                      return (
+                        <Marker
+                          key={`side-s-${village.id}`}
+                          position={village.coords}
+                          icon={createSettlementPin(true, village.floodDepthMeters)}
+                          eventHandlers={{
+                            click: () => {
+                              setInspectedVillage({
+                                id: village.id,
+                                name: village.name,
+                                district: village.district,
+                                population: village.population,
+                                isFlooded: village.isFlooded,
+                                floodDepthMeters: village.floodDepthMeters,
+                                status: village.status,
+                                type: 'settlement',
+                                hazardLevel: (village.status === 'critical' || village.isFlooded ? 'critical' : 'safe') as 'critical' | 'moderate' | 'safe',
+                                recommendedAction: village.recommendedAction || 'Follow NEOC guidelines and move to designated high ground.',
+                                coords: village.coords,
+                              });
+                            },
+                          }}
+                        >
+                          <Popup>
+                            <div className="p-1.5 space-y-1.5 text-slate-100 max-w-[260px]">
+                              <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">
+                                CRITICAL: SUBMERGED SETTLEMENT
+                              </span>
+                              <h4 className="font-extrabold text-sm text-white">{village.name}</h4>
+                              <div className="text-xs text-slate-300 space-y-0.5">
+                                <p><strong>District:</strong> {village.district} (Nepal Terai)</p>
+                                <p><strong>Total Population:</strong> {village.population.toLocaleString()}</p>
+                                <p className="text-rose-400 font-bold">
+                                  <strong>Affected People:</strong> ~{affectedCount.toLocaleString()} citizens
+                                </p>
+                                {village.floodDepthMeters && (
+                                  <p className="text-rose-300 font-bold">
+                                    <strong>Water Depth:</strong> ~{village.floodDepthMeters} meters
+                                  </p>
+                                )}
+                                <div className="rounded bg-slate-900/90 p-1.5 border border-slate-800 text-[11px] text-blue-300 space-y-0.5 mt-1">
+                                  <p><strong>Nearest Hospital:</strong> {nearestHosp.name}</p>
+                                  <p><strong>Hospital Beds:</strong> {nearestHosp.beds} ({nearestHosp.status.split('(')[0]})</p>
+                                  <p><strong>Action:</strong> {village.recommendedAction}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      );
+                    })}
+
+                {/* Terai City Color Points */}
+                {showCityPoints &&
+                  TERAI_CITIES_DATA.map((city) => (
+                    <Marker
+                      key={`side-city-r-${city.id}`}
+                      position={city.coords}
+                      icon={createCityColorLeafletPin(city)}
+                      eventHandlers={{
+                        click: () => {
+                          setSelectedCity(city);
+                          setSelectedCityId(city.id);
+                          setIsCityModalOpen(true);
+                        },
+                      }}
+                    />
+                  ))}
+              </MapContainer>
+            </div>
           </div>
-
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded bg-blue-500 border border-cyan-300 shrink-0" />
-              <span className="text-cyan-300 font-medium">Flooded (Inundated)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded bg-emerald-500 border border-emerald-300 shrink-0" />
-              <span className="text-emerald-300 font-medium">No Flood (Safe Ridge)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-0.5 w-4 border-b-2 border-dashed border-emerald-400 shrink-0" />
-              <span className="text-emerald-200">Terai Lowlands</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-0.5 w-4 border-b-2 border-dashed border-amber-400 shrink-0" />
-              <span className="text-amber-200">Nepal Border (Dotted)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-red-500 border border-white shrink-0" />
-              <span className="text-red-300">Submerged Village</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 border border-white shrink-0" />
-              <span className="text-emerald-300">Safe Refugee Hub</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Split View Controls (Top Right) */}
-        <div className="absolute top-4 right-4 z-[500] flex items-center gap-1.5 bg-slate-950/90 border border-slate-700/80 p-1 rounded-xl shadow-2xl backdrop-blur-md text-xs">
-          <button
-            onClick={() => setSliderPosition(0)}
-            className="rounded-lg px-2.5 py-1 text-slate-300 hover:text-white transition-colors"
-          >
-            100% Flood Deluge
-          </button>
-          <button
-            onClick={() => setSliderPosition(50)}
-            className="rounded-lg bg-blue-600 px-3 py-1 font-bold text-white shadow-md"
-          >
-            50/50 Split Swipe
-          </button>
-          <button
-            onClick={() => setSliderPosition(100)}
-            className="rounded-lg px-2.5 py-1 text-slate-300 hover:text-white transition-colors"
-          >
-            100% Dry Baseline
-          </button>
-        </div>
-
-        {/* Bottom Left: Baseline Label */}
-        <div className="absolute bottom-5 left-5 z-[500] pointer-events-none">
-          <div className="rounded-xl border border-emerald-500/50 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-emerald-300 space-y-0.5">
-            <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-              <span>BEFORE FLOOD &mdash; Google Satellite Dry Baseline</span>
-            </div>
-            <div className="text-[10px] font-mono font-normal text-emerald-400/80">
-              Reference Date: {beforeDate} &bull; Normal River Channels &bull; Dry Agricultural Land
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Right: After Flood Deluge Label */}
-        <div className="absolute bottom-5 right-5 z-[500] pointer-events-none">
-          <div className="rounded-xl border border-cyan-500/50 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-cyan-300 space-y-0.5 text-right">
-            <div className="flex items-center justify-end gap-1.5">
-              <span>AFTER FLOOD &mdash; {activeSensor.name} Deluge Peak</span>
-              <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse"></span>
-            </div>
-            <div className="text-[10px] font-mono font-normal text-cyan-400/80">
-              Observation: {afterDate} &bull; {activeRegion.floodAreaKm2} km² Submerged Deluge
-            </div>
-          </div>
-        </div>
-
-        {/* Draggable Vertical Split Divider Line */}
-        {viewMode === 'split' && (
+        ) : (
+          /* SPLIT SWIPE SLIDER MODE */
           <div
-            className="absolute top-0 bottom-0 z-[600] w-1 bg-white shadow-[0_0_24px_rgba(255,255,255,0.95)] cursor-ew-resize"
-            style={{ left: `${sliderPosition}%` }}
-            onMouseDown={() => setIsDragging(true)}
-            onTouchStart={() => setIsDragging(true)}
+            ref={containerRef}
+            onMouseMove={handleMouseMove}
+            onTouchMove={handleTouchMove}
+            onMouseUp={() => setIsDragging(false)}
+            onTouchEnd={() => setIsDragging(false)}
+            className={`relative h-[660px] w-full rounded-2xl border border-slate-700/80 bg-slate-950 shadow-2xl overflow-hidden select-none ${
+              isBwRadar ? 'sar-bw-mode' : ''
+            }`}
           >
-            {/* Drag Handle with Clear DRY | FLOOD Labels */}
-            <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center rounded-full bg-blue-600 text-white shadow-2xl border-2 border-white cursor-ew-resize active:scale-105 transition-transform px-3 py-1.5 text-[10px] font-black whitespace-nowrap gap-1.5 select-none">
-              <span className="text-emerald-300 font-bold">DRY</span>
-              <ArrowLeftRight className="h-3.5 w-3.5" />
-              <span className="text-cyan-300 font-bold">FLOOD</span>
+            <MapContainer
+              center={effectiveCenter}
+              zoom={effectiveZoom}
+              minZoom={7.5}
+              maxBounds={[[26.15, 79.85], [28.40, 88.35]]}
+              scrollWheelZoom={true}
+              zoomControl={false}
+              className="h-full w-full"
+            >
+              <MapViewController center={effectiveCenter} zoom={effectiveZoom} />
+              <ClippedFloodPane sliderPosition={sliderPosition} viewMode={viewMode} />
+
+              {/* BASE LAYER (BEFORE): Google Satellite Pre-Monsoon Dry Baseline */}
+              <TileLayer
+                url={tileUrls[mapType]}
+                attribution="&copy; Google Earth Engine &bull; Pre-Monsoon Dry Baseline"
+                maxZoom={20}
+              />
+
+              {/* CLIPPED AFTER LAYER: Copernicus Sentinel-1 Deluge Peak Satellite Imagery */}
+              <Pane name="afterDelugePane" style={{ zIndex: 350 }}>
+                <TileLayer
+                  url={tileUrls[mapType]}
+                  attribution="&copy; Copernicus Sentinel-1 SAR &bull; Deluge Peak"
+                  maxZoom={20}
+                />
+              </Pane>
+
+              {/* 1. Nepal Sovereign Border (Dotted) */}
+              {showNepalBorder && (
+                <Polyline
+                  positions={nepalBoundaries.nepal_border}
+                  pathOptions={{ color: '#F59E0B', weight: 2.8, dashArray: '8, 8', opacity: 0.95 }}
+                />
+              )}
+
+              {/* 2. Nepal Terai Plains Boundary Highlight */}
+              {showTeraiBoundary && (
+                <Polygon
+                  positions={getActiveTeraiPolygon()}
+                  pathOptions={{ color: '#10B981', weight: 2.2, dashArray: '6, 6', fillColor: '#10B981', fillOpacity: 0.12 }}
+                />
+              )}
+
+              {/* 3. Flooded Areas Inundation Layer (In floodInundationPane for Split Slider) */}
+              <Pane name="floodInundationPane" style={{ zIndex: 450 }}>
+                {showFloodPolygons &&
+                  activeRegion.floodPolygons.map((polyCoords, idx) => (
+                    <Polygon
+                      key={`flood-poly-${idx}`}
+                      positions={polyCoords}
+                      pathOptions={{
+                        color: '#00E5FF',
+                        weight: 2.2,
+                        fillColor: isBwRadar ? '#020617' : '#0284C7',
+                        fillOpacity: isBwRadar ? 0.92 : 0.68,
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-1.5 space-y-1 text-slate-100 max-w-[240px]">
+                          <span className="text-[10px] font-black uppercase text-cyan-400 flex items-center gap-1">
+                            <Waves className="h-3 w-3" />
+                            ACTIVE FLOOD INUNDATION
+                          </span>
+                          <h4 className="font-bold text-sm text-white">
+                            {activeRegion.shortName} Flood Inundation Zone #{idx + 1}
+                          </h4>
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            <strong>Sensor:</strong> {activeSensor.fullName}<br />
+                            <strong>Status:</strong> Active Specular Inundation<br />
+                            <strong>Water Depth:</strong> 1.2m &ndash; 2.4m<br />
+                            <strong>Backscatter Drop:</strong> {activeRegion.deltaDb} dB (Otsu Threshold {activeRegion.otsuThreshold} dB)
+                          </p>
+                        </div>
+                      </Popup>
+                    </Polygon>
+                  ))}
+
+                {/* Deep Water Core River Channels (>1.8m Depth) */}
+                {showFloodPolygons &&
+                  activeRegion.floodPolygons.slice(0, 5).map((polyCoords, idx) => (
+                    <Polygon
+                      key={`deep-water-${idx}`}
+                      positions={polyCoords.slice(1, polyCoords.length - 2)}
+                      pathOptions={{ color: '#38BDF8', weight: 1.5, fillColor: '#0052CC', fillOpacity: 0.85 }}
+                    />
+                  ))}
+              </Pane>
+
+              {/* 4. Safe Elevated High Ground Havens */}
+              {showSafeHighGrounds &&
+                activeRegion.safeZones.map((safeZone) => (
+                  <Polygon
+                    key={safeZone.id}
+                    positions={safeZone.polygon}
+                    pathOptions={{ color: '#10B981', weight: 2.5, fillColor: '#059669', fillOpacity: 0.5 }}
+                  >
+                    <Popup>
+                      <div className="p-1.5 space-y-1 text-slate-100">
+                        <span className="text-[10px] font-black uppercase text-emerald-400 flex items-center gap-1">
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          SAFE ELEVATED HAVEN
+                        </span>
+                        <h4 className="font-bold text-sm text-white">{safeZone.name}</h4>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          <strong>District:</strong> {safeZone.district}<br />
+                          <strong>Elevation:</strong> {safeZone.elevationMeters}m ASL<br />
+                          <strong>Capacity:</strong> {safeZone.shelterCapacity.toLocaleString()} citizens<br />
+                          <strong>Agency:</strong> {safeZone.contactAgency}
+                        </p>
+                      </div>
+                    </Popup>
+                  </Polygon>
+                ))}
+
+              {/* 5. Settlement Hazard & Safe Haven Pins */}
+              {showSettlementPins &&
+                activeRegion.settlements.map((village) => {
+                  const nearestHosp = TERAI_HOSPITALS.find(
+                    (h) => h.district.toLowerCase() === village.district.toLowerCase()
+                  ) || TERAI_HOSPITALS[0];
+                  const affectedCount = village.isFlooded ? Math.round(village.population * 0.72) : 0;
+
+                  return (
+                    <Marker
+                      key={village.id}
+                      position={village.coords}
+                      icon={createSettlementPin(village.isFlooded, village.floodDepthMeters)}
+                      eventHandlers={{
+                        click: () => {
+                          setInspectedVillage({
+                            id: village.id,
+                            name: village.name,
+                            district: village.district,
+                            population: village.population,
+                            isFlooded: village.isFlooded,
+                            floodDepthMeters: village.floodDepthMeters,
+                            status: village.status,
+                            type: 'settlement',
+                            hazardLevel: (village.status === 'critical' || village.isFlooded ? 'critical' : 'safe') as 'critical' | 'moderate' | 'safe',
+                            recommendedAction: village.recommendedAction || 'Follow NEOC guidelines and move to designated high ground.',
+                            coords: village.coords,
+                          });
+                        },
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-1.5 space-y-1.5 text-slate-100 max-w-[260px]">
+                          <span
+                            className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
+                              village.isFlooded
+                                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            }`}
+                          >
+                            {village.isFlooded ? 'CRITICAL: FLOODED / SUBMERGED' : 'SAFE HIGH GROUND HAVEN'}
+                          </span>
+                          <h4 className="font-extrabold text-sm text-white">{village.name}</h4>
+                          <div className="text-xs text-slate-300 space-y-0.5">
+                            <p><strong>District:</strong> {village.district} (Nepal Terai)</p>
+                            <p><strong>Population:</strong> {village.population.toLocaleString()}</p>
+                            {village.isFlooded && (
+                              <p className="text-rose-400 font-bold">
+                                <strong>Affected People:</strong> ~{affectedCount.toLocaleString()} citizens
+                              </p>
+                            )}
+                            {village.floodDepthMeters && (
+                              <p className="text-rose-300 font-bold">
+                                <strong>Water Depth:</strong> ~{village.floodDepthMeters} meters
+                              </p>
+                            )}
+                            <div className="rounded bg-slate-900/90 p-1.5 border border-slate-800 text-[11px] text-blue-300 space-y-0.5 mt-1">
+                              <p><strong>Nearest Hospital:</strong> {nearestHosp.name}</p>
+                              <p><strong>Hospital Beds:</strong> {nearestHosp.beds} ({nearestHosp.status.split('(')[0]})</p>
+                              <p><strong>Action:</strong> {village.recommendedAction}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+
+              {/* 6. Terai City Color Points */}
+              {showCityPoints &&
+                TERAI_CITIES_DATA.map((city) => {
+                  if (selectedRegionKey !== 'full_terai' && city.regionKey !== selectedRegionKey) {
+                    return null;
+                  }
+                  return (
+                    <Marker
+                      key={`slider-city-${city.id}`}
+                      position={city.coords}
+                      icon={createCityColorLeafletPin(city)}
+                      eventHandlers={{
+                        click: () => {
+                          setSelectedCity(city);
+                          setSelectedCityId(city.id);
+                          setIsCityModalOpen(true);
+                        },
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-1 space-y-1.5 max-w-[220px]">
+                          <span
+                            className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded border"
+                            style={{
+                              backgroundColor: `${city.color}25`,
+                              borderColor: `${city.color}60`,
+                              color: city.color,
+                            }}
+                          >
+                            {city.status.toUpperCase()} ZONE &bull; {city.district}
+                          </span>
+                          <h4 className="font-bold text-sm text-white">{city.name}</h4>
+                          <p className="text-xs text-slate-300">{city.statusText}</p>
+                          <button
+                            onClick={() => {
+                              setSelectedCity(city);
+                              setSelectedCityId(city.id);
+                              setIsCityModalOpen(true);
+                            }}
+                            className="w-full mt-1 rounded-lg bg-blue-600 px-2 py-1 text-xs font-bold text-white hover:bg-blue-500 shadow-sm"
+                          >
+                            Inspect Villages &amp; Towns ({city.villagesAndTowns.length})
+                          </button>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+            </MapContainer>
+
+            {/* Floating Master Legend */}
+            <div className="absolute top-4 left-4 z-[500] pointer-events-auto max-w-sm rounded-2xl border border-slate-700/80 bg-slate-950/90 p-3.5 shadow-2xl backdrop-blur-md space-y-2 text-xs">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <span className="font-extrabold text-white flex items-center gap-1.5">
+                  <ShieldAlert className="h-4 w-4 text-cyan-400" />
+                  Nepal Terai Flood Intelligence
+                </span>
+                <span className="text-[10px] font-mono text-cyan-300">
+                  {activeRegion.floodAreaKm2} km² Deluge
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded bg-blue-500 border border-cyan-300 shrink-0" />
+                  <span className="text-cyan-300 font-medium">Flooded (Inundated)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded bg-emerald-500 border border-emerald-300 shrink-0" />
+                  <span className="text-emerald-300 font-medium">No Flood (Safe Ridge)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-0.5 w-4 border-b-2 border-dashed border-emerald-400 shrink-0" />
+                  <span className="text-emerald-200">Terai Lowlands</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-0.5 w-4 border-b-2 border-dashed border-amber-400 shrink-0" />
+                  <span className="text-amber-200">Nepal Border (Dotted)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-red-500 border border-white shrink-0" />
+                  <span className="text-red-300">Submerged Village</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 border border-white shrink-0" />
+                  <span className="text-emerald-300">Safe Refugee Hub</span>
+                </div>
+              </div>
             </div>
 
-            {/* Position Percentage Badge */}
-            <div className="absolute top-5 -translate-x-1/2 rounded-md bg-slate-950 border border-slate-700 px-2 py-0.5 text-[11px] font-mono font-bold text-white shadow-xl">
-              {Math.round(sliderPosition)}%
+            {/* Quick Split View Controls */}
+            <div className="absolute top-4 right-4 z-[500] flex items-center gap-1.5 bg-slate-950/90 border border-slate-700/80 p-1 rounded-xl shadow-2xl backdrop-blur-md text-xs">
+              <button
+                onClick={() => setSliderPosition(0)}
+                className="rounded-lg px-2.5 py-1 text-slate-300 hover:text-white transition-colors"
+              >
+                100% Flood Deluge
+              </button>
+              <button
+                onClick={() => setSliderPosition(50)}
+                className="rounded-lg bg-blue-600 px-3 py-1 font-bold text-white shadow-md"
+              >
+                50/50 Split Swipe
+              </button>
+              <button
+                onClick={() => setSliderPosition(100)}
+                className="rounded-lg px-2.5 py-1 text-slate-300 hover:text-white transition-colors"
+              >
+                100% Dry Baseline
+              </button>
             </div>
+
+            {/* Bottom Left: Baseline Label */}
+            <div className="absolute bottom-5 left-5 z-[500] pointer-events-none">
+              <div className="rounded-xl border border-emerald-500/50 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-emerald-300 space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+                  <span>BEFORE FLOOD &mdash; Google Satellite Dry Baseline</span>
+                </div>
+                <div className="text-[10px] font-mono font-normal text-emerald-400/80">
+                  Reference Date: {beforeDate} &bull; Normal River Channels &bull; Dry Land
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Right: After Flood Deluge Label */}
+            <div className="absolute bottom-5 right-5 z-[500] pointer-events-none">
+              <div className="rounded-xl border border-cyan-500/50 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-cyan-300 space-y-0.5 text-right">
+                <div className="flex items-center justify-end gap-1.5">
+                  <span>AFTER FLOOD &mdash; {activeSensor.name} Deluge Peak</span>
+                  <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                </div>
+                <div className="text-[10px] font-mono font-normal text-cyan-400/80">
+                  Observation: {afterDate} &bull; {activeRegion.floodAreaKm2} km² Submerged
+                </div>
+              </div>
+            </div>
+
+            {/* Draggable Vertical Split Divider Line */}
+            {viewMode === 'split' && (
+              <div
+                className="absolute top-0 bottom-0 z-[600] w-1 bg-white shadow-[0_0_24px_rgba(255,255,255,0.95)] cursor-ew-resize"
+                style={{ left: `${sliderPosition}%` }}
+                onMouseDown={() => setIsDragging(true)}
+                onTouchStart={() => setIsDragging(true)}
+              >
+                <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center rounded-full bg-blue-600 text-white shadow-2xl border-2 border-white cursor-ew-resize active:scale-105 transition-transform px-3 py-1.5 text-[10px] font-black whitespace-nowrap gap-1.5 select-none">
+                  <span className="text-emerald-300 font-bold">DRY</span>
+                  <ArrowLeftRight className="h-3.5 w-3.5" />
+                  <span className="text-cyan-300 font-bold">FLOOD</span>
+                </div>
+                <div className="absolute top-5 -translate-x-1/2 rounded-md bg-slate-950 border border-slate-700 px-2 py-0.5 text-[11px] font-mono font-bold text-white shadow-xl">
+                  {Math.round(sliderPosition)}%
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

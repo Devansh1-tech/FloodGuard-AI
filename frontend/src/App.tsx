@@ -8,7 +8,7 @@
  * 4. Demographics & Vulnerability: WorldPop empirical population headcounts.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Activity,
   AlertCircle,
@@ -25,6 +25,7 @@ import {
   Shield,
   ShieldAlert,
   Sun,
+  Truck,
   Users,
   Waves,
   Zap,
@@ -32,20 +33,100 @@ import {
 
 import { Stage51ComparisonPage } from '@/pages/comparison/Stage51ComparisonPage';
 import { Stage52GoogleMapPage } from '@/pages/map/Stage52GoogleMapPage';
+import { Stage54RoadsPage } from '@/pages/roads/Stage54RoadsPage';
 import { HospitalDirectoryPage } from '@/pages/infrastructure/HospitalDirectoryPage';
 import { DemographicsPage } from '@/pages/demographics/DemographicsPage';
 import { ExecutiveDashboard } from '@/pages/dashboard/ExecutiveDashboard';
+import CardNav, { CardNavItem, CardNavLink } from '@/components/nav/CardNav';
 
-export type NavigationTab = 'dashboard' | 'satellite' | 'command_map' | 'hospitals' | 'demographics';
+export type NavigationTab = 'dashboard' | 'satellite' | 'command_map' | 'roads' | 'hospitals' | 'demographics';
 
 export const App: React.FC = () => {
   const [isDark, setIsDark] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<NavigationTab>('dashboard');
 
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+  }, []);
+
   const toggleTheme = () => {
     setIsDark(!isDark);
     document.documentElement.classList.toggle('light', isDark);
     document.documentElement.classList.toggle('dark', !isDark);
+  };
+
+  const navLogo = (
+    <div className="flex items-center gap-2 font-black text-sm tracking-tight text-white select-none">
+      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-500 shadow-sm shadow-blue-500/30">
+        <Shield className="h-4 w-4 text-white" />
+      </div>
+      <span className="font-extrabold tracking-tight">
+        FLOODGUARD<span className="text-cyan-400"> AI</span>
+      </span>
+      <span className="hidden sm:inline-flex items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-bold text-rose-300 border border-rose-500/30">
+        NEPAL GOVT
+      </span>
+    </div>
+  );
+
+  const navItems: CardNavItem[] = [
+    {
+      label: 'NEOC Command',
+      description: 'National Emergency Operations & Terai status.',
+      links: [
+        { label: 'Executive Dashboard (Overview)', href: '#dashboard' },
+        { label: 'Terai Lowland Scope (21 Dist.)', href: '#dashboard' },
+        { label: 'Live Incident Telemetry', href: '#dashboard' },
+      ],
+    },
+    {
+      label: 'Flood Detection',
+      description: 'Sentinel-1 SAR Radar & Earth Engine.',
+      links: [
+        { label: 'Split Deluge Comparison', href: '#satellite' },
+        { label: 'Side-by-Side Dual Alignment', href: '#satellite' },
+        { label: 'Black & White SAR Radar Mode', href: '#satellite' },
+        { label: 'Terai City & Village Picker', href: '#satellite' },
+      ],
+    },
+    {
+      label: 'Relief & Alternate Routes',
+      description: 'Emergency convoys & evacuation detours.',
+      links: [
+        { label: 'Road Inundation & Bridges (5.4)', href: '#roads' },
+        { label: 'Bharatpur → Gaur Convoy (84 km)', href: '#command_map' },
+        { label: 'Duhabi → Koshi Relief Corridor', href: '#command_map' },
+        { label: 'Civilian Alternate Evacuations', href: '#command_map' },
+        { label: 'Field Command Map (Live)', href: '#command_map' },
+      ],
+    },
+    {
+      label: 'Critical Infrastructure',
+      description: 'Hospitals, population risk & shelters.',
+      links: [
+        { label: 'Hospitals & ICUs (7/8 Active)', href: '#hospitals' },
+        { label: 'WorldPop Terai Demographics', href: '#demographics' },
+        { label: 'Settlement Dossiers & Depths', href: '#command_map' },
+      ],
+    },
+  ];
+
+  const handleLinkClick = (link: CardNavLink) => {
+    if (!link.href) return;
+    if (link.href.includes('#dashboard')) {
+      setActiveTab('dashboard');
+    } else if (link.href.includes('#satellite')) {
+      setActiveTab('satellite');
+    } else if (link.href.includes('#command_map')) {
+      setActiveTab('command_map');
+    } else if (link.href.includes('#roads')) {
+      setActiveTab('roads');
+    } else if (link.href.includes('#hospitals')) {
+      setActiveTab('hospitals');
+    } else if (link.href.includes('#demographics')) {
+      setActiveTab('demographics');
+    }
   };
 
   const tabs = [
@@ -74,6 +155,14 @@ export const App: React.FC = () => {
       badgeColor: 'border-blue-500/30 bg-blue-500/20 text-blue-400',
     },
     {
+      id: 'roads' as NavigationTab,
+      label: 'Road Inundation (5.4)',
+      tagline: 'Highways & Cut-Off Zones',
+      icon: Truck,
+      badge: 'Point 4 Disruption',
+      badgeColor: 'border-amber-500/30 bg-amber-500/20 text-amber-400',
+    },
+    {
       id: 'hospitals' as NavigationTab,
       label: 'Healthcare Infrastructure',
       tagline: 'Hospitals & Emergency Clinics',
@@ -92,75 +181,36 @@ export const App: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
       {/* ───────────────────────────────────────────────────────────────────────
-          TOP COMMAND HEADER
+          CARDNAV MASTER NAVIGATION BAR (React Bits Component)
       ───────────────────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 flex h-16 w-full items-center justify-between border-b border-slate-800 bg-slate-900/95 px-4 md:px-8 backdrop-blur-md shadow-lg">
-        {/* Brand & Terai Scope */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 shadow-md shadow-blue-500/20">
-            <Shield className="h-5 w-5 text-white" />
+      <header className="sticky top-0 z-50 w-full border-b border-slate-800/80 bg-[#07090e]/95 backdrop-blur-md px-3 py-2">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+          <div className="flex-1">
+            <CardNav
+              logo={navLogo}
+              logoAlt="FloodGuard AI Nepal"
+              items={navItems}
+              cta={{ label: 'NEOC SOS 1155', href: 'tel:1155' }}
+              theme={isDark ? 'dark' : 'light'}
+              surface="glass"
+              cardEffect="rise"
+              openOn="click"
+              maxWidth={940}
+              accentColor="#f43f5e"
+              onLinkClick={handleLinkClick}
+            />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-lg font-black tracking-tight text-white">FloodGuard AI</span>
-              <span className="hidden sm:inline-flex items-center gap-1 rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                NEPAL TERAI LIVE
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 hidden xs:block">
-              Disaster Intelligence Platform &bull; All 21 Southern Lowland Districts
-            </p>
+          <div className="hidden md:flex items-center gap-2 shrink-0">
+            <button
+              onClick={toggleTheme}
+              className="rounded-xl border border-slate-700 bg-slate-800/90 p-2 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+              title="Toggle Theme"
+            >
+              {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-300" />}
+            </button>
           </div>
-        </div>
-
-        {/* Live Metrics Quick Capsule */}
-        <div className="hidden lg:flex items-center gap-4 text-xs font-medium">
-          <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-1.5">
-            <Waves className="h-4 w-4 text-cyan-400" />
-            <div>
-              <span className="text-[10px] text-slate-400 block leading-tight">Terai Inundation</span>
-              <span className="font-bold text-cyan-300">642.8 km²</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-1.5">
-            <Users className="h-4 w-4 text-purple-400" />
-            <div>
-              <span className="text-[10px] text-slate-400 block leading-tight">Population at Risk</span>
-              <span className="font-bold text-purple-300">1,482,000</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/80 px-3 py-1.5">
-            <Building2 className="h-4 w-4 text-emerald-400" />
-            <div>
-              <span className="text-[10px] text-slate-400 block leading-tight">Active Hospitals</span>
-              <span className="font-bold text-emerald-300">7 / 8 Operational</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Actions & Theme */}
-        <div className="flex items-center gap-2.5">
-          <a
-            href="tel:1155"
-            className="hidden sm:flex items-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/20 transition-all"
-            title="National Emergency Operations Center Nepal"
-          >
-            <Phone className="h-3.5 w-3.5 text-rose-400 animate-pulse" />
-            <span>NEOC 1155</span>
-          </a>
-
-          <button
-            onClick={toggleTheme}
-            className="rounded-xl border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
-            title="Toggle Theme"
-          >
-            {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-300" />}
-          </button>
         </div>
       </header>
 
@@ -242,6 +292,7 @@ export const App: React.FC = () => {
         )}
         {activeTab === 'satellite' && <Stage51ComparisonPage />}
         {activeTab === 'command_map' && <Stage52GoogleMapPage />}
+        {activeTab === 'roads' && <Stage54RoadsPage />}
         {activeTab === 'hospitals' && <HospitalDirectoryPage />}
         {activeTab === 'demographics' && <DemographicsPage />}
       </main>

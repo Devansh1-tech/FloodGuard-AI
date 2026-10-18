@@ -13,6 +13,8 @@ export interface VillageTownItem {
   id: string;
   name: string;
   localName?: string;
+  district?: string;
+  status?: string;
   type: 'village' | 'town' | 'ward' | 'settlement' | 'safe_shelter';
   coords: [number, number]; // [lat, lng]
   isFlooded: boolean;
