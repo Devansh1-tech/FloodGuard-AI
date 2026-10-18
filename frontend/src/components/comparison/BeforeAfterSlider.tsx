@@ -30,6 +30,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  Code2,
   Compass,
   Eye,
   EyeOff,
@@ -60,6 +61,14 @@ import {
   VillageSettlement,
 } from '@/data/teraiRegions';
 import { nepalBoundaries } from '@/data/nepalBoundaries';
+import { EarthEngineScriptModal } from '@/components/gee/EarthEngineScriptModal';
+import {
+  TERAI_CITIES_DATA,
+  TeraiCityData,
+  VillageTownItem,
+  createCityColorLeafletPin,
+} from '@/data/teraiCitiesData';
+import { CityVillagesModal } from '@/components/map/CityVillagesModal';
 
 export { TERAI_REGIONS, TERAI_REGIONS as TERAI_PRESETS };
 
@@ -171,22 +180,39 @@ const createSettlementPin = (isFlooded: boolean, depth?: number) => {
   });
 };
 
-// Map View Controller to handle smooth flyTo transitions
+// Map View Controller to handle smooth flyTo transitions and container sizing
 const MapViewController: React.FC<{
   center: [number, number];
   zoom: number;
 }> = ({ center, zoom }) => {
   const map = useMap();
+
   useEffect(() => {
+    map.invalidateSize();
     map.flyTo(center, zoom, {
       duration: 1.2,
       easeLinearity: 0.25,
     });
   }, [center, zoom, map]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    window.addEventListener('resize', handleResize);
+    const t1 = setTimeout(() => map.invalidateSize(), 100);
+    const t2 = setTimeout(() => map.invalidateSize(), 300);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [map]);
+
   return null;
 };
 
-// Clipped Flood Pane for split-slider comparison
+// Clipped Panes for true Before (Dry Baseline) vs After (Flood Deluge) split comparison
 const ClippedFloodPane: React.FC<{
   sliderPosition: number;
   viewMode: 'split' | 'overlay' | 'difference';
@@ -194,18 +220,24 @@ const ClippedFloodPane: React.FC<{
   const map = useMap();
 
   useEffect(() => {
-    const pane = map.getPane('floodInundationPane');
-    if (!pane) return;
+    const afterDelugePane = map.getPane('afterDelugePane');
+    const floodPane = map.getPane('floodInundationPane');
 
-    if (viewMode === 'split') {
-      pane.style.clipPath = `polygon(${sliderPosition}% 0%, 100% 0%, 100% 100%, ${sliderPosition}% 100%)`;
-      pane.style.display = 'block';
-    } else if (viewMode === 'overlay') {
-      pane.style.clipPath = 'none';
-      pane.style.display = 'block';
-    } else {
-      pane.style.display = 'none';
-    }
+    const updatePane = (pane: HTMLElement | undefined) => {
+      if (!pane) return;
+      if (viewMode === 'split') {
+        pane.style.clipPath = `polygon(${sliderPosition}% 0%, 100% 0%, 100% 100%, ${sliderPosition}% 100%)`;
+        pane.style.display = 'block';
+      } else if (viewMode === 'overlay') {
+        pane.style.clipPath = 'none';
+        pane.style.display = 'block';
+      } else {
+        pane.style.display = 'none';
+      }
+    };
+
+    updatePane(afterDelugePane);
+    updatePane(floodPane);
   }, [sliderPosition, viewMode, map]);
 
   return null;
@@ -245,6 +277,11 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
   const [showFloodPolygons, setShowFloodPolygons] = useState<boolean>(true);
   const [showSafeHighGrounds, setShowSafeHighGrounds] = useState<boolean>(true);
   const [showSettlementPins, setShowSettlementPins] = useState<boolean>(true);
+  const [showDeepWater, setShowDeepWater] = useState<boolean>(true);
+  const [showCityPoints, setShowCityPoints] = useState<boolean>(true);
+  const [selectedCity, setSelectedCity] = useState<TeraiCityData | null>(null);
+  const [isCityModalOpen, setIsCityModalOpen] = useState<boolean>(false);
+  const [isScriptModalOpen, setIsScriptModalOpen] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const activeRegion: TeraiRegionData = TERAI_REGIONS[selectedRegionKey] || TERAI_REGIONS.full_terai;
@@ -382,6 +419,15 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
               <span>{isRefreshing ? 'Querying GEE Catalog...' : 'Refresh GEE'}</span>
+            </button>
+
+            <button
+              onClick={() => setIsScriptModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-600/20 px-3.5 py-2 text-xs font-bold text-cyan-300 hover:bg-cyan-600/30 transition-all active:scale-95"
+              title="View Google Earth Engine Sentinel-1 SAR script"
+            >
+              <Code2 className="h-3.5 w-3.5 text-cyan-400" />
+              <span>GEE Script</span>
             </button>
           </div>
         </div>
@@ -526,11 +572,70 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
           </div>
         </div>
 
-        {/* Layer Visibility Checkboxes (User Requests #1, #5, #6, #7) */}
-        <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-slate-800/80 text-xs">
+        {/* Officer Quick Filter: What I want to see (Flooded vs Non-Flooded) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-slate-300 flex items-center gap-1.5">
+              <Eye className="h-3.5 w-3.5 text-amber-400" />
+              What I Want to See:
+            </span>
+            <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1">
+              <button
+                onClick={() => {
+                  setShowFloodPolygons(true);
+                  setShowSafeHighGrounds(true);
+                }}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  showFloodPolygons && showSafeHighGrounds
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Show Both (Flood vs Safe)
+              </button>
+              <button
+                onClick={() => {
+                  setShowFloodPolygons(true);
+                  setShowSafeHighGrounds(false);
+                }}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  showFloodPolygons && !showSafeHighGrounds
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🌊 Flooded Areas Only
+              </button>
+              <button
+                onClick={() => {
+                  setShowFloodPolygons(false);
+                  setShowSafeHighGrounds(true);
+                }}
+                className={`px-3 py-1 rounded-lg font-bold transition-all ${
+                  !showFloodPolygons && showSafeHighGrounds
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🛡️ Non-Flooded (Safe) Only
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-mono">
+            <span className="text-slate-400">Total Inundated:</span>
+            <span className="text-cyan-400 font-bold text-sm">{activeRegion.floodAreaKm2} km²</span>
+            <span className="text-slate-500">|</span>
+            <span className="text-slate-400">Safe Ridge:</span>
+            <span className="text-emerald-400 font-bold text-sm">{activeRegion.safeAreaKm2.toLocaleString()} km²</span>
+          </div>
+        </div>
+
+        {/* Detailed Layer Checkboxes */}
+        <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
           <span className="text-slate-400 font-bold uppercase tracking-wider text-[11px] flex items-center gap-1">
             <Filter className="h-3.5 w-3.5 text-blue-400" />
-            Map Overlays:
+            Fine Overlays:
           </span>
 
           <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
@@ -540,7 +645,17 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
               onChange={(e) => setShowFloodPolygons(e.target.checked)}
               className="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-0"
             />
-            <span className="text-cyan-400 font-semibold">🌊 Flooded Zones (Blue)</span>
+            <span className="text-cyan-400 font-semibold">🌊 Flooded Zones</span>
+          </label>
+
+          <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+            <input
+              type="checkbox"
+              checked={showDeepWater}
+              onChange={(e) => setShowDeepWater(e.target.checked)}
+              className="rounded border-slate-700 bg-slate-950 text-blue-400 focus:ring-0"
+            />
+            <span className="text-blue-300 font-semibold">💧 Deep Cores (&gt;1.8m)</span>
           </label>
 
           <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
@@ -550,7 +665,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
               onChange={(e) => setShowSafeHighGrounds(e.target.checked)}
               className="rounded border-slate-700 bg-slate-950 text-emerald-600 focus:ring-0"
             />
-            <span className="text-emerald-400 font-semibold">🛡️ Safe High Ground (Green)</span>
+            <span className="text-emerald-400 font-semibold">🛡️ Safe High Ground</span>
           </label>
 
           <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
@@ -560,7 +675,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
               onChange={(e) => setShowTeraiBoundary(e.target.checked)}
               className="rounded border-slate-700 bg-slate-950 text-emerald-600 focus:ring-0"
             />
-            <span className="text-emerald-300 font-semibold">🟢 Nepal Terai Plains Boundary</span>
+            <span className="text-emerald-300 font-semibold">🟢 Terai Plain</span>
           </label>
 
           <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
@@ -582,6 +697,16 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             />
             <span className="text-rose-400 font-semibold">📍 Settlement Hazard Pins</span>
           </label>
+
+          <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+            <input
+              type="checkbox"
+              checked={showCityPoints}
+              onChange={(e) => setShowCityPoints(e.target.checked)}
+              className="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-0"
+            />
+            <span className="text-cyan-300 font-semibold">🏙️ All Terai Cities (21 Color Points)</span>
+          </label>
         </div>
       </div>
 
@@ -599,6 +724,11 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
         <MapContainer
           center={activeRegion.center}
           zoom={activeRegion.zoom}
+          minZoom={7.5}
+          maxBounds={[
+            [26.15, 79.85],
+            [28.40, 88.35],
+          ]}
           scrollWheelZoom={true}
           zoomControl={false}
           className="h-full w-full"
@@ -606,12 +736,21 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
           <MapViewController center={activeRegion.center} zoom={activeRegion.zoom} />
           <ClippedFloodPane sliderPosition={sliderPosition} viewMode={viewMode} />
 
-          {/* Real Google Satellite / Google Hybrid Tile Basemap */}
+          {/* BASE LAYER (BEFORE): Google Satellite Pre-Monsoon Dry Baseline (15 June 2024) */}
           <TileLayer
-            url={tileUrls[mapType]}
-            attribution="&copy; Google Maps / Google Earth Engine &copy; Copernicus Sentinel-1/2"
+            url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+            attribution="&copy; Google Earth Engine &bull; Pre-Monsoon Dry Baseline"
             maxZoom={20}
           />
+
+          {/* CLIPPED AFTER LAYER: Copernicus Sentinel-1 Deluge Peak Satellite Imagery (01 October 2024) */}
+          <Pane name="afterDelugePane" style={{ zIndex: 350 }}>
+            <TileLayer
+              url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+              attribution="&copy; Copernicus Sentinel-1 SAR &bull; Deluge Peak"
+              maxZoom={20}
+            />
+          </Pane>
 
           {/* 1. Nepal Sovereign Border (Illuminated Dotted Outline - User Request #5) */}
           {showNepalBorder && (
@@ -664,7 +803,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             </Polygon>
           )}
 
-          {/* 3. Flooded Areas Inundation Layer (In floodInundationPane for Slider - User Request #1 & #7) */}
+          {/* 3. Flooded Areas Inundation Layer (In floodInundationPane for Split Slider - User Request #1 & #7) */}
           <Pane name="floodInundationPane" style={{ zIndex: 450 }}>
             {showFloodPolygons &&
               activeRegion.floodPolygons.map((polyCoords, idx) => (
@@ -672,18 +811,17 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
                   key={`flood-poly-${idx}`}
                   positions={polyCoords}
                   pathOptions={{
-                    color: '#38BDF8',
-                    weight: 2.5,
+                    color: '#00E5FF',
+                    weight: 2.2,
                     fillColor: '#0284C7',
-                    fillOpacity: 0.72,
-                    dashArray: '4, 4',
+                    fillOpacity: 0.68,
                   }}
                 >
                   <Popup>
-                    <div className="p-1.5 space-y-1 text-slate-100">
+                    <div className="p-1.5 space-y-1 text-slate-100 max-w-[240px]">
                       <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 flex items-center gap-1">
                         <Waves className="h-3 w-3" />
-                        SUBMERGED FLOOD DELUGE
+                        ACTIVE FLOOD INUNDATION
                       </span>
                       <h4 className="font-bold text-sm text-white">
                         {activeRegion.shortName} Flood Inundation Zone #{idx + 1}
@@ -692,11 +830,26 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
                         <strong>Sensor:</strong> {activeSensor.fullName}<br />
                         <strong>Inundation Status:</strong> Active Specular Water Cover<br />
                         <strong>Est. Water Depth:</strong> 1.2m &ndash; 2.4m<br />
-                        <strong>Backscatter Drop:</strong> {activeRegion.deltaDb} dB (Otsu Threshold {activeRegion.otsuThreshold} dB)
+                        <strong>Radar Backscatter Drop:</strong> {activeRegion.deltaDb} dB (Otsu Threshold {activeRegion.otsuThreshold} dB)
                       </p>
                     </div>
                   </Popup>
                 </Polygon>
+              ))}
+
+            {/* Deep Water Core River Channels (>1.8m Depth) */}
+            {showFloodPolygons &&
+              activeRegion.floodPolygons.slice(0, 5).map((polyCoords, idx) => (
+                <Polygon
+                  key={`deep-water-${idx}`}
+                  positions={polyCoords.slice(1, polyCoords.length - 2)}
+                  pathOptions={{
+                    color: '#38BDF8',
+                    weight: 1.5,
+                    fillColor: '#0052CC',
+                    fillOpacity: 0.85,
+                  }}
+                />
               ))}
           </Pane>
 
@@ -768,6 +921,53 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
                 </Popup>
               </Marker>
             ))}
+
+          {/* 6. Terai City Color Points (User Feature) */}
+          {showCityPoints &&
+            TERAI_CITIES_DATA.map((city) => {
+              if (selectedRegionKey !== 'full_terai' && city.regionKey !== selectedRegionKey) {
+                return null;
+              }
+              return (
+                <Marker
+                  key={`slider-city-${city.id}`}
+                  position={city.coords}
+                  icon={createCityColorLeafletPin(city)}
+                  eventHandlers={{
+                    click: () => {
+                      setSelectedCity(city);
+                      setIsCityModalOpen(true);
+                    },
+                  }}
+                >
+                  <Popup>
+                    <div className="p-1 space-y-1.5 max-w-[220px]">
+                      <span
+                        className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded border"
+                        style={{
+                          backgroundColor: `${city.color}25`,
+                          borderColor: `${city.color}60`,
+                          color: city.color,
+                        }}
+                      >
+                        {city.status.toUpperCase()} ZONE &bull; {city.district}
+                      </span>
+                      <h4 className="font-bold text-sm text-white">{city.name}</h4>
+                      <p className="text-xs text-slate-300">{city.statusText}</p>
+                      <button
+                        onClick={() => {
+                          setSelectedCity(city);
+                          setIsCityModalOpen(true);
+                        }}
+                        className="w-full mt-1 rounded-lg bg-blue-600 px-2 py-1 text-xs font-bold text-white hover:bg-blue-500 shadow-sm"
+                      >
+                        Inspect Villages &amp; Towns ({city.villagesAndTowns.length})
+                      </button>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
         </MapContainer>
 
         {/* Floating Master Legend (User Request #1, #5, #6, #7) */}
@@ -835,19 +1035,25 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
         {/* Bottom Left: Baseline Label */}
         <div className="absolute bottom-5 left-5 z-[500] pointer-events-none">
           <div className="rounded-xl border border-emerald-500/50 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-emerald-300 space-y-0.5">
-            <div>BEFORE FLOOD &mdash; Google Satellite Dry Baseline</div>
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>BEFORE FLOOD &mdash; Google Satellite Dry Baseline</span>
+            </div>
             <div className="text-[10px] font-mono font-normal text-emerald-400/80">
-              Reference Date: {beforeDate} (Pre-Monsoon Normal Soil)
+              Reference Date: {beforeDate} &bull; Normal River Channels &bull; Dry Agricultural Land
             </div>
           </div>
         </div>
 
         {/* Bottom Right: After Flood Deluge Label */}
         <div className="absolute bottom-5 right-5 z-[500] pointer-events-none">
-          <div className="rounded-xl border border-blue-500/50 bg-blue-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-blue-200 space-y-0.5 text-right">
-            <div>AFTER FLOOD &mdash; {activeSensor.name} Deluge Peak</div>
-            <div className="text-[10px] font-mono font-normal text-cyan-300">
-              Observation: {afterDate} &bull; {activeRegion.floodAreaKm2} km² Submerged
+          <div className="rounded-xl border border-cyan-500/50 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-cyan-300 space-y-0.5 text-right">
+            <div className="flex items-center justify-end gap-1.5">
+              <span>AFTER FLOOD &mdash; {activeSensor.name} Deluge Peak</span>
+              <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse"></span>
+            </div>
+            <div className="text-[10px] font-mono font-normal text-cyan-400/80">
+              Observation: {afterDate} &bull; {activeRegion.floodAreaKm2} km² Submerged Deluge
             </div>
           </div>
         </div>
@@ -860,9 +1066,11 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             onMouseDown={() => setIsDragging(true)}
             onTouchStart={() => setIsDragging(true)}
           >
-            {/* Circular Drag Handle Grip */}
-            <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-2xl border-2 border-white cursor-ew-resize active:scale-110 transition-transform">
-              <ArrowLeftRight className="h-5 w-5" />
+            {/* Drag Handle with Clear DRY | FLOOD Labels */}
+            <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center rounded-full bg-blue-600 text-white shadow-2xl border-2 border-white cursor-ew-resize active:scale-105 transition-transform px-3 py-1.5 text-[10px] font-black whitespace-nowrap gap-1.5 select-none">
+              <span className="text-emerald-300 font-bold">DRY</span>
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+              <span className="text-cyan-300 font-bold">FLOOD</span>
             </div>
 
             {/* Position Percentage Badge */}
@@ -939,6 +1147,22 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
           </p>
         </div>
       </div>
+
+      {/* Google Earth Engine Analysis Code Modal */}
+      <EarthEngineScriptModal
+        isOpen={isScriptModalOpen}
+        onClose={() => setIsScriptModalOpen(false)}
+        selectedRegionName={activeRegion.name}
+        beforeDate={beforeDate}
+        afterDate={afterDate}
+      />
+
+      {/* Terai City Villages & Towns Directory Modal */}
+      <CityVillagesModal
+        city={selectedCity}
+        isOpen={isCityModalOpen}
+        onClose={() => setIsCityModalOpen(false)}
+      />
     </div>
   );
 };

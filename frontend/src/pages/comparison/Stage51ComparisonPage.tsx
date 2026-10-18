@@ -1,72 +1,49 @@
 /**
- * Stage51ComparisonPage.tsx — Dedicated Workspace View for Stage 5.1.
+ * Stage51ComparisonPage.tsx — Satellite Flood Detection & Analysis (Earth Engine).
  *
- * Implements Point 1 of User Vision:
- * "jo sabse pahle before and after image ko compare kare then bataye flood kaha hai."
- *
- * Features:
- * - Real Google Earth Engine style Google Satellite basemap.
- * - Full Nepal Terai Region (all 20+ lowland districts) + regional basin selectors.
- * - Draggable Before & After Split Swipe Slider.
- * - Otsu radar backscatter bimodal threshold analytics.
+ * Provides before & after satellite image analysis, radar specular backscatter drop,
+ * and Otsu bimodal inundation thresholding for Nepal Terai.
  */
 
 import React, { useState } from 'react';
 import {
-  ArrowRight,
-  Calendar,
   CheckCircle2,
   Globe,
   Info,
   Layers,
   MapPin,
+  Satellite,
   ShieldAlert,
   Sparkles,
 } from 'lucide-react';
 import { BeforeAfterSlider, TERAI_PRESETS } from '@/components/comparison/BeforeAfterSlider';
 
-export interface Stage51ComparisonPageProps {
-  onProceedToNextStage?: () => void;
-}
-
-export const Stage51ComparisonPage: React.FC<Stage51ComparisonPageProps> = ({
-  onProceedToNextStage,
-}) => {
+export const Stage51ComparisonPage: React.FC = () => {
   const [activePresetKey, setActivePresetKey] = useState<string>('full_terai');
-  const [beforeDates] = useState({ start: '2024-06-01', end: '2024-06-30' });
-  const [afterDates] = useState({ start: '2024-09-15', end: '2024-10-15' });
-
   const activePreset = TERAI_PRESETS[activePresetKey as keyof typeof TERAI_PRESETS] || TERAI_PRESETS.full_terai;
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Stage Header */}
+      {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-400 border border-emerald-500/30">
-              STAGE 5.1 VERIFIED
+            <span className="rounded-md bg-cyan-500/20 px-2.5 py-0.5 text-xs font-bold text-cyan-400 border border-cyan-500/30 flex items-center gap-1">
+              <Satellite className="h-3.5 w-3.5" />
+              GOOGLE EARTH ENGINE &bull; COPERNICUS
             </span>
-            <span className="text-xs text-slate-400">Point 1 of 11 • Google Satellite &amp; Earth Engine SAR</span>
+            <span className="text-xs text-slate-400">
+              Sentinel-1 SAR C-Band Microwave Analysis &bull; Nepal Terai
+            </span>
           </div>
           <h1 className="text-2xl font-black text-white mt-1 flex items-center gap-2">
             <Layers className="h-6 w-6 text-blue-500" />
-            Before &amp; After Satellite Comparison — Nepal Terai
+            Satellite Flood Detection &amp; Comparison
           </h1>
           <p className="text-xs text-slate-300 mt-0.5">
-            Real Google Satellite imagery compared against Sentinel-1 SAR deluge extent across the entire southern Terai belt.
+            Cloud-penetrating radar change detection comparing pre-monsoon dry terrain against deluge peak flood extent across the entire southern Terai belt.
           </p>
         </div>
-
-        {onProceedToNextStage && (
-          <button
-            onClick={onProceedToNextStage}
-            className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-blue-600/30 hover:bg-blue-500 transition-all active:scale-95 shrink-0"
-          >
-            <span>Proceed to Stage 5.2</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        )}
       </div>
 
       {/* Main Interactive Google Satellite Before & After Slider */}
@@ -80,11 +57,11 @@ export const Stage51ComparisonPage: React.FC<Stage51ComparisonPageProps> = ({
             Full Nepal Terai Coverage
           </h3>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Covers all 20+ southern Terai districts from <strong>Jhapa in the east to Kanchanpur in the far-west</strong>.
+            Covers all 21 southern Terai districts from <strong>Jhapa in the east to Kanchanpur in the far-west</strong>.
             The alluvial flatlands of Koshi, Bagmati, Narayani, Rapti, and Karnali rivers are mapped at 10-meter ground pixel fidelity.
           </p>
           <div className="rounded-xl border border-slate-800 bg-slate-950 p-2.5 font-mono text-[11px] text-blue-300">
-            Latitude: 26.3&deg;N &mdash; 28.9&deg;N | Longitude: 80.1&deg;E &mdash; 88.1&deg;E
+            Latitude: 26.3&deg;N &mdash; 27.9&deg;N | Longitude: 80.0&deg;E &mdash; 88.2&deg;E
           </div>
         </div>
 

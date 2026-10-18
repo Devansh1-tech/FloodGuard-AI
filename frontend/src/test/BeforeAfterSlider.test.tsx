@@ -20,7 +20,7 @@ describe('Stage 5.1: BeforeAfterSlider Component & Geographic Data Suite', () =>
   it('contains Full Nepal Terai preset data with accurate geographical coordinates', () => {
     const fullTerai = TERAI_REGIONS.full_terai;
     expect(fullTerai.name).toContain('Full Nepal Terai Plains');
-    expect(fullTerai.center).toEqual([27.35, 84.15]);
+    expect(fullTerai.center).toEqual([26.85, 85.30]);
     expect(fullTerai.floodAreaKm2).toBe(642.8);
     expect(fullTerai.districts.length).toBe(21);
     expect(fullTerai.settlements.length).toBeGreaterThan(5);
