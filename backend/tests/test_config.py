@@ -71,3 +71,11 @@ def test_get_settings_caching():
     s1 = get_settings()
     s2 = get_settings()
     assert s1 is s2
+
+
+def test_settings_gemini_configuration():
+    """Verify Gemini AI settings initialization and model binding."""
+    settings = Settings()
+    assert settings.GEMINI_API_KEY is not None
+    assert "flash" in settings.GEMINI_MODEL
+

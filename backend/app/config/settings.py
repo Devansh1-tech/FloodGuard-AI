@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     EE_PROJECT_ID: str = Field(default="home-credit-505106", description="GCP Project ID with Earth Engine enabled")
     EE_SERVICE_ACCOUNT_KEY: Optional[str] = Field(default=None, description="Path to service account credentials JSON")
 
+    GEMINI_API_KEY: Optional[str] = Field(default="AQ.Ab8RN6IRx8hygWm8XQLWtEFlcFOpSvNSW2NmSEXP8hYumUGuzw", description="Google Gemini API key for demographic & healthcare intelligence")
+    GEMINI_MODEL: str = Field(default="gemini-flash-latest", description="Gemini model name")
+
     # ── Storage Abstraction ─────────────────────────────────────────────
     STORAGE_BACKEND: str = Field(default="local", description="Storage driver: local | s3 | gcs | azure")
     STORAGE_LOCAL_ROOT: str = Field(default="outputs", description="Root directory for local file storage")

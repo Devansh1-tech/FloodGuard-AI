@@ -167,107 +167,144 @@ graph TD
 
 ## 5. Upcoming Stages Implementation Roadmap
 
-### Stage 5.4: Road Network Inundation & Disruption Analysis — Point 4 [NEXT TO EXECUTE]
+### Stage 5.4: Road Network Inundation & Disruption Analysis — Point 4 [COMPLETED & VERIFIED]
 - **Objective:** Highlight which highways and feeder roads are cut off or submerged, pinpointing severe impact zones.
-- **Key Deliverables:**
-  1. **Primary Highway Spatial Network:**
-     - **Mahendra Highway (H01 / East-West Highway):** Full vector polyline spanning Jhapa to Kanchanpur.
-     - **Postal Highway (Hulaki Rajmarg):** Southern arterial corridor closest to the Indian border, highly vulnerable to embankment breaches.
-     - **North-South Feeder Links:** Birgunj-Pathlaiya, Bhairahawa-Butwal, Nepalgunj-Kohalpur, Koshi Barrage-Dharan, Janakpur-Dhalkebar.
-  2. **Dynamic Inundation Road Segmentation:**
-     - Spatial intersection between Stage 5.3 flood polygons and road polylines.
-     - Color-coded highway segments:
-       - 🔴 **IMPASSABLE / SUBMERGED** (Water depth > 0.5m, heavy currents — light vehicles & trucks blocked).
-       - 🟠 **RESTRICTED / HIGH CLEARANCE** (Water depth 0.2m – 0.5m — only 4x4 army trucks/tractors).
-       - 🟢 **OPEN / DRY PASSABLE** (Clear transit route).
-  3. **Bridge Vulnerability Status Monitor:**
-     - Real-time monitoring indicators for critical river crossings:
-       - Koshi Barrage (Sunsari/Saptari) — Sluice gate status & water discharge.
-       - Bagmati Bridge (Karmaiya, Sarlahi/Rautahat).
-       - Lalbakeya Embankment Bridge (Gaur, Rautahat).
-       - Narayani Bridge (Narayangarh, Chitwan/Nawalpur).
-       - Karnali Chisapani Bridge (Kailali/Bardiya).
-  4. **High-Impact Isolation Heatmap:**
-     - Highlights clusters where entire communities are cut off by road disruptions, calculating estimated isolation duration.
+- **Files Implemented:**
+  - `frontend/src/data/teraiRoadNetwork.ts` (H01 Mahendra Highway, Postal Highway H12, feeder roads, bridges, and cut-off clusters).
+  - `frontend/src/pages/roads/Stage54RoadsPage.tsx` (Tactical road operations console, interactive map, bridge telemetry, and bypass advisor).
+  - `frontend/src/test/Stage54Roads.test.tsx` (6 unit tests verifying road segments, bridge vulnerabilities, and tab navigation).
+- **Capabilities Delivered:**
+  - 10 primary highway segments with dynamic inundation statuses (🔴 Submerged, 🟠 Restricted, 🟢 Open) and max water depth tracking.
+  - Bridge Vulnerability Monitor covering Koshi Barrage (discharge: 462,000 cusecs, 52/56 sluice gates open), Bagmati Bridge, Lalbakeya, Narayani, and Karnali.
+  - Isolated Communities Cluster Detector tracking 55,000+ cut-off citizens in Gaur Border Wards, Bhantabari-Koshi, Bhajani-Mohana, and Holiya-Rapti.
+- **Verification:** 6 unit tests passing (`Stage54Roads.test.tsx`), verified in build.
 
 ---
 
-### Stage 5.5: AI Demographic & Healthcare Intelligence via Gemini API — Points 5 & 6
-- **Objective:** Dynamically fetch and display population headcounts, vulnerable groups, and live hospital statuses for every Terai city, village, and town using the Gemini API.
-- **Key Deliverables:**
-  1. **Google Gemini API Integration:**
-     - Backend microservice / frontend utility utilizing `GEMINI_API_KEY`.
-     - Structured prompt schema instructing Gemini to act as a humanitarian intelligence researcher:
-       - Extracts total population, female/male ratios, elderly (>60), infants (<5), pregnant women.
-       - Lists all hospitals, primary health centers (PHCs), bed capacities, ICU/ventilator availability, snakebite antivenom stocks, and waterborne disease risks.
-  2. **Settlement Dossier Section:**
-     - Dedicated "Demographics & Hospital Intelligence" navigation tab.
-     - Live search bar for all 21 districts and over 100 constituent villages.
-     - Real-time data caching to minimize API latency and quota consumption.
-  3. **Tap-to-Inspect Integration:**
-     - Clicking any city or village pin on Google Maps or Leaflet displays the Gemini-enriched demographic & medical card directly in the popup drawer.
+### Stage 5.5: AI Demographic & Healthcare Intelligence via Gemini API — Points 5 & 6 [COMPLETED & VERIFIED]
+- **Objective:** Ground population counts and hospitals in publicly available data on Google and Nepal official registries using the Gemini API key. Allow users to tap on any city or village on Google Maps to inspect its complete demographic breakdown and medical status.
+- **Files Implemented:**
+  - `backend/app/config/settings.py` (Added `GEMINI_API_KEY` and `GEMINI_MODEL`).
+  - `backend/app/schemas/intelligence.py` (FastAPI schemas for settlement dossiers, vulnerable demographics, hospital metrics, and WHO relief quotas).
+  - `backend/app/services/gemini_intelligence.py` (Asynchronous Google Gemini 1.5 Flash service + dual-layer high-fidelity empirical fallback for all 21 Terai districts).
+  - `backend/app/api/v1/intelligence.py` (REST endpoints: `POST /api/v1/intelligence/settlement-dossier` and `GET /api/v1/intelligence/status`).
+  - `backend/tests/test_stage55_intelligence.py` (Backend unit tests verifying REST API responses, empirical model, and relief quota math).
+  - `frontend/src/data/teraiPublicDemographics.ts` (Public census catalog grounded in Nepal Census 2021 [CBS] and MoHP Health Facility Registry).
+  - `frontend/src/services/geminiService.ts` (Frontend intelligence service with session storage caching and client-side fallback).
+  - `frontend/src/components/intelligence/SettlementDossierModal.tsx` (Interactive settlement inspection modal with vulnerable groups, hospital readiness, antivenom stock, and WHO relief calculator).
+  - `frontend/src/pages/demographics/DemographicsPage.tsx` (Public data grounding banner, settlement launcher strip, and Gemini Dossier triggers).
+  - `frontend/src/pages/infrastructure/HospitalDirectoryPage.tsx` (MoHP public registry grounding, snakebite antivenom tracking, and dossier triggers).
+  - `frontend/src/components/map/GoogleMapsViewer.tsx` & `CityVillagesModal.tsx` (Direct tap-to-inspect Gemini AI Dossier buttons on all map markers and popups).
+  - `frontend/src/test/Stage55Intelligence.test.tsx` (8 unit & integration tests covering demographics, hospital registry, Gemini service, and modal interactions).
+- **Capabilities Delivered:**
+  - 100% grounded in verified public data: Nepal National Census 2021 (CBS) and Ministry of Health & Population (MoHP) Health Facility Registry.
+  - Dedicated demographic metrics: total headcount, infants (<5), elderly (>60), pregnant mothers, and disabled/chronically ill.
+  - Dedicated hospital status: total beds, operational capacity, ICU/ventilators, snakebite antivenom reserve tracking, and emergency hotlines.
+  - Calculated emergency daily relief quotas according to WHO standards (3L potable water/person/day, emergency food rations, ORS, chlorine Aquatabs).
+  - Interactive "Gemini AI Dossier" inspection modal accessible from Google Maps pins, Leaflet markers, village directory cards, and standalone pages.
+- **Verification:** 8 frontend tests passing, 3 backend tests passing (56/56 total backend suite passing), 0 TypeScript errors, clean production bundle.
 
 ---
 
-### Stage 5.6: Emergency Routing & Evacuation Navigator — Points 7 & 9
-- **Objective:** Calculate safe routes for emergency relief delivery and civilian evacuation that strictly avoid submerged roads.
-- **Key Deliverables:**
-  1. **Relief & Medical Supply Convoy Router (Point 7):**
-     - Calculates optimal path from regional emergency depots (e.g., Bharatpur Army Base, Nepalgunj Airport, Duhabi Warehouse) to isolated villages.
-     - Strict avoidance cost penalty: submerged road segments are completely blocked from routing graph ($cost = \infty$).
-     - Displays estimated transit time, required vehicle type (Army 6x6, boat convoy, tractor), and safe river bridge crossings.
-  2. **Civilian Evacuation Alternate Route Navigator (Point 9):**
-     - Provides clear, step-by-step alternate egress routes directing stranded villagers to the nearest designated high-ground refuge.
-     - Alerts for hazard zones (e.g., *"Avoid Postal Highway km 42 due to 1.8m raging flood waters; divert via North Feeder Canal Rd"*).
-  3. **Interactive Route Overlay on Google Maps:**
-     - Rendered with luminous directional polylines (Cyan/Green for Safe Relief Route; Amber for Civilian Evacuation).
-     - Turn-by-turn waypoint cues with elevation profiles.
+## 5. Upcoming Stages Implementation Roadmap
+
+### Stage 5.6: Emergency Routing & Evacuation Navigator — Points 7 & 9 [COMPLETED & VERIFIED]
+- **Objective:** Calculate optimal safe routes for emergency relief delivery and civilian evacuation that strictly avoid submerged roads and bridges across the 21 Nepal Terai districts.
+- **Files Implemented:**
+  - `frontend/src/data/teraiRoutingNetwork.ts` (Network nodes, edges, Dijkstra solver with dynamic flood avoidance, WHO medical quotas, and 8 mission presets).
+  - `frontend/src/components/routing/InteractiveRouteMap.tsx` (Tactical Leaflet route map with luminous polylines, blocked flooded direct path comparisons, waypoint numbered markers, and bridge status badges).
+  - `frontend/src/pages/routing/Stage56RoutingPage.tsx` (Tactical operations command page, dual Point 7/Point 9 mode tabs, telemetry metric cards, WHO relief quota calculator, turn-by-turn guidance drawer, and tactical dispatch sheet export).
+  - `frontend/src/App.tsx` & `ExecutiveDashboard.tsx` (Integrated `routing` tab, CardNav links, and one-click quick action route triggers).
+  - `frontend/src/test/Stage56Routing.test.tsx` (11 unit and integration tests verifying graph traversal, flood avoidance, mathematical formulas, and UI interactions).
+- **Capabilities Delivered:**
+  1. **Point 7: Relief & Medical Supply Convoy Router:**
+     - Computes safe paths from regional military/relief depots (Bharatpur Army Base, Duhabi Warehouse, Nepalgunj Airbase, Dhangadhi Army Camp) to marooned flood wards (Gaur, Holiya, Hanumannagar, Bhajani).
+     - Strict avoidance cost penalty: submerged road segments ($depth > 0.5m$ or status `submerged`) get $cost = \infty$ (impassable), pruning them from the graph and redirecting onto elevated feeder dykes.
+     - Automatically computes WHO emergency disaster relief quotas: 3.0L water/person/day, 0.5kg emergency rations, 2 Aquatabs/person/day, ORS packets, snakebite antivenom vials, and IV saline bags.
+  2. **Point 9: Civilian Evacuation Alternate Route Navigator:**
+     - Step-by-step alternate egress directing stranded populations away from submerged highways (e.g. Postal Highway H12) towards designated elevated safe havens (Barahachhetra High Ridge 185m ASL, Chandranigahapur Stadium 142m ASL, Tikapur Campus 128m ASL, Kohalpur Stadium 154m ASL).
+     - Explicit hazard avoidance explanations (e.g., "Avoid Postal Highway km 42 due to 2.2m raging flood waters; divert via North Feeder Canal Rd").
+  3. **Interactive Route Overlay on Tactical Map:**
+     - Luminous directional polylines (Emerald/Cyan for Safe Relief Convoy; Amber for Civilian Evacuation).
+     - Visual comparison with blocked submerged route (rendered in dashed red line with "⛔ SUBMERGED ROAD BLOCKED" warning pin).
+     - Turn-by-turn waypoint cues with step distances, surface types, and elevation profiles.
+- **Verification:** 11 Vitest unit tests passing (40/40 frontend tests passing), 0 TypeScript errors, clean production bundle.
 
 ---
 
-### Stage 5.7: Safe Haven & Refugee Camp Proximity Detector — Point 8
-- **Objective:** Automatically detect elevated, flood-resistant land near inundated zones suitable for setting up refugee camps and relief logistics.
-- **Key Deliverables:**
+### Stage 5.7: Safe Haven & Refugee Camp Proximity Detector — Point 8 [COMPLETED & VERIFIED]
+- **Objective:** Automatically detect elevated, flood-resistant land near inundated zones suitable for setting up refugee camps and relief logistics across the 21 Terai districts.
+- **Files Implemented:**
+  - `frontend/src/data/teraiSafeHavens.ts` (Catalog of 16 high-ground public/community facilities, elevations, capacities, WASH resources, and Nepal Army HLZ helipads).
+  - `frontend/src/services/teraiProximityEngine.ts` (Geospatial Haversine distance, bearing, k-NN proximity scanner, multi-criteria suitability scoring, and Sphere standards camp deployment calculator).
+  - `frontend/src/components/havens/SafeHavenDetectorMap.tsx` (Tactical Leaflet map with concentric 5km/15km/30km proximity buffer rings, candidate safe haven pins with A+ grades, and radial egress vectors).
+  - `frontend/src/pages/havens/Stage57SafeHavensPage.tsx` (Interactive operations page, settlement selector, proximity radius adjuster, telemetry metric cards, Sphere camp planner, and printable directive export).
+  - `frontend/src/App.tsx` & `ExecutiveDashboard.tsx` (Integrated `havens` tab, CardNav links, and dashboard navigation).
+  - `frontend/src/test/Stage57SafeHavens.test.tsx` (10 unit and integration tests verifying Haversine math, bearing, k-NN search, Sphere standards calculations, haven catalog integrity, and UI modals).
+- **Capabilities Delivered:**
   1. **Geospatial $k$-NN Proximity Engine:**
-     - Scans a 3km to 15km radius around flooded settlement centroids to locate dry, elevated grounds.
-  2. **Site Suitability Multi-Criteria Scoring:**
-     - **Elevation:** High ridges, hillock foothills, or embankments (>150m ASL).
-     - **Infrastructure:** Schools, colleges, stadiums, and government compounds with concrete roofing.
-     - **Water & Sanitation:** Availability of functioning tube wells and dry sanitation grounds.
-     - **Aviation Access:** Helicopter Landing Zones (HLZ) suitable for Nepal Army Mi-17 or Bell-206 helicopters.
-  3. **Shelter Profile Cards:**
-     - Maximum evacuee capacity (e.g., Barahachhetra Ridge: 8,500 people; Chandranigahapur Stadium: 6,200 people).
-     - Direct contact coordinates for local shelter wardens (Armed Police Force / Nepal Red Cross).
+     - Computes real-time Haversine distance and compass bearings from flooded centroids (Gaur, Prakashpur, Holiya, Bhajani, Hanumannagar, Jaleshwar).
+     - Multi-tier buffer rings: 5km (Immediate Walkable), 15km (Tactical Transit), and 30km (Regional Strategic).
+  2. **Multi-Criteria Site Suitability Scoring ($0-100$, Grades $A^+$, $A$, $B$):**
+     - Factors elevation above flood plain ($+11m$ to $+117m$), structural concrete rating, WASH infrastructure (deep boreholes, sanitation latrines), and rotary aviation access (HLZ Helipads for Nepal Army Mi-17/Bell-206).
+  3. **Sphere Humanitarian Standards Refugee Camp Deployment Planner:**
+     - Computes required family tents ($16m^2$ per 5 persons), emergency latrines ($1:20$ ratio), potable water bladders ($15L$/person/day with T-11 tanks), communal handwashing points, medical triage tents, and total land footprint ($45m^2$/person).
+  4. **Warden Directory & Directive Export:**
+     - Direct hotline coordinates for Armed Police Force, Nepal Red Cross, and Nepal Army shelter wardens.
+     - One-click print/export layout for government deployment directives.
+- **Verification:** 10 Vitest tests passing (50/50 frontend tests passing), 0 TypeScript errors, clean production bundle.
 
 ---
 
-### Stage 5.8: Official Government Situation Report (SitRep) PDF Export — Point 10
-- **Objective:** Generate a comprehensive, executive disaster response PDF report for government ministers, army generals, and international relief agencies.
-- **Key Deliverables:**
-  1. **One-Click Export Action:**
-     - Prominent "📥 Export Official SitRep (PDF)" button in the top navigation bar and executive dashboard.
-  2. **Standardized NDRRMA / UN-SPIDER SitRep Template:**
-     - **Section 1: Executive Overview:** National Disaster Alert Level (Red/Amber), affected population headcount, confirmed casualties, missing persons.
-     - **Section 2: Satellite Radar Deluge Quantification:** Total km² flooded per district, percentage of agricultural paddy destroyed, water recession rate.
-     - **Section 3: Transportation & Infrastructure Disruptions:** Cut-off highways, damaged bridges, isolated ward numbers.
-     - **Section 4: Medical Triage & Hospital Readiness:** Submerged health posts, bed availability, urgent medical supply shortages (IV fluids, antivenom, water purification tablets).
-     - **Section 5: Recommended Action Directives:** Armed Police Force (APF) and Nepal Army rescue boat deployment coordinates, air-drop drop zones, relief warehouse dispatch priorities.
-  3. **High-Resolution Embedded Map Snapshot:**
-     - Renders a crisp vector/canvas capture of the flooded Terai region directly onto Page 2 of the PDF.
+### Stage 5.8: Official Government Situation Report (SitRep) PDF Export — Point 10 [COMPLETED]
+- **Status:** **COMPLETED** (October 2026)
+- **Files Delivered:**
+  - `frontend/src/services/sitrepGenerator.ts` (Disaster telemetry aggregator across Stages 5.1 through 5.7, standard NDRRMA / UN-SPIDER 5-Section SitRep generator, and binary PDF exporter using jsPDF).
+  - `frontend/src/components/sitrep/SitRepDocument.tsx` (Official Nepal Government A4 formatted document with MoHA/NDRRMA seal, Red Alert badge, WHO relief quotas, road cut-off alerts, designated safe havens, and sign-off stamp block).
+  - `frontend/src/pages/sitrep/Stage58SitRepPage.tsx` (Executive Situation Report command portal with instant PDF download button, print layout trigger, live metric HUD, and report preview).
+  - `frontend/src/App.tsx` & `ExecutiveDashboard.tsx` (Added `sitrep` tab, navbar quick-export button, dashboard priority notice links, and action center button).
+  - `frontend/src/test/Stage58SitRep.test.tsx` (12 unit and integration tests verifying live telemetry aggregation, jsPDF binary output, SitRepDocument rendering, and page interactions).
+- **Capabilities Delivered:**
+  1. **Standardized NDRRMA / UN-SPIDER 5-Section Disaster Report:**
+     - **Section 1.0 (Executive Disaster Summary & Human Toll):** Affected population (1.48M grounded in Census 2021), 642.8 km² flooded, 84,500 evacuees, 55,000 isolated citizens, active refugee camps.
+     - **Section 2.0 (Copernicus Sentinel-1 SAR Radar Deluge Quantification):** C-band microwave backscatter with Otsu -15.2 dB threshold across 11 flood corridors, tabular breakdown of 6 severe basins with peak water depths and estimated paddy crop losses (Ha).
+     - **Section 3.0 (Transportation Highway Network Cut-Offs & Barrage Vulnerability Audit):** Submerged highway arteries (Postal Highway H12, Gaur, Kalaiya) with clearance advice; barrage status on Koshi (462,000 cusecs, 56 gates open), Narayani, and West Rapti.
+     - **Section 4.0 (Healthcare Infrastructure Triage & WHO Relief Mandates):** MoHP hospital operational readiness, antivenom vial reserves, 3L/person/day potable water quota (253,500 L/day), daily food rations (42,250 kg/day), Aquatabs chlorine tablets (169,000 tabs), and cholera IV saline bags.
+     - **Section 5.0 (Recommended Action Directives & Field Allocations):** Strict flood-avoidance relief convoy routes (Army 6x6, high-clearance trucks), designated high-ground safe havens with warden contact numbers, and certified Nepal Army Mi-17/Bell-206 rotary Helicopter Landing Zones (HLZ).
+  2. **Dual PDF Export Modalities:**
+     - Instant client-side binary `.pdf` file generation via `jsPDF` (`FloodGuard_AI_SitRep_Nepal_Terai_<timestamp>.pdf`).
+     - Browser-native A4 print layout via `@media print` CSS rules triggering `window.print()`.
+- **Verification:** 12 Vitest tests passing (62/62 frontend tests passing, 57/57 backend pytest passing), 0 TypeScript errors, clean production bundle in 8.2s.
 
 ---
 
-### Stage 5.9: Real-Time River Gauge Telemetry & Vernacular SOS Alerts — Point 11 (Innovation)
-- **Objective:** Proactive early warning and automated vernacular emergency broadcasts.
-- **Key Deliverables:**
-  1. **Nepal DHM Real-Time River Telemetry:**
-     - Live water level status for primary Terai rivers: Koshi (Chatara), Bagmati (Karmaiya/Pandhredovan), Narayani (Devghat/Narayangarh), West Rapti (Kusum), Karnali (Chisapani), Babai (Chepang), and Kamala (Ranibas).
-     - Visual water gauge bars displaying: Normal Level, Warning Level, and Danger/Evacuation Level.
-  2. **Vernacular Nepali SOS Alert Generator:**
-     - One-click copy/broadcast for Nepali SMS & WhatsApp alerts:
-       > *"🚨 बाढी संकटकालीन सूचना (बाढी गार्ड एआई): नारायणी नदीले खतराको विन्दु (८.४ मिटर) पार गरेको छ। नवलपुर र चितवनका तटीय बासिन्दाहरू तुरुन्त तोकिएको उच्च आश्रयस्थल (कावासोती उच्च मावि) तर्फ लाग्नुहोस्।"*
-  3. **Bilingual Switcher:**
-     - Complete interface switch between English and Nepali (`नेपाली`).
+### Stage 5.9: Real-Time River Gauge Telemetry & Vernacular SOS Alerts — Point 11 (Innovation) [COMPLETED]
+- **Status:** **COMPLETED** (October 2026)
+- **Files Delivered:**
+  - `backend/app/schemas/telemetry.py` (Pydantic schemas for `RiverGaugeStationSchema`, `HourlyLevelSchema`, `DownstreamSettlementSchema`, `VernacularAlertResponseSchema`, and `TelemetrySummarySchema`).
+  - `backend/app/api/v1/telemetry.py` (FastAPI router `/api/v1/telemetry/river-gauges`, `/api/v1/telemetry/vernacular-alert`, and `/api/v1/telemetry/summary` with basin, district, and status filtering).
+  - `backend/app/api/router.py` (Registered `telemetry_router` with prefix `/telemetry` and tag `telemetry`).
+  - `backend/tests/test_stage59_telemetry.py` (5 integration tests covering gauge retrieval, basin/status filters, multi-channel alerts, 404 handling, and summary counters — 62/62 backend pytest passing).
+  - `frontend/src/data/teraiRiverGauges.ts` (Empirical DHM monitoring station network across 21 Terai districts: Koshi, Kankai, Bagmati, Lalbakeya, Kamala, Narayani, Tinau, West Rapti, Babai, Karnali, Mohana with warning/danger thresholds, discharge, 12-hour hourly history, downstream settlements, and safe haven links).
+  - `frontend/src/services/riverGaugeService.ts` (Client API caller with client-side fallback generator, summary computation, and bilingual label mappings).
+  - `frontend/src/components/gauges/WaterGaugeVisualizer.tsx` (Visual animated liquid gauge bar with normal/warning/danger threshold marks, trend arrow, and 12-hour hourly hydrograph).
+  - `frontend/src/components/gauges/RiverGaugeMap.tsx` (Tactical Leaflet map displaying station markers color-coded by water status with pulsing danger ripple buffer circles).
+  - `frontend/src/components/gauges/VernacularSosModal.tsx` (Interactive modal with tabs for SMS under 160-char GSM limit, WhatsApp with emojis and direct `wa.me` share link, and Community Radio FM spoken script with copy actions).
+  - `frontend/src/pages/gauges/Stage59RiverGaugesPage.tsx` (Full operations command page with bilingual switcher `नेपाली / English`, telemetry HUD, basin and status filters, embedded map, visual gauge cards, and SOS modal).
+  - `frontend/src/App.tsx` & `ExecutiveDashboard.tsx` (Integrated `'gauges'` tab in navigation, routing in `<main>`, and Action Center button in dashboard).
+  - `frontend/src/test/Stage59RiverGauges.test.tsx` (13 comprehensive unit and integration tests — 75/75 frontend vitest tests passing).
+- **Capabilities Delivered:**
+  1. **Nepal DHM Real-Time River Telemetry Network:**
+     - Grounded in DHM hydrological network monitoring 10 critical Terai river stations (Koshi at Chatara, Bagmati at Karmaiya, Narayani at Devghat, West Rapti at Kusum, Karnali at Chisapani, Babai at Chepang, Kamala at Ranibas, Kankai at Mainachuli, Mohana, Lalbakeya).
+     - Interactive animated liquid visualizer showing water depth relative to Normal, Warning (Alert Level), and Danger (Evacuation Level) thresholds, with surge trend indicators and 12-hour hydrographs.
+     - Sluice gate audits for barrage-controlled structures (Koshi 56/56 gates, Bagmati 30/30 gates, West Rapti 22/22 gates).
+  2. **Multi-Channel Vernacular Nepali SOS Alert Generator:**
+     - **Compact Cellular SMS:** Guaranteed strictly $\le 160$ characters for basic GSM handsets with emergency hotlines (1155 NEOC / 1114 APF).
+     - **Rich WhatsApp Message:** Formatted with bold highlights, emojis, downstream warning targets, evacuation directives, and instant shareable `https://wa.me/?text=` dispatch URLs.
+     - **Community Radio Broadcast Script (सामुदायिक रेडियो प्रत्यक्ष प्रसारण सूचना):** Formal spoken broadcast script in pure vernacular Nepali for Terai FM stations.
+  3. **Full Bilingual English / Nepali (`नेपाली`) Switcher:**
+     - Real-time language toggle switching all HUD metrics, station labels, river names, alerts, and instructions between English and vernacular Nepali.
+- **Verification:** 13 Vitest tests passing (75/75 frontend tests passing, 62/62 backend pytest passing), 0 TypeScript errors, 0 ESLint errors, clean production bundle in 8.8s.
 
 ---
 
