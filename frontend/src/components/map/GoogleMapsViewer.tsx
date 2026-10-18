@@ -15,6 +15,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader';
+
+let googleMapsOptionsConfigured = false;
+
 import {
   MapContainer,
   TileLayer,
@@ -95,6 +98,7 @@ import {
   TeraiBridge,
 } from '@/data/teraiRoadNetwork';
 import { CityVillagesModal } from '@/components/map/CityVillagesModal';
+import { SettlementDossierModal } from '@/components/intelligence/SettlementDossierModal';
 
 // Strict geographical bounds for Nepal Terai Lowlands (excludes high mountain ranges)
 const NEPAL_TERAI_BOUNDS = {
@@ -361,6 +365,12 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   const [showBridges, setShowBridges] = useState<boolean>(true);
   const [selectedCity, setSelectedCity] = useState<TeraiCityData | null>(null);
   const [isCityModalOpen, setIsCityModalOpen] = useState<boolean>(false);
+  const [dossierTarget, setDossierTarget] = useState<{
+    name: string;
+    district: string;
+    isFlooded?: boolean;
+    depth?: number;
+  } | null>(null);
 
   // DOM & Map References
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -605,14 +615,17 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
       return;
     }
 
-    try {
-      setOptions({
-        key: apiKey.trim(),
-        v: 'weekly',
-        libraries: ['places', 'geometry'],
-      });
-    } catch {
-      // Ignore if options already configured in current browser session
+    if (!googleMapsOptionsConfigured) {
+      try {
+        setOptions({
+          key: apiKey.trim(),
+          v: 'weekly',
+          libraries: ['places', 'geometry'],
+        });
+        googleMapsOptionsConfigured = true;
+      } catch {
+        // Ignore if options already configured in current browser session
+      }
     }
 
     importLibrary('maps')
@@ -1820,6 +1833,20 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                             <strong>Action:</strong> {v.recommendedAction}
                           </p>
                         </div>
+                        <button
+                          onClick={() =>
+                            setDossierTarget({
+                              name: v.name,
+                              district: v.district,
+                              isFlooded: v.isFlooded,
+                              depth: v.floodDepthMeters,
+                            })
+                          }
+                          className="w-full mt-2 rounded-lg bg-blue-600/30 border border-blue-500/40 px-2 py-1 text-[11px] font-bold text-blue-200 hover:bg-blue-600/50 transition-colors flex items-center justify-center gap-1 shadow-sm"
+                        >
+                          <Sparkles className="h-3 w-3 text-cyan-300" />
+                          <span>Gemini AI Dossier</span>
+                        </button>
                       </div>
                     </Popup>
                   </Marker>
@@ -1982,6 +2009,16 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
           pinpointVillageOnMap(v);
           setIsCityModalOpen(false);
         }}
+      />
+
+      {/* Stage 5.5 Gemini AI Demographic & Healthcare Dossier Modal */}
+      <SettlementDossierModal
+        settlementName={dossierTarget?.name || null}
+        district={dossierTarget?.district || null}
+        isFlooded={dossierTarget?.isFlooded}
+        floodDepthMeters={dossierTarget?.depth}
+        isOpen={Boolean(dossierTarget)}
+        onClose={() => setDossierTarget(null)}
       />
     </div>
   );

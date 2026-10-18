@@ -25,12 +25,14 @@ import {
   Shield,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Users,
   Waves,
   X,
   Zap,
 } from 'lucide-react';
 import { TeraiCityData, VillageTownItem } from '@/data/teraiCitiesData';
+import { SettlementDossierModal } from '@/components/intelligence/SettlementDossierModal';
 
 interface CityVillagesModalProps {
   city: TeraiCityData | null;
@@ -47,6 +49,7 @@ export const CityVillagesModal: React.FC<CityVillagesModalProps> = ({
 }) => {
   const [filterMode, setFilterMode] = useState<'all' | 'flooded' | 'safe'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDossierVillage, setSelectedDossierVillage] = useState<VillageTownItem | null>(null);
 
   if (!isOpen || !city) return null;
 
@@ -263,22 +266,31 @@ export const CityVillagesModal: React.FC<CityVillagesModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Action Button */}
-                    <div className="shrink-0 flex items-center gap-2">
+                    {/* Action Buttons */}
+                    <div className="shrink-0 flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => setSelectedDossierVillage(item)}
+                        className="flex items-center gap-1 rounded-xl border border-blue-500/40 bg-blue-600/20 px-2.5 py-1.5 text-xs font-bold text-blue-200 hover:bg-blue-600/40 transition-all active:scale-95 shadow-sm"
+                        title="Inspect Public Demographics & Hospitals (Gemini AI)"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
+                        <span>Gemini Dossier</span>
+                      </button>
+
                       {onFocusVillage && (
                         <button
                           onClick={() => {
                             onFocusVillage(item);
                             onClose();
                           }}
-                          className={`flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold transition-all active:scale-95 ${
+                          className={`flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-bold transition-all active:scale-95 ${
                             isFlooded
                               ? 'bg-rose-600 text-white hover:bg-rose-500 shadow-md shadow-rose-600/30'
                               : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md shadow-emerald-600/30'
                           }`}
                         >
                           <Navigation className="h-3.5 w-3.5" />
-                          <span>Pinpoint on Map</span>
+                          <span>Pinpoint</span>
                         </button>
                       )}
                     </div>
@@ -304,6 +316,16 @@ export const CityVillagesModal: React.FC<CityVillagesModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Stage 5.5 Gemini AI Demographic & Healthcare Dossier Modal */}
+      <SettlementDossierModal
+        settlementName={selectedDossierVillage?.name || null}
+        district={city.district}
+        isFlooded={selectedDossierVillage?.isFlooded}
+        floodDepthMeters={selectedDossierVillage?.floodDepthMeters}
+        isOpen={Boolean(selectedDossierVillage)}
+        onClose={() => setSelectedDossierVillage(null)}
+      />
     </div>
   );
 };

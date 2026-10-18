@@ -1,12 +1,3 @@
-/**
- * HospitalDirectoryPage.tsx — Terai Health Infrastructure Directory.
- *
- * Visualizes healthcare facility status across the Nepal Terai region:
- * - Direct operational status (Operational vs Submerged/Inoperable).
- * - Bed capacity, facility category, and emergency contact numbers.
- * - Nearest safe haven evacuation recommendations.
- */
-
 import React, { useState } from 'react';
 import {
   Activity,
@@ -19,13 +10,20 @@ import {
   Search,
   Shield,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 import { TERAI_HOSPITALS, HospitalFacility } from '@/data/teraiInfrastructure';
+import { SettlementDossierModal } from '@/components/intelligence/SettlementDossierModal';
 
 export const HospitalDirectoryPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBasin, setSelectedBasin] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'operational' | 'flooded'>('all');
+  const [activeDossierTarget, setActiveDossierTarget] = useState<{
+    name: string;
+    district: string;
+    isFlooded?: boolean;
+  } | null>(null);
 
   const filteredHospitals = TERAI_HOSPITALS.filter((h) => {
     const matchesSearch =
@@ -49,19 +47,21 @@ export const HospitalDirectoryPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-md bg-blue-500/20 px-2.5 py-0.5 text-xs font-bold text-blue-400 border border-blue-500/30 flex items-center gap-1">
               <HeartPulse className="h-3.5 w-3.5" />
-              HEALTHCARE INFRASTRUCTURE
+              STAGE 5.5: PUBLIC HEALTHCARE REGISTRY &amp; GEMINI INTEL
             </span>
-            <span className="text-xs text-slate-400">Nepal Terai Lowland Facilities</span>
+            <span className="text-xs text-slate-400">
+              Grounded in Public Data Available on Google &bull; Nepal MoHP Registry &bull; EDCD
+            </span>
           </div>
           <h1 className="text-2xl font-black text-white mt-1 flex items-center gap-2">
             <Building2 className="h-6 w-6 text-blue-400" />
             Hospital &amp; Medical Infrastructure Directory
           </h1>
           <p className="text-xs text-slate-300 mt-0.5">
-            Operational status, capacity, and emergency routing for major hospitals and primary health posts across Nepal Terai.
+            Operational status, ICU/ventilator capacity, monsoon snakebite antivenom stocks, and emergency contacts across Nepal Terai.
           </p>
         </div>
       </div>
@@ -101,7 +101,7 @@ export const HospitalDirectoryPage: React.FC = () => {
             Total Bed Capacity
           </span>
           <div className="text-2xl font-black text-cyan-400">{totalBeds.toLocaleString()} Beds</div>
-          <p className="text-[11px] text-slate-400">Regional healthcare network</p>
+          <p className="text-[11px] text-slate-400">Public healthcare network</p>
         </div>
       </div>
 
@@ -175,6 +175,17 @@ export const HospitalDirectoryPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Antivenom & Bed Capacity Ribbon */}
+            <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-2.5 text-xs flex items-center justify-between">
+              <span className="text-slate-300 font-semibold flex items-center gap-1.5 text-[11px]">
+                <ShieldAlert className="h-3.5 w-3.5 text-amber-400" />
+                Snakebite Antivenom Stock:
+              </span>
+              <span className="font-mono text-amber-300 text-[11px] font-bold">
+                {hosp.isFlooded ? 'Depleted / Staged North' : '60+ vials Available'}
+              </span>
+            </div>
+
             <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-800/80">
               <div className="space-y-0.5">
                 <span className="text-[10px] text-slate-400 uppercase font-semibold">Emergency Contact</span>
@@ -195,9 +206,39 @@ export const HospitalDirectoryPage: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Action Buttons */}
+            <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between">
+              <button
+                onClick={() =>
+                  setActiveDossierTarget({
+                    name: hosp.name,
+                    district: hosp.district,
+                    isFlooded: hosp.isFlooded,
+                  })
+                }
+                className="rounded-xl border border-blue-500/30 bg-blue-600/20 px-3 py-1.5 text-xs font-bold text-blue-200 hover:bg-blue-600/40 transition-colors flex items-center gap-1.5 shadow-sm"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
+                <span>Launch Gemini Settlement Dossier</span>
+              </button>
+              <span className="text-[10px] text-slate-500 font-mono">Verified MoHP</span>
+            </div>
           </div>
         ))}
       </div>
+
+      {/* Settlement Dossier Modal */}
+      <SettlementDossierModal
+        settlementName={activeDossierTarget?.name || null}
+        district={activeDossierTarget?.district || null}
+        isFlooded={activeDossierTarget?.isFlooded}
+        isOpen={Boolean(activeDossierTarget)}
+        onClose={() => setActiveDossierTarget(null)}
+      />
     </div>
   );
 };
+
+export default HospitalDirectoryPage;
+

@@ -35,7 +35,13 @@ vi.mock('react-leaflet', () => ({
 
 vi.mock('@googlemaps/js-api-loader', () => ({
   setOptions: vi.fn(),
-  importLibrary: vi.fn().mockRejectedValue(new Error('Mock Fallback to Leaflet')),
+  importLibrary: vi.fn().mockResolvedValue({
+    Map: vi.fn().mockImplementation(() => ({
+      panTo: vi.fn(),
+      setZoom: vi.fn(),
+      setMapTypeId: vi.fn(),
+    })),
+  }),
 }));
 
 describe('Stage 5.4: Road Network Inundation & Disruption Intelligence Data Suite', () => {

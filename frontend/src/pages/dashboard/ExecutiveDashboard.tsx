@@ -35,6 +35,7 @@ import {
   Compass,
   ExternalLink,
   Eye,
+  FileDown,
   FileText,
   Filter,
   Globe,
@@ -229,7 +230,7 @@ const MapViewController: React.FC<{
 };
 
 interface ExecutiveDashboardProps {
-  onNavigateToTab: (tabId: 'command_map' | 'satellite' | 'hospitals' | 'demographics' | 'roads') => void;
+  onNavigateToTab: (tabId: 'command_map' | 'satellite' | 'hospitals' | 'demographics' | 'roads' | 'routing' | 'havens' | 'sitrep' | 'gauges') => void;
   onSelectRegion?: (regionKey: string) => void;
 }
 
@@ -444,7 +445,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
 
                   {/* Relief & Evacuation Routes Button */}
                   <button
-                    onClick={() => onNavigateToTab('command_map')}
+                    onClick={() => onNavigateToTab('routing')}
                     className="w-full flex items-center justify-between gap-3 rounded-xl bg-[#0d1320] border border-slate-700/80 hover:border-amber-500/60 px-4 py-3 text-xs font-bold text-slate-200 hover:text-white hover:bg-[#121a2c] transition-all shadow-md group cursor-pointer"
                   >
                     <div className="flex items-center gap-2.5">
@@ -452,6 +453,34 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                       <span>Relief Convoys &amp; Alternate Routes</span>
                     </div>
                     <ArrowRight className="h-4 w-4 text-amber-400 transition-transform group-hover:translate-x-1" />
+                  </button>
+
+                  {/* Official Govt SitRep (Stage 5.8) Button */}
+                  <button
+                    onClick={() => onNavigateToTab('sitrep')}
+                    className="w-full flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-cyan-950/70 border border-emerald-500/40 hover:border-emerald-400 px-4 py-3 text-xs font-bold text-emerald-200 hover:text-white transition-all shadow-md group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <FileDown className="h-4 w-4 text-emerald-400" />
+                      <span>Govt Situation Report (SitRep PDF)</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      Stage 5.8
+                    </span>
+                  </button>
+
+                  {/* DHM River Gauges & SOS Alerts (Stage 5.9) Button */}
+                  <button
+                    onClick={() => onNavigateToTab('gauges')}
+                    className="w-full flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-blue-950/70 via-slate-900 to-rose-950/70 border border-blue-500/40 hover:border-rose-400 px-4 py-3 text-xs font-bold text-cyan-200 hover:text-white transition-all shadow-md group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Waves className="h-4 w-4 text-cyan-400 animate-pulse" />
+                      <span>DHM River Gauges &amp; Vernacular SOS</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                      Stage 5.9
+                    </span>
                   </button>
 
                   {/* GEE Script Launcher */}
@@ -935,6 +964,13 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
           <div className="text-[11px] font-mono text-amber-300/90">
             District: Sunsari &bull; Safe Refuge: Barahachhetra High Ridge (8,500 cap)
           </div>
+          <button
+            onClick={() => onNavigateToTab('havens')}
+            className="w-full mt-2 rounded-xl bg-amber-600/30 border border-amber-500/50 px-3 py-1.5 text-xs font-bold text-amber-200 hover:bg-amber-600/50 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+          >
+            <span>Safe Havens &amp; Camps (Stage 5.7)</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
         </div>
 
         <div className="rounded-2xl border border-blue-500/30 bg-blue-950/20 p-5 space-y-2.5">
@@ -949,6 +985,13 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
           <div className="text-[11px] font-mono text-blue-300/90">
             District: Banke &bull; Safe Refuge: Kohalpur Evacuation Hub (9,200 cap)
           </div>
+          <button
+            onClick={() => onNavigateToTab('routing')}
+            className="w-full mt-2 rounded-xl bg-blue-600/30 border border-blue-500/50 px-3 py-1.5 text-xs font-bold text-blue-200 hover:bg-blue-600/50 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+          >
+            <span>Emergency Route Navigator (Stage 5.6)</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 

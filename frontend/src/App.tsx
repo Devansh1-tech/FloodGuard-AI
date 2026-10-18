@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Building2,
   CheckCircle2,
+  FileDown,
   Globe,
   HeartPulse,
   Info,
@@ -21,10 +22,12 @@ import {
   MapPin,
   Moon,
   Phone,
+  Route,
   Satellite,
   Shield,
   ShieldAlert,
   Sun,
+  Tent,
   Truck,
   Users,
   Waves,
@@ -34,12 +37,16 @@ import {
 import { Stage51ComparisonPage } from '@/pages/comparison/Stage51ComparisonPage';
 import { Stage52GoogleMapPage } from '@/pages/map/Stage52GoogleMapPage';
 import { Stage54RoadsPage } from '@/pages/roads/Stage54RoadsPage';
+import { Stage56RoutingPage } from '@/pages/routing/Stage56RoutingPage';
+import { Stage57SafeHavensPage } from '@/pages/havens/Stage57SafeHavensPage';
+import { Stage58SitRepPage } from '@/pages/sitrep/Stage58SitRepPage';
+import { Stage59RiverGaugesPage } from '@/pages/gauges/Stage59RiverGaugesPage';
 import { HospitalDirectoryPage } from '@/pages/infrastructure/HospitalDirectoryPage';
 import { DemographicsPage } from '@/pages/demographics/DemographicsPage';
 import { ExecutiveDashboard } from '@/pages/dashboard/ExecutiveDashboard';
 import CardNav, { CardNavItem, CardNavLink } from '@/components/nav/CardNav';
 
-export type NavigationTab = 'dashboard' | 'satellite' | 'command_map' | 'roads' | 'hospitals' | 'demographics';
+export type NavigationTab = 'dashboard' | 'satellite' | 'command_map' | 'roads' | 'routing' | 'havens' | 'sitrep' | 'gauges' | 'hospitals' | 'demographics';
 
 export const App: React.FC = () => {
   const [isDark, setIsDark] = useState<boolean>(true);
@@ -76,6 +83,8 @@ export const App: React.FC = () => {
       description: 'National Emergency Operations & Terai status.',
       links: [
         { label: 'Executive Dashboard (Overview)', href: '#dashboard' },
+        { label: 'Export Official SitRep PDF (5.8)', href: '#sitrep' },
+        { label: 'DHM River Gauges & SOS (5.9)', href: '#gauges' },
         { label: 'Terai Lowland Scope (21 Dist.)', href: '#dashboard' },
         { label: 'Live Incident Telemetry', href: '#dashboard' },
       ],
@@ -94,20 +103,21 @@ export const App: React.FC = () => {
       label: 'Relief & Alternate Routes',
       description: 'Emergency convoys & evacuation detours.',
       links: [
+        { label: 'Emergency Routing Operations (5.6)', href: '#routing' },
+        { label: 'Safe Havens & Refugee Camps (5.7)', href: '#havens' },
+        { label: 'Point 7: Relief Convoy Router', href: '#routing' },
+        { label: 'Point 9: Civilian Evacuation Detours', href: '#routing' },
         { label: 'Road Inundation & Bridges (5.4)', href: '#roads' },
-        { label: 'Bharatpur → Gaur Convoy (84 km)', href: '#command_map' },
-        { label: 'Duhabi → Koshi Relief Corridor', href: '#command_map' },
-        { label: 'Civilian Alternate Evacuations', href: '#command_map' },
         { label: 'Field Command Map (Live)', href: '#command_map' },
       ],
     },
     {
-      label: 'Critical Infrastructure',
-      description: 'Hospitals, population risk & shelters.',
+      label: 'Public Demographics & Hospitals (5.5)',
+      description: 'Grounded public data (Google, CBS & MoHP).',
       links: [
-        { label: 'Hospitals & ICUs (7/8 Active)', href: '#hospitals' },
-        { label: 'WorldPop Terai Demographics', href: '#demographics' },
-        { label: 'Settlement Dossiers & Depths', href: '#command_map' },
+        { label: 'Public Census Demographics (5.5)', href: '#demographics' },
+        { label: 'MoHP Hospitals & Antivenom (5.5)', href: '#hospitals' },
+        { label: 'Settlement AI Dossiers & Depths', href: '#command_map' },
       ],
     },
   ];
@@ -122,6 +132,14 @@ export const App: React.FC = () => {
       setActiveTab('command_map');
     } else if (link.href.includes('#roads')) {
       setActiveTab('roads');
+    } else if (link.href.includes('#routing')) {
+      setActiveTab('routing');
+    } else if (link.href.includes('#havens')) {
+      setActiveTab('havens');
+    } else if (link.href.includes('#sitrep')) {
+      setActiveTab('sitrep');
+    } else if (link.href.includes('#gauges')) {
+      setActiveTab('gauges');
     } else if (link.href.includes('#hospitals')) {
       setActiveTab('hospitals');
     } else if (link.href.includes('#demographics')) {
@@ -163,19 +181,51 @@ export const App: React.FC = () => {
       badgeColor: 'border-amber-500/30 bg-amber-500/20 text-amber-400',
     },
     {
+      id: 'routing' as NavigationTab,
+      label: 'Emergency Routes (5.6)',
+      tagline: 'Convoys & Evacuation',
+      icon: Route,
+      badge: 'Points 7 & 9',
+      badgeColor: 'border-cyan-500/30 bg-cyan-500/20 text-cyan-400',
+    },
+    {
+      id: 'havens' as NavigationTab,
+      label: 'Safe Havens (5.7)',
+      tagline: 'Refugee Camps & HLZ',
+      icon: Tent,
+      badge: 'Point 8 Proximity',
+      badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400',
+    },
+    {
+      id: 'sitrep' as NavigationTab,
+      label: 'Govt SitRep (5.8)',
+      tagline: 'Official PDF Export',
+      icon: FileDown,
+      badge: 'Point 10 PDF',
+      badgeColor: 'border-rose-500/30 bg-rose-500/20 text-rose-400',
+    },
+    {
+      id: 'gauges' as NavigationTab,
+      label: 'River Gauges & SOS (5.9)',
+      tagline: 'DHM Telemetry & Alerts',
+      icon: Waves,
+      badge: 'Point 11 Early Warning',
+      badgeColor: 'border-blue-500/30 bg-blue-500/20 text-blue-400',
+    },
+    {
       id: 'hospitals' as NavigationTab,
-      label: 'Healthcare Infrastructure',
-      tagline: 'Hospitals & Emergency Clinics',
+      label: 'Public Hospitals (5.5)',
+      tagline: 'Beds, ICU & Antivenom',
       icon: HeartPulse,
-      badge: '8 Facilities Tracked',
+      badge: 'Public MoHP Data',
       badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400',
     },
     {
       id: 'demographics' as NavigationTab,
-      label: 'Population Exposure',
-      tagline: 'WorldPop 100m Demographics',
+      label: 'Public Demographics (5.5)',
+      tagline: 'Census 2021 & Gemini AI',
       icon: Users,
-      badge: '21 Lowland Districts',
+      badge: 'Points 5 & 6',
       badgeColor: 'border-purple-500/30 bg-purple-500/20 text-purple-400',
     },
   ];
@@ -203,6 +253,14 @@ export const App: React.FC = () => {
             />
           </div>
           <div className="hidden md:flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setActiveTab('sitrep')}
+              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 px-3 py-2 text-xs font-bold text-white shadow-md shadow-rose-600/25 hover:from-rose-500 hover:to-amber-500 transition-all border border-rose-400/30 cursor-pointer"
+              title="Export Official Government Situation Report (PDF)"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              <span className="hidden lg:inline">SitRep (PDF)</span>
+            </button>
             <button
               onClick={toggleTheme}
               className="rounded-xl border border-slate-700 bg-slate-800/90 p-2 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
@@ -293,6 +351,10 @@ export const App: React.FC = () => {
         {activeTab === 'satellite' && <Stage51ComparisonPage />}
         {activeTab === 'command_map' && <Stage52GoogleMapPage />}
         {activeTab === 'roads' && <Stage54RoadsPage />}
+        {activeTab === 'routing' && <Stage56RoutingPage />}
+        {activeTab === 'havens' && <Stage57SafeHavensPage />}
+        {activeTab === 'sitrep' && <Stage58SitRepPage />}
+        {activeTab === 'gauges' && <Stage59RiverGaugesPage />}
         {activeTab === 'hospitals' && <HospitalDirectoryPage />}
         {activeTab === 'demographics' && <DemographicsPage />}
       </main>
