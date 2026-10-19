@@ -142,3 +142,23 @@
 .sar-bw-mode .leaflet-tile {
   filter: grayscale(100%) contrast(185%) brightness(82%) !important;
 }
+
+/* Non-Flood Pre-Monsoon Dry Baseline Satellite Filter */
+.dry-baseline-mode .leaflet-tile {
+  filter: contrast(106%) brightness(102%) saturate(104%);
+}
+
+/* Real Flood Deluge Sentinel-1 SAR Specular Radar Mode */
+.sar-specular-mode .leaflet-tile {
+  filter: contrast(145%) brightness(88%) saturate(135%) hue-rotate(190deg) !important;
+}
+
+/* Real Flood Deluge Sentinel-2 False Color NIR Moisture Mode */
+.deluge-false-color-mode .leaflet-tile {
+  filter: contrast(135%) brightness(92%) saturate(160%) hue-rotate(150deg) !important;
+}
+
+/* Real Flood Optical Deluge Mode */
+.deluge-optical-mode .leaflet-tile {
+  filter: contrast(124%) brightness(96%) saturate(125%) !important;
+}

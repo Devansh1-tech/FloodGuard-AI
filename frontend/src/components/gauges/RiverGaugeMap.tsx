@@ -23,15 +23,33 @@ import { RiverGaugeStation } from '@/data/teraiRiverGauges';
 
 // Map View Controller for auto bounds
 const MapViewController: React.FC<{
+  gauges: RiverGaugeStation[];
   selectedStation: RiverGaugeStation | null;
-}> = ({ selectedStation }) => {
+}> = ({ gauges, selectedStation }) => {
   const map = useMap();
 
   useEffect(() => {
-    if (selectedStation) {
-      map.flyTo(selectedStation.coords, 10, { duration: 1.2 });
+    if (selectedStation && typeof map?.flyTo === 'function') {
+      map.flyTo(selectedStation.coords, 10, { duration: 1.0 });
     }
   }, [selectedStation, map]);
+
+  useEffect(() => {
+    if (!gauges || gauges.length === 0) {
+      if (typeof map?.setView === 'function') {
+        map.setView([27.5, 84.5], 7);
+      }
+    } else if (gauges.length === 1) {
+      if (typeof map?.flyTo === 'function') {
+        map.flyTo(gauges[0].coords, 10, { duration: 1.0 });
+      }
+    } else {
+      if (typeof map?.fitBounds === 'function' && typeof L?.latLngBounds === 'function') {
+        const bounds = L.latLngBounds(gauges.map((g) => g.coords));
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 11, duration: 1.0 });
+      }
+    }
+  }, [gauges, map]);
 
   return null;
 };
@@ -125,12 +143,12 @@ export const RiverGaugeMap: React.FC<RiverGaugeMapProps> = ({
         ]}
       >
         <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CARTO</a> &amp; Nepal DHM'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          maxZoom={18}
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &amp; Nepal DHM'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maxZoom={19}
         />
 
-        <MapViewController selectedStation={selectedStation} />
+        <MapViewController gauges={gauges} selectedStation={selectedStation} />
 
         {/* Render Concentric Danger Radius Buffers */}
         {gauges.map((station) => {

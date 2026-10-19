@@ -46,23 +46,37 @@
   box-sizing: border-box;
 }
 
+.card-nav__left-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: start;
+}
+
+.card-nav__right-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: end;
+}
+
 .card-nav__menu {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  justify-self: start;
+  gap: 7px;
   height: calc(var(--cn-bar) - var(--cn-inset) * 2);
-  padding: 0 14px 0 16px;
-  border: 0;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: calc(var(--cn-radius) - var(--cn-inset));
-  background: none;
+  background: rgba(255, 255, 255, 0.05);
   color: var(--cn-text);
   font-family: inherit;
-  font-size: inherit;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   outline: none;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .card-nav__menu[data-icon-only] {
@@ -72,7 +86,24 @@
 }
 
 .card-nav__menu:hover {
-  background: var(--cn-hover);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.card-nav[data-open] .card-nav__menu {
+  background: rgba(6, 182, 212, 0.16);
+  border-color: rgba(6, 182, 212, 0.45);
+  color: #38bdf8;
+}
+
+.card-nav__chevron {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  color: currentColor;
+  opacity: 0.85;
+}
+
+.card-nav__chevron--open {
+  transform: rotate(180deg);
 }
 
 .card-nav__menu:focus-visible,
@@ -193,13 +224,28 @@
   grid-column: 1;
   grid-row: 1;
   justify-self: start;
-  padding-left: 14px;
+  padding-left: 10px;
 }
 
-.card-nav[data-narrow] .card-nav__menu {
+.card-nav[data-narrow] .card-nav__left-section {
   grid-column: 3;
   grid-row: 1;
   justify-self: end;
+}
+
+.card-nav[data-narrow] .card-nav__right-section {
+  display: none;
+}
+
+.card-nav__dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: calc(var(--cn-radius) - var(--cn-inset));
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .card-nav__content {
@@ -237,10 +283,11 @@
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
-  gap: 18px;
+  gap: 6px;
   min-width: 0;
-  min-height: var(--cn-card);
-  padding: 16px 16px 14px;
+  height: var(--cn-card);
+  max-height: var(--cn-card);
+  padding: 10px 12px 8px;
   border-radius: calc(var(--cn-radius) - var(--cn-inset));
   box-sizing: border-box;
   background: var(--cn-tile);
@@ -248,19 +295,24 @@
   color: var(--cn-text);
   transform-origin: 50% 0;
   will-change: transform, opacity;
+  overflow: hidden;
 }
 
 .card-nav[data-narrow] .card-nav__card {
   flex: none;
+  height: auto;
+  max-height: 145px;
   min-height: 0;
-  gap: 10px;
-  padding: 14px 14px 12px;
+  gap: 6px;
+  padding: 10px 12px 8px;
 }
 
 .card-nav[data-narrow] .card-nav__links {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 2px 16px;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 3px;
+  max-height: 90px;
+  overflow-y: auto;
 }
 
 .card-nav__card[data-tinted] {
@@ -272,20 +324,29 @@
 .card-nav__card-head {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  flex-shrink: 0;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .card-nav__label {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   letter-spacing: -0.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-nav__description {
   margin: 0;
   color: var(--cn-muted);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 10.5px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-nav__card[data-tinted] .card-nav__description {
@@ -297,41 +358,125 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: auto 0 0;
-  padding: 0;
+  margin: 0;
+  padding: 2px 3px 2px 0;
   list-style: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.4) transparent;
+}
+
+.card-nav__links::-webkit-scrollbar {
+  width: 3.5px;
+}
+
+.card-nav__links::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.card-nav__links::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+}
+
+.card-nav__links::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.6);
 }
 
 .card-nav__link {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 6px;
   border: 0;
   border-radius: 6px;
   background: none;
   color: inherit;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 11.5px;
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;
   outline: none;
-  opacity: 0.82;
-  transition: opacity 0.2s ease;
+  opacity: 0.85;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .card-nav__link:hover {
   opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.card-nav__link--active {
+  opacity: 1;
+  background: rgba(6, 182, 212, 0.14);
+  box-shadow: inset 2px 0 0 #06b6d4;
+  color: #67e8f9;
+}
+
+.card-nav__link-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.card-nav__link-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+}
+
+.card-nav__link-sublabel {
+  font-size: 9.5px;
+  line-height: 1.2;
+  color: var(--cn-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-nav__link--active .card-nav__link-sublabel {
+  color: rgba(103, 232, 249, 0.75);
+}
+
+.card-nav__link-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: center;
 }
 
 .card-nav__arrow {
   position: relative;
   display: inline-block;
   flex: none;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
+  margin-top: 1px;
   overflow: hidden;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.card-nav__link:hover .card-nav__arrow {
+  color: #38bdf8;
 }
 
 .card-nav__arrow-icon {

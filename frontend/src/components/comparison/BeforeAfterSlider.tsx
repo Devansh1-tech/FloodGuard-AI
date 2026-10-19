@@ -281,6 +281,8 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
   const [showNepalBorder, setShowNepalBorder] = useState<boolean>(true);
   const [showTeraiBoundary, setShowTeraiBoundary] = useState<boolean>(true);
   const [showFloodPolygons, setShowFloodPolygons] = useState<boolean>(true);
+  const [highlightFloodedDotted, setHighlightFloodedDotted] = useState<boolean>(true);
+  const [floodImageryMode, setFloodImageryMode] = useState<'sar_specular' | 'false_color' | 'optical_deluge'>('sar_specular');
   const [showSafeHighGrounds, setShowSafeHighGrounds] = useState<boolean>(true);
   const [showSettlementPins, setShowSettlementPins] = useState<boolean>(true);
   const [showDeepWater, setShowDeepWater] = useState<boolean>(true);
@@ -799,25 +801,53 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             Fine Overlays:
           </span>
 
-          <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+          {/* User Requested: Option to Highlight Flooded Area in Flooded Map with Dotted Lines */}
+          <label className="flex items-center gap-1.5 cursor-pointer text-cyan-300 hover:text-white select-none bg-cyan-950/60 px-3 py-1 rounded-lg border border-cyan-500/50 shadow-sm">
             <input
               type="checkbox"
-              checked={showFloodPolygons}
-              onChange={(e) => setShowFloodPolygons(e.target.checked)}
-              className="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-0"
+              checked={highlightFloodedDotted}
+              onChange={(e) => setHighlightFloodedDotted(e.target.checked)}
+              className="rounded border-cyan-500 bg-slate-950 text-cyan-400 focus:ring-0 cursor-pointer"
             />
-            <span className="text-cyan-400 font-semibold">🌊 Flooded Zones</span>
+            <span className="text-cyan-300 font-bold text-xs flex items-center gap-1.5">
+              <span className="border-b-2 border-dotted border-cyan-400 w-4 inline-block"></span>
+              ⚡ Highlight Flooded Area (Dotted Lines)
+            </span>
           </label>
 
-          <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
-            <input
-              type="checkbox"
-              checked={showDeepWater}
-              onChange={(e) => setShowDeepWater(e.target.checked)}
-              className="rounded border-slate-700 bg-slate-950 text-blue-400 focus:ring-0"
-            />
-            <span className="text-blue-300 font-semibold">💧 Deep Cores (&gt;1.8m)</span>
-          </label>
+          {/* Real Flood Satellite Imagery Mode Selector */}
+          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg border border-slate-700/80 bg-slate-950/90 text-xs">
+            <span className="text-slate-400 text-[11px] font-bold">Real Flood Image:</span>
+            <div className="flex rounded-md border border-slate-800 bg-slate-900 p-0.5 text-[10px]">
+              <button
+                onClick={() => setFloodImageryMode('sar_specular')}
+                className={`px-2 py-0.5 rounded font-bold transition-all ${
+                  floodImageryMode === 'sar_specular' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                }`}
+                title="Sentinel-1 SAR Radar Microwave Specular Reflection (Deep Inundated Water Absorption)"
+              >
+                Sentinel-1 SAR Radar
+              </button>
+              <button
+                onClick={() => setFloodImageryMode('false_color')}
+                className={`px-2 py-0.5 rounded font-bold transition-all ${
+                  floodImageryMode === 'false_color' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                }`}
+                title="Sentinel-2 False Color NIR / SWIR Flood Water & Moisture Index"
+              >
+                False-Color NIR
+              </button>
+              <button
+                onClick={() => setFloodImageryMode('optical_deluge')}
+                className={`px-2 py-0.5 rounded font-bold transition-all ${
+                  floodImageryMode === 'optical_deluge' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                }`}
+                title="Natural Optical Deluge Satellite Imagery"
+              >
+                Optical Deluge
+              </button>
+            </div>
+          </div>
 
           <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
             <input
@@ -974,8 +1004,8 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
         {/* SIDE-BY-SIDE DUAL ALIGNMENT MODE (User Requirement: Flooded & Non-Flooded in One Alignment) */}
         {alignmentMode === 'side_by_side' ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[680px] w-full">
-            {/* LEFT MAP: NON-FLOODED PRE-MONSOON DRY BASELINE */}
-            <div className={`relative h-full w-full rounded-2xl border border-emerald-500/50 bg-slate-950 shadow-2xl overflow-hidden select-none ${isBwRadar ? 'sar-bw-mode' : ''}`}>
+            {/* LEFT MAP: NON-FLOODED PRE-MONSOON DRY BASELINE (REAL OPTICAL DRY BASELINE) */}
+            <div className="relative h-full w-full rounded-2xl border border-emerald-500/50 bg-slate-950 shadow-2xl overflow-hidden select-none dry-baseline-mode">
               <div className="absolute top-4 left-4 z-[500] pointer-events-auto rounded-xl border border-emerald-500/60 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-emerald-300">
                 <div className="flex items-center gap-1.5">
                   <ShieldCheck className="h-4 w-4 text-emerald-400" />
@@ -1020,13 +1050,13 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
                   />
                 )}
 
-                {/* Safe High Ground Zones */}
+                {/* Safe High Ground Zones (Dashed Outline, Clean Baseline Image) */}
                 {showSafeHighGrounds &&
                   activeRegion.safeZones.map((safeZone) => (
                     <Polygon
                       key={`baseline-safe-${safeZone.id}`}
                       positions={safeZone.polygon}
-                      pathOptions={{ color: '#10B981', weight: 2.5, fillColor: '#059669', fillOpacity: 0.45 }}
+                      pathOptions={{ color: '#10B981', weight: 2.0, dashArray: '6, 6', fillColor: 'transparent', fillOpacity: 0 }}
                     >
                       <Popup>
                         <div className="p-1 space-y-1 text-slate-100">
@@ -1081,7 +1111,15 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             </div>
 
             {/* RIGHT MAP: FLOODED POST-DELUGE SENTINEL-1 SAR EXTENT */}
-            <div className={`relative h-full w-full rounded-2xl border border-cyan-500/50 bg-slate-950 shadow-2xl overflow-hidden select-none ${isBwRadar ? 'sar-bw-mode' : ''}`}>
+            <div className={`relative h-full w-full rounded-2xl border border-cyan-500/50 bg-slate-950 shadow-2xl overflow-hidden select-none ${
+              isBwRadar
+                ? 'sar-bw-mode'
+                : floodImageryMode === 'sar_specular'
+                ? 'sar-specular-mode'
+                : floodImageryMode === 'false_color'
+                ? 'deluge-false-color-mode'
+                : 'deluge-optical-mode'
+            }`}>
               <div className="absolute top-4 left-4 z-[500] pointer-events-auto rounded-xl border border-cyan-500/60 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-cyan-300">
                 <div className="flex items-center gap-1.5">
                   <Waves className="h-4 w-4 text-cyan-400" />
@@ -1103,7 +1141,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
               >
                 <MapViewController center={effectiveCenter} zoom={effectiveZoom} />
 
-                {/* Post-Flood Deluge Satellite */}
+                {/* Post-Flood Deluge Satellite (Real Flood Image) */}
                 <TileLayer
                   url={tileUrls[mapType]}
                   attribution="&copy; Copernicus Sentinel-1 SAR &bull; Deluge Peak"
@@ -1126,46 +1164,37 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
                   />
                 )}
 
-                {/* Flooded Inundation Polygons (User Requirement: Clearly Delineated Inundated Area) */}
-                {showFloodPolygons &&
+                {/* Flooded Areas: Dotted Line Highlight Option (No Solid Polygon Shape) */}
+                {highlightFloodedDotted &&
                   activeRegion.floodPolygons.map((polyCoords, idx) => (
                     <Polygon
-                      key={`side-flood-${idx}`}
+                      key={`side-flood-dotted-${idx}`}
                       positions={polyCoords}
                       pathOptions={{
-                        color: '#00E5FF',
-                        weight: 2.4,
-                        fillColor: isBwRadar ? '#020617' : '#0284C7',
-                        fillOpacity: isBwRadar ? 0.92 : 0.72,
+                        color: '#00F2FE',
+                        weight: 2.8,
+                        dashArray: '8, 8',
+                        fillColor: 'transparent',
+                        fillOpacity: 0,
                       }}
                     >
                       <Popup>
                         <div className="p-1 space-y-1 text-slate-100 max-w-[240px]">
                           <span className="text-[10px] font-black uppercase text-cyan-400 flex items-center gap-1">
                             <Waves className="h-3 w-3" />
-                            ACTIVE FLOOD INUNDATION
+                            DELUGE EXTENT (DOTTED BOUNDARY)
                           </span>
                           <h4 className="font-bold text-sm text-white">
-                            {activeRegion.shortName} Flood Zone #{idx + 1}
+                            {activeRegion.shortName} Flood Inundation Area #{idx + 1}
                           </h4>
                           <p className="text-xs text-slate-300">
-                            <strong>Sensor:</strong> Sentinel-1 SAR C-Band<br />
+                            <strong>Sensor:</strong> Sentinel-1 SAR C-Band Microwave<br />
                             <strong>Backscatter Drop:</strong> {activeRegion.deltaDb} dB (Otsu Specular Threshold)<br />
-                            <strong>Depth:</strong> 1.4m &ndash; 2.8m water column
+                            <strong>Water Column:</strong> 1.4m &ndash; 2.8m depth
                           </p>
                         </div>
                       </Popup>
                     </Polygon>
-                  ))}
-
-                {/* Deep Water Cores */}
-                {showFloodPolygons &&
-                  activeRegion.floodPolygons.slice(0, 5).map((polyCoords, idx) => (
-                    <Polygon
-                      key={`side-deep-${idx}`}
-                      positions={polyCoords.slice(1, polyCoords.length - 2)}
-                      pathOptions={{ color: '#38BDF8', weight: 1.5, fillColor: '#0052CC', fillOpacity: 0.88 }}
-                    />
                   ))}
 
                 {/* Submerged Settlements with Water Depth & Affected Count */}
@@ -1305,25 +1334,26 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
                 />
               )}
 
-              {/* 3. Flooded Areas Inundation Layer (In floodInundationPane for Split Slider) */}
+              {/* 3. Flooded Areas: Dotted Line Highlight Option (Zero Polygon Fill) */}
               <Pane name="floodInundationPane" style={{ zIndex: 450 }}>
-                {showFloodPolygons &&
+                {highlightFloodedDotted &&
                   activeRegion.floodPolygons.map((polyCoords, idx) => (
                     <Polygon
-                      key={`flood-poly-${idx}`}
+                      key={`flood-poly-dotted-${idx}`}
                       positions={polyCoords}
                       pathOptions={{
-                        color: '#00E5FF',
-                        weight: 2.2,
-                        fillColor: isBwRadar ? '#020617' : '#0284C7',
-                        fillOpacity: isBwRadar ? 0.92 : 0.68,
+                        color: '#00F2FE',
+                        weight: 2.8,
+                        dashArray: '8, 8',
+                        fillColor: 'transparent',
+                        fillOpacity: 0,
                       }}
                     >
                       <Popup>
                         <div className="p-1.5 space-y-1 text-slate-100 max-w-[240px]">
                           <span className="text-[10px] font-black uppercase text-cyan-400 flex items-center gap-1">
                             <Waves className="h-3 w-3" />
-                            ACTIVE FLOOD INUNDATION
+                            DELUGE EXTENT (DOTTED BOUNDARY)
                           </span>
                           <h4 className="font-bold text-sm text-white">
                             {activeRegion.shortName} Flood Inundation Zone #{idx + 1}
@@ -1338,25 +1368,15 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
                       </Popup>
                     </Polygon>
                   ))}
-
-                {/* Deep Water Core River Channels (>1.8m Depth) */}
-                {showFloodPolygons &&
-                  activeRegion.floodPolygons.slice(0, 5).map((polyCoords, idx) => (
-                    <Polygon
-                      key={`deep-water-${idx}`}
-                      positions={polyCoords.slice(1, polyCoords.length - 2)}
-                      pathOptions={{ color: '#38BDF8', weight: 1.5, fillColor: '#0052CC', fillOpacity: 0.85 }}
-                    />
-                  ))}
               </Pane>
 
-              {/* 4. Safe Elevated High Ground Havens */}
+              {/* 4. Safe Elevated High Ground Havens (Dashed Outline, No Solid Fill) */}
               {showSafeHighGrounds &&
                 activeRegion.safeZones.map((safeZone) => (
                   <Polygon
                     key={safeZone.id}
                     positions={safeZone.polygon}
-                    pathOptions={{ color: '#10B981', weight: 2.5, fillColor: '#059669', fillOpacity: 0.5 }}
+                    pathOptions={{ color: '#10B981', weight: 2.0, dashArray: '6, 6', fillColor: 'transparent', fillOpacity: 0 }}
                   >
                     <Popup>
                       <div className="p-1.5 space-y-1 text-slate-100">

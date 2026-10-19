@@ -464,6 +464,40 @@ def _build_vernacular_alert(gauge: Dict) -> VernacularAlertResponseSchema:
 # ─────────────────────────────────────────────────────────────────────────────
 # API ENDPOINTS
 # ─────────────────────────────────────────────────────────────────────────────
+def _matches_basin(gauge: dict, basin_query: str) -> bool:
+    bq = basin_query.lower()
+    b = gauge["basin"].lower()
+    r = gauge["river"].lower()
+    d = gauge["district"].lower()
+    if bq in b or bq in r or bq in d:
+        return True
+    if bq == "koshi" and ("kankai" in r or "jhapa" in b or "morang" in d or "saptari" in d or "sunsari" in d):
+        return True
+    if bq == "bagmati" and ("lalbakeya" in r or "kamala" in r or "rautahat" in b or "sarlahi" in b or "siraha" in b or "dhanusa" in b):
+        return True
+    if bq == "narayani" and ("tinau" in r or "lumbini" in b or "gandaki" in r or "chitwan" in d or "nawalpur" in d or "rupandehi" in d):
+        return True
+    if bq == "rapti" and ("babai" in r or "bardiya" in b or "banke" in d or "dang" in d):
+        return True
+    if bq == "karnali" and ("mohana" in r or "kailali" in b or "kailali" in d or "bardiya" in d):
+        return True
+    return False
+
+
+def _matches_status(gauge: dict, status_query: str) -> bool:
+    sq = status_query.lower()
+    gs = gauge["status"].lower()
+    if sq == "extreme_flood":
+        return gs == "extreme_flood"
+    if sq == "danger":
+        return gs in ("danger", "extreme_flood")
+    if sq == "warning":
+        return gs == "warning"
+    if sq == "normal":
+        return gs == "normal"
+    return gs == sq
+
+
 @router.get("/river-gauges", response_model=ApiResponse[List[RiverGaugeStationSchema]])
 async def get_river_gauges(
     request: Request,
@@ -474,14 +508,14 @@ async def get_river_gauges(
     """Returns real-time DHM hydrological monitoring stations across the 21 Terai districts."""
     results = DHM_GAUGE_DATA
 
-    if basin:
-        results = [g for g in results if basin.lower() in g["basin"].lower()]
+    if basin and basin.lower() != "all":
+        results = [g for g in results if _matches_basin(g, basin)]
 
-    if district:
+    if district and district.lower() != "all":
         results = [g for g in results if district.lower() in g["district"].lower()]
 
-    if status:
-        results = [g for g in results if g["status"].lower() == status.lower()]
+    if status and status.lower() != "all":
+        results = [g for g in results if _matches_status(g, status)]
 
     return make_response(
         data=results,

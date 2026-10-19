@@ -75,8 +75,6 @@ import {
   createCityColorLeafletPin,
 } from '@/data/teraiCitiesData';
 import { CityVillagesModal } from '@/components/map/CityVillagesModal';
-import SwarmCursor from '@/components/ui/SwarmCursor';
-import MaskedHeading from '@/components/ui/MaskedHeading';
 import { GoogleMapsViewer } from '@/components/map/GoogleMapsViewer';
 
 // Custom Map Pins for Flooded vs Safe High-Ground Settlements
@@ -306,217 +304,225 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
     <div className="space-y-8 pb-16">
       {/* ───────────────────────────────────────────────────────────────────────
           HERO EXECUTIVE LANDING PAGE: GOVERNMENT DISASTER INTELLIGENCE PLATFORM
-          (Ultra-Sleek Dark Theme with React Bits <SwarmCursor count={800} size={2.6} spread={90} swirl={0.6} clickEffect="burst" />)
+          (Ultra-Sleek Dark Theme Matching FloodGuard AI Sovereign Aesthetic)
       ───────────────────────────────────────────────────────────────────────── */}
       <div
-        style={{ position: 'relative', width: '100%', minHeight: '600px' }}
-        className="rounded-3xl border border-slate-800/90 bg-[#05070e] shadow-[0_0_60px_rgba(0,0,0,0.95)] backdrop-blur-2xl overflow-hidden"
+        style={{ position: 'relative', width: '100%', minHeight: '560px', backgroundColor: '#070b16' }}
+        className="relative rounded-3xl border border-cyan-500/30 bg-[#070b16] shadow-[0_0_60px_rgba(0,0,0,0.95)] backdrop-blur-2xl overflow-hidden"
       >
-        <SwarmCursor
-          count={800}
-          size={2.6}
-          spread={90}
-          swirl={0.6}
-          clickEffect="burst"
-          color="#38BDF8"
-          accentColor="#00F2FE"
-          lightMode={false}
-          className="w-full h-full"
-        >
-          <div className="relative z-10 p-6 sm:p-8 md:p-10 flex flex-col justify-between min-h-[600px] space-y-6">
-            {/* Top Header: Official Nepal Government Badges */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="flex items-center gap-1.5 rounded-lg bg-rose-950/70 px-3 py-1.5 text-xs font-black text-rose-300 border border-rose-500/40 shadow-sm shadow-rose-950/40">
-                  <span className="h-2 w-2 rounded-full bg-rose-400 animate-ping"></span>
-                  OFFICIAL GOVERNMENT COMMAND PORTAL
-                </span>
-                <span className="rounded-lg bg-blue-950/70 px-3 py-1.5 text-xs font-bold text-blue-300 border border-blue-500/40">
-                  GOVERNMENT OF NEPAL &bull; MoHA / NEOC
-                </span>
-                <span className="rounded-lg bg-emerald-950/70 px-3 py-1.5 text-xs font-bold text-emerald-300 border border-emerald-500/40">
-                  21 DISTRICTS ACTIVE
-                </span>
-                <span className="hidden sm:inline-flex rounded-lg bg-cyan-950/70 px-3 py-1.5 text-xs font-bold text-cyan-300 border border-cyan-500/40">
-                  🛰️ SENTINEL-1 RADAR LIVE
-                </span>
+        {/* Deep Sovereign Dark Ambient Accents & Grid */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-950/40 via-[#070b16] to-cyan-950/30 pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(#0ea5e9_1px,transparent_1px)] [background-size:28px_28px] opacity-[0.08] pointer-events-none" />
+        <div className="absolute -top-32 left-1/4 h-72 w-96 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 right-1/4 h-72 w-96 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 p-5 sm:p-7 md:p-9 flex flex-col justify-between min-h-[560px] space-y-6">
+          {/* Top Header: Official Nepal Government Badges — All 5 in One-Line Alignment */}
+          <div className="w-full border-b border-slate-800/80 pb-3.5 overflow-x-auto no-scrollbar">
+            <div className="flex items-center justify-between gap-2 min-w-[760px] lg:min-w-0 w-full">
+              {/* 1. Official Government Command Portal */}
+              <div className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-950/70 px-2.5 py-1.5 text-[11px] font-bold text-rose-200 shadow-sm shadow-rose-950/40 whitespace-nowrap">
+                <span className="h-2 w-2 rounded-full bg-rose-400 animate-ping shrink-0" />
+                <span>OFFICIAL GOVERNMENT COMMAND PORTAL</span>
               </div>
 
+              {/* 2. Government of Nepal MoHA / NEOC */}
+              <div className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-950/70 px-2.5 py-1.5 text-[11px] font-bold text-blue-200 shadow-sm shadow-blue-950/40 whitespace-nowrap">
+                <Shield className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                <span>GOVERNMENT OF NEPAL &bull; MoHA / NEOC</span>
+              </div>
+
+              {/* 3. 21 Districts Active */}
+              <div className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/70 px-2.5 py-1.5 text-[11px] font-bold text-emerald-200 shadow-sm shadow-emerald-950/40 whitespace-nowrap">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span>21 DISTRICTS ACTIVE</span>
+              </div>
+
+              {/* 4. Sentinel-1 Radar Live */}
+              <div className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-950/70 px-2.5 py-1.5 text-[11px] font-bold text-cyan-200 shadow-sm shadow-cyan-950/40 whitespace-nowrap">
+                <Satellite className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                <span>SENTINEL-1 RADAR LIVE</span>
+              </div>
+
+              {/* 5. NEOC 1155 Emergency Room */}
               <a
                 href="tel:1155"
-                className="flex items-center gap-2 rounded-xl border border-rose-500/60 bg-rose-950/40 px-3.5 py-1.5 text-xs font-extrabold text-rose-300 hover:bg-rose-900/60 transition-all shadow-md"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-rose-500/60 bg-gradient-to-r from-rose-950/90 to-red-900/70 hover:from-rose-900/90 hover:to-red-800/80 px-2.5 py-1.5 text-[11px] font-extrabold text-rose-200 hover:text-white transition-all shadow-md shadow-rose-950/40 whitespace-nowrap cursor-pointer group"
               >
-                <Phone className="h-3.5 w-3.5 text-rose-400 animate-pulse" />
+                <Phone className="h-3.5 w-3.5 text-rose-400 animate-pulse shrink-0 group-hover:scale-110 transition-transform" />
                 <span>NEOC 1155 EMERGENCY ROOM</span>
               </a>
             </div>
+          </div>
 
-            {/* Middle Section: Animated Logo, Title & Detailed Government Briefing */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center py-2">
-              <div className="lg:col-span-8 space-y-4">
-                {/* React Bits MaskedHeading for Top Brand Emblem */}
-                <div className="pt-1 pb-1">
-                  <MaskedHeading
-                    text="FLOODGUARD NEPAL"
-                    mediaType="image"
-                    src="https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=1200&q=80"
-                    fillScale={1.3}
-                    parallax={24}
-                    reveal="scale"
-                    trigger="mount"
-                    duration={1.2}
-                    textScale={0.075}
-                    align="left"
-                    className="text-white"
-                  />
+          {/* Middle Section: Sovereign Brand Emblem, Title & Detailed Government Briefing */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center py-2">
+            <div className="lg:col-span-8 space-y-4">
+              {/* Sovereign Brand Emblem */}
+              <div className="flex items-center gap-3 pt-1">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/30 border border-cyan-400/40 shadow-lg shadow-cyan-500/20">
+                  <Shield className="h-6 w-6 text-cyan-400" />
                 </div>
-
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white leading-tight">
-                  Disaster Response &amp; Flood Intelligence Console
-                </h1>
-
-                {/* Nepal Government Briefing Statement */}
-                <div className="rounded-2xl border border-cyan-500/25 bg-[#090d16]/95 p-4 sm:p-5 backdrop-blur-md space-y-2.5 shadow-2xl">
+                <div>
                   <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-cyan-400" />
-                    <p className="text-xs sm:text-sm font-bold text-cyan-300">
-                      Dedicated Nepal Government Disaster Intelligence Briefing
-                    </p>
+                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight bg-gradient-to-r from-white via-slate-100 to-cyan-200 bg-clip-text text-transparent">
+                      FLOODGUARD NEPAL
+                    </h2>
+                    <span className="rounded-md border border-cyan-500/40 bg-cyan-950/60 px-2 py-0.5 text-[10px] font-mono font-bold text-cyan-300">
+                      v5.10 SOVEREIGN AI
+                    </span>
                   </div>
-                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                    National command intelligence platform designed for the Ministry of Home Affairs (MoHA) and the National Emergency Operations Centre (NEOC). High-frequency Copernicus Sentinel-1 Synthetic Aperture Radar (SAR) microwave change detection is directly fused with Google Maps JavaScript API v3 infrastructure layers across all 21 southern lowland Terai plain districts from Jhapa to Kanchanpur.
+                  <p className="text-[11px] font-mono text-cyan-400/80 tracking-wider uppercase font-semibold">
+                    National Emergency Operations Centre (NEOC) &bull; Ministry of Home Affairs
                   </p>
                 </div>
-
-                {/* Quick Key Telemetry Capsules inside Hero */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                  <div className="rounded-xl border border-cyan-500/30 bg-[#06121f]/90 p-2.5 backdrop-blur-sm shadow-md">
-                    <span className="text-[10px] text-cyan-300 font-semibold uppercase block">Inundated Area</span>
-                    <span className="text-base sm:text-lg font-black text-cyan-200">642.8 km²</span>
-                  </div>
-                  <div className="rounded-xl border border-purple-500/30 bg-[#140824]/90 p-2.5 backdrop-blur-sm shadow-md">
-                    <span className="text-[10px] text-purple-300 font-semibold uppercase block">Population at Risk</span>
-                    <span className="text-base sm:text-lg font-black text-purple-200">1,482,000</span>
-                  </div>
-                  <div className="rounded-xl border border-emerald-500/30 bg-[#051811]/90 p-2.5 backdrop-blur-sm shadow-md">
-                    <span className="text-[10px] text-emerald-300 font-semibold uppercase block">Active Hospitals</span>
-                    <span className="text-base sm:text-lg font-black text-emerald-200">7 / 8 Ready</span>
-                  </div>
-                  <div className="rounded-xl border border-blue-500/30 bg-[#081024]/90 p-2.5 backdrop-blur-sm shadow-md">
-                    <span className="text-[10px] text-blue-300 font-semibold uppercase block">Monitored Basin</span>
-                    <span className="text-base sm:text-lg font-black text-blue-200">21 Districts</span>
-                  </div>
-                </div>
               </div>
 
-              {/* Action Center: Prominent Buttons for Moving Next */}
-              <div className="lg:col-span-4 flex flex-col gap-3">
-                <div className="rounded-2xl border border-slate-800 bg-[#070b13]/95 p-4 space-y-3 shadow-2xl backdrop-blur-xl">
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
-                    Immediate Operational Actions
-                  </span>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white leading-tight">
+                Disaster Response &amp; Flood Intelligence Console
+              </h1>
 
-                  {/* Primary Next Stage Button */}
-                  <button
-                    onClick={() => onNavigateToTab('satellite')}
-                    className="w-full flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 px-4 py-3.5 text-xs font-black text-white hover:from-blue-500 hover:to-cyan-400 transition-all shadow-lg shadow-cyan-950/60 active:scale-95 group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Satellite className="h-4 w-4 text-cyan-100" />
-                      <span>Proceed to Next Stage: Flood Detection</span>
-                    </div>
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </button>
+              {/* Nepal Government Briefing Statement */}
+              <div className="rounded-2xl border border-cyan-500/25 bg-[#090d16]/95 p-4 sm:p-5 backdrop-blur-md space-y-2.5 shadow-2xl">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-cyan-400" />
+                  <p className="text-xs sm:text-sm font-bold text-cyan-300">
+                    Dedicated Nepal Government Disaster Intelligence Briefing
+                  </p>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  National command intelligence platform designed for the Ministry of Home Affairs (MoHA) and the National Emergency Operations Centre (NEOC). High-frequency Copernicus Sentinel-1 Synthetic Aperture Radar (SAR) microwave change detection is directly fused with Google Maps JavaScript API v3 infrastructure layers across all 21 southern lowland Terai plain districts from Jhapa to Kanchanpur.
+                </p>
+              </div>
 
-                  {/* View Google Map Button */}
-                  <button
-                    onClick={() => {
-                      const el = document.getElementById('terai-google-map');
-                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }}
-                    className="w-full flex items-center justify-between gap-3 rounded-xl bg-[#0d1320] border border-slate-700/80 hover:border-cyan-500/60 px-4 py-3 text-xs font-bold text-slate-200 hover:text-white hover:bg-[#121a2c] transition-all shadow-md group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Globe className="h-4 w-4 text-cyan-400" />
-                      <span>Explore Live Google Map Below</span>
-                    </div>
-                    <span className="text-cyan-400 font-black group-hover:translate-y-0.5 transition-transform">&darr;</span>
-                  </button>
-
-                  {/* Relief & Evacuation Routes Button */}
-                  <button
-                    onClick={() => onNavigateToTab('routing')}
-                    className="w-full flex items-center justify-between gap-3 rounded-xl bg-[#0d1320] border border-slate-700/80 hover:border-amber-500/60 px-4 py-3 text-xs font-bold text-slate-200 hover:text-white hover:bg-[#121a2c] transition-all shadow-md group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Compass className="h-4 w-4 text-amber-400" />
-                      <span>Relief Convoys &amp; Alternate Routes</span>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-amber-400 transition-transform group-hover:translate-x-1" />
-                  </button>
-
-                  {/* Official Govt SitRep (Stage 5.8) Button */}
-                  <button
-                    onClick={() => onNavigateToTab('sitrep')}
-                    className="w-full flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-cyan-950/70 border border-emerald-500/40 hover:border-emerald-400 px-4 py-3 text-xs font-bold text-emerald-200 hover:text-white transition-all shadow-md group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <FileDown className="h-4 w-4 text-emerald-400" />
-                      <span>Govt Situation Report (SitRep PDF)</span>
-                    </div>
-                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                      Stage 5.8
-                    </span>
-                  </button>
-
-                  {/* DHM River Gauges & SOS Alerts (Stage 5.9) Button */}
-                  <button
-                    onClick={() => onNavigateToTab('gauges')}
-                    className="w-full flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-blue-950/70 via-slate-900 to-rose-950/70 border border-blue-500/40 hover:border-rose-400 px-4 py-3 text-xs font-bold text-cyan-200 hover:text-white transition-all shadow-md group cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Waves className="h-4 w-4 text-cyan-400 animate-pulse" />
-                      <span>DHM River Gauges &amp; Vernacular SOS</span>
-                    </div>
-                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                      Stage 5.9
-                    </span>
-                  </button>
-
-                  {/* GEE Script Launcher */}
-                  <button
-                    onClick={() => setIsScriptModalOpen(true)}
-                    className="w-full flex items-center justify-between gap-3 rounded-xl border border-cyan-500/40 bg-[#091522] px-4 py-2.5 text-xs font-bold text-cyan-300 hover:text-white hover:bg-[#0e2136] transition-all active:scale-95 cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Code2 className="h-3.5 w-3.5 text-cyan-400" />
-                      <span>GEE Sentinel-1 SAR Code</span>
-                    </div>
-                    <ExternalLink className="h-3.5 w-3.5 text-cyan-400" />
-                  </button>
+              {/* Quick Key Telemetry Capsules inside Hero */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                <div className="rounded-xl border border-cyan-500/30 bg-[#06121f]/90 p-2.5 backdrop-blur-sm shadow-md">
+                  <span className="text-[10px] text-cyan-300 font-semibold uppercase block">Inundated Area</span>
+                  <span className="text-base sm:text-lg font-black text-cyan-200">642.8 km²</span>
+                </div>
+                <div className="rounded-xl border border-purple-500/30 bg-[#140824]/90 p-2.5 backdrop-blur-sm shadow-md">
+                  <span className="text-[10px] text-purple-300 font-semibold uppercase block">Population at Risk</span>
+                  <span className="text-base sm:text-lg font-black text-purple-200">1,482,000</span>
+                </div>
+                <div className="rounded-xl border border-emerald-500/30 bg-[#051811]/90 p-2.5 backdrop-blur-sm shadow-md">
+                  <span className="text-[10px] text-emerald-300 font-semibold uppercase block">Active Hospitals</span>
+                  <span className="text-base sm:text-lg font-black text-emerald-200">7 / 8 Ready</span>
+                </div>
+                <div className="rounded-xl border border-blue-500/30 bg-[#081024]/90 p-2.5 backdrop-blur-sm shadow-md">
+                  <span className="text-[10px] text-blue-300 font-semibold uppercase block">Monitored Basin</span>
+                  <span className="text-base sm:text-lg font-black text-blue-200">21 Districts</span>
                 </div>
               </div>
             </div>
 
-            {/* Bottom Indicator: Scroll Prompt */}
-            <div className="pt-2 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>Copernicus Sentinel-1 SAR &bull; Google Maps API v3 &bull; Strictly Nepal Terai Basin</span>
+            {/* Action Center: Prominent Buttons for Moving Next */}
+            <div className="lg:col-span-4 flex flex-col gap-3">
+              <div className="rounded-2xl border border-slate-800 bg-[#070b13]/95 p-4 space-y-3 shadow-2xl backdrop-blur-xl">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                  Immediate Operational Actions
+                </span>
+
+                {/* Primary Next Stage Button */}
+                <button
+                  onClick={() => onNavigateToTab('satellite')}
+                  className="w-full flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 px-4 py-3.5 text-xs font-black text-white hover:from-blue-500 hover:to-cyan-400 transition-all shadow-lg shadow-cyan-950/60 active:scale-95 group cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Satellite className="h-4 w-4 text-cyan-100" />
+                    <span>Proceed to Next Stage: Flood Detection</span>
+                  </div>
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </button>
+
+                {/* View Google Map Button */}
+                <button
+                  onClick={() => {
+                    const el = document.getElementById('terai-google-map');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className="w-full flex items-center justify-between gap-3 rounded-xl bg-[#0d1320] border border-slate-700/80 hover:border-cyan-500/60 px-4 py-3 text-xs font-bold text-slate-200 hover:text-white hover:bg-[#121a2c] transition-all shadow-md group cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Globe className="h-4 w-4 text-cyan-400" />
+                    <span>Explore Live Google Map Below</span>
+                  </div>
+                  <span className="text-cyan-400 font-black group-hover:translate-y-0.5 transition-transform">&darr;</span>
+                </button>
+
+                {/* Relief & Evacuation Routes Button */}
+                <button
+                  onClick={() => onNavigateToTab('routing')}
+                  className="w-full flex items-center justify-between gap-3 rounded-xl bg-[#0d1320] border border-slate-700/80 hover:border-amber-500/60 px-4 py-3 text-xs font-bold text-slate-200 hover:text-white hover:bg-[#121a2c] transition-all shadow-md group cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Compass className="h-4 w-4 text-amber-400" />
+                    <span>Relief Convoys &amp; Alternate Routes</span>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-amber-400 transition-transform group-hover:translate-x-1" />
+                </button>
+
+                {/* Official Govt SitRep (Stage 5.8) Button */}
+                <button
+                  onClick={() => onNavigateToTab('sitrep')}
+                  className="w-full flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-cyan-950/70 border border-emerald-500/40 hover:border-emerald-400 px-4 py-3 text-xs font-bold text-emerald-200 hover:text-white transition-all shadow-md group cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <FileDown className="h-4 w-4 text-emerald-400" />
+                    <span>Govt Situation Report (SitRep PDF)</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    Stage 5.8
+                  </span>
+                </button>
+
+                {/* DHM River Gauges & SOS Alerts (Stage 5.9) Button */}
+                <button
+                  onClick={() => onNavigateToTab('gauges')}
+                  className="w-full flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-blue-950/70 via-slate-900 to-rose-950/70 border border-blue-500/40 hover:border-rose-400 px-4 py-3 text-xs font-bold text-cyan-200 hover:text-white transition-all shadow-md group cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Waves className="h-4 w-4 text-cyan-400 animate-pulse" />
+                    <span>DHM River Gauges &amp; Vernacular SOS</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                    Stage 5.9
+                  </span>
+                </button>
+
+                {/* GEE Script Launcher */}
+                <button
+                  onClick={() => setIsScriptModalOpen(true)}
+                  className="w-full flex items-center justify-between gap-3 rounded-xl border border-cyan-500/40 bg-[#091522] px-4 py-2.5 text-xs font-bold text-cyan-300 hover:text-white hover:bg-[#0e2136] transition-all active:scale-95 cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Code2 className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>GEE Sentinel-1 SAR Code</span>
+                  </div>
+                  <ExternalLink className="h-3.5 w-3.5 text-cyan-400" />
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  const el = document.getElementById('terai-google-map');
-                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }}
-                className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-bold transition-colors cursor-pointer"
-              >
-                <span>Scroll Down to Google Map &amp; Real-Time Hazards</span>
-                <span className="animate-bounce">&darr;</span>
-              </button>
             </div>
           </div>
-        </SwarmCursor>
+
+          {/* Bottom Indicator: Scroll Prompt */}
+          <div className="pt-2 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Copernicus Sentinel-1 SAR &bull; Google Maps API v3 &bull; Strictly Nepal Terai Basin</span>
+            </div>
+            <button
+              onClick={() => {
+                const el = document.getElementById('terai-google-map');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-bold transition-colors cursor-pointer"
+            >
+              <span>Scroll Down to Google Map &amp; Real-Time Hazards</span>
+              <span className="animate-bounce">&darr;</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ───────────────────────────────────────────────────────────────────────
@@ -547,27 +553,29 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
               <Calendar className="h-3.5 w-3.5 text-cyan-400" />
               Select Flood Event Observation Window:
             </span>
-            <span className="text-slate-400 text-[11px]">Sentinel-1 C-Band SAR Specular Backscatter</span>
+            <span className="text-slate-400 text-[11px] hidden sm:inline">
+              Sentinel-1 C-Band SAR &bull; Otsu threshold computed automatically via GEE
+            </span>
           </div>
 
-          {/* Quick Presets */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {/* Quick Presets & Custom Temporal Range — All 4 Buttons Aligned with Matching Size */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             {DATE_PRESETS.map((preset) => {
               const isSelected = preset.id === selectedDatePreset;
               return (
                 <button
                   key={preset.id}
                   onClick={() => handleDatePresetChange(preset.id)}
-                  className={`p-3 rounded-xl border text-left transition-all ${
+                  className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
                     isSelected
                       ? 'border-cyan-500 bg-cyan-600/20 text-white shadow-lg ring-1 ring-cyan-500/40'
                       : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-white'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-1.5">
                     <span className="font-bold text-xs truncate">{preset.label}</span>
                     <span
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
                         isSelected
                           ? 'bg-cyan-500/30 text-cyan-200'
                           : 'bg-slate-800 text-slate-400'
@@ -576,41 +584,70 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                       {preset.badge}
                     </span>
                   </div>
-                  <div className="text-[10px] font-mono text-slate-400 mt-1">
-                    Dry: {preset.beforeDate} &rarr; Deluge: {preset.afterDate}
+                  <div className="text-[10px] font-mono text-slate-400 mt-2">
+                    <span className="text-emerald-400/90 font-bold">Dry:</span> {preset.beforeDate} &rarr;{' '}
+                    <span className="text-cyan-400/90 font-bold">Deluge:</span> {preset.afterDate}
                   </div>
                 </button>
               );
             })}
-          </div>
 
-          {/* Custom Date Pickers */}
-          <div className="flex flex-wrap items-center gap-4 pt-2 text-xs bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-            <span className="font-semibold text-slate-300 flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5 text-blue-400" />
-              Custom Temporal Range:
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-emerald-400 font-bold">Baseline (Dry):</span>
-              <input
-                type="date"
-                value={beforeDate}
-                onChange={(e) => setBeforeDate(e.target.value)}
-                className="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
-              />
+            {/* 4. Custom Temporal Range Button (Fixed Size matching the other 3 presets) */}
+            <div
+              onClick={() => setSelectedDatePreset('custom')}
+              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                selectedDatePreset === 'custom'
+                  ? 'border-cyan-500 bg-cyan-600/20 text-white shadow-lg ring-1 ring-cyan-500/40'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1.5">
+                <span className="font-bold text-xs truncate flex items-center gap-1.5 text-slate-200">
+                  <Clock className={`h-3.5 w-3.5 shrink-0 ${selectedDatePreset === 'custom' ? 'text-cyan-400' : 'text-blue-400'}`} />
+                  Custom Temporal Range
+                </span>
+                <span
+                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                    selectedDatePreset === 'custom'
+                      ? 'bg-cyan-500/30 text-cyan-200'
+                      : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  CUSTOM
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+                <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
+                  <label className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-tight">
+                    Baseline (Dry)
+                  </label>
+                  <input
+                    type="date"
+                    value={beforeDate}
+                    onChange={(e) => {
+                      setBeforeDate(e.target.value);
+                      setSelectedDatePreset('custom');
+                    }}
+                    className="rounded-lg border border-slate-700/80 bg-slate-900/90 px-1.5 py-0.5 text-[10px] text-white font-mono focus:outline-none focus:border-cyan-500 cursor-pointer w-full"
+                  />
+                </div>
+                <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
+                  <label className="text-[9px] font-mono font-bold text-cyan-400 uppercase tracking-tight">
+                    Observation (Deluge)
+                  </label>
+                  <input
+                    type="date"
+                    value={afterDate}
+                    onChange={(e) => {
+                      setAfterDate(e.target.value);
+                      setSelectedDatePreset('custom');
+                    }}
+                    className="rounded-lg border border-slate-700/80 bg-slate-900/90 px-1.5 py-0.5 text-[10px] text-white font-mono focus:outline-none focus:border-cyan-500 cursor-pointer w-full"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] text-cyan-400 font-bold">Observation (Deluge):</span>
-              <input
-                type="date"
-                value={afterDate}
-                onChange={(e) => setAfterDate(e.target.value)}
-                className="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
-              />
-            </div>
-            <span className="text-[11px] text-slate-500 italic hidden md:inline">
-              Otsu threshold computed automatically via GEE
-            </span>
           </div>
         </div>
 
@@ -722,7 +759,17 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
           (User Requirement: The uske neeche bas google map lagana hai, agar kahi flood aye to google map pe highlight karke bataye)
       ───────────────────────────────────────────────────────────────────────── */}
       <div id="terai-google-map" className="space-y-4 scroll-mt-24">
-        <GoogleMapsViewer />
+        <GoogleMapsViewer
+          selectedRegionKey={selectedRegionKey}
+          selectedDistrict={selectedDistrict}
+          viewLayerMode={viewLayerMode}
+          selectedDatePreset={selectedDatePreset}
+          beforeDate={beforeDate}
+          afterDate={afterDate}
+          onRegionChange={(key) => handleRegionChange(key)}
+          onDistrictChange={(d) => setSelectedDistrict(d)}
+          onViewLayerModeChange={(m) => setViewLayerMode(m)}
+        />
       </div>
 
       {/* ───────────────────────────────────────────────────────────────────────

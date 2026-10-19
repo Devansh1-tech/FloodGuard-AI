@@ -44,13 +44,20 @@ import { Stage59RiverGaugesPage } from '@/pages/gauges/Stage59RiverGaugesPage';
 import { HospitalDirectoryPage } from '@/pages/infrastructure/HospitalDirectoryPage';
 import { DemographicsPage } from '@/pages/demographics/DemographicsPage';
 import { ExecutiveDashboard } from '@/pages/dashboard/ExecutiveDashboard';
+import { LandingHeroPage } from '@/pages/landing/LandingHeroPage';
 import CardNav, { CardNavItem, CardNavLink } from '@/components/nav/CardNav';
+import { AboutModal } from '@/components/common/AboutModal';
+import { FaqModal } from '@/components/common/FaqModal';
+import { ContactModal } from '@/components/common/ContactModal';
 
-export type NavigationTab = 'dashboard' | 'satellite' | 'command_map' | 'roads' | 'routing' | 'havens' | 'sitrep' | 'gauges' | 'hospitals' | 'demographics';
+export type NavigationTab = 'landing' | 'dashboard' | 'satellite' | 'command_map' | 'roads' | 'routing' | 'havens' | 'sitrep' | 'gauges' | 'hospitals' | 'demographics';
 
 export const App: React.FC = () => {
   const [isDark, setIsDark] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<NavigationTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<NavigationTab>('landing');
+  const [isAboutOpen, setIsAboutOpen] = useState<boolean>(false);
+  const [isFaqOpen, setIsFaqOpen] = useState<boolean>(false);
+  const [isContactOpen, setIsContactOpen] = useState<boolean>(false);
 
   useEffect(() => {
     document.documentElement.classList.add('dark');
@@ -64,279 +71,432 @@ export const App: React.FC = () => {
   };
 
   const navLogo = (
-    <div className="flex items-center gap-2 font-black text-sm tracking-tight text-white select-none">
-      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-blue-600 to-cyan-500 shadow-sm shadow-blue-500/30">
-        <Shield className="h-4 w-4 text-white" />
-      </div>
-      <span className="font-extrabold tracking-tight">
-        FLOODGUARD<span className="text-cyan-400"> AI</span>
-      </span>
-      <span className="hidden sm:inline-flex items-center gap-1 rounded bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-bold text-rose-300 border border-rose-500/30">
-        NEPAL GOVT
-      </span>
-    </div>
+    <span className="font-extrabold text-sm sm:text-base tracking-tight text-white select-none whitespace-nowrap">
+      Floodguard AI
+    </span>
   );
 
   const navItems: CardNavItem[] = [
     {
-      label: 'NEOC Command',
-      description: 'National Emergency Operations & Terai status.',
+      label: '🛡️ NEOC Command',
+      description: 'National Emergency Operations & Terai river alerts.',
       links: [
-        { label: 'Executive Dashboard (Overview)', href: '#dashboard' },
-        { label: 'Export Official SitRep PDF (5.8)', href: '#sitrep' },
-        { label: 'DHM River Gauges & SOS (5.9)', href: '#gauges' },
-        { label: 'Terai Lowland Scope (21 Dist.)', href: '#dashboard' },
-        { label: 'Live Incident Telemetry', href: '#dashboard' },
+        {
+          label: 'Home & Sovereign Overview',
+          sublabel: 'Public Landing & Hero Mission',
+          href: '#landing',
+          isActive: activeTab === 'landing',
+        },
+        {
+          label: 'Executive Dashboard',
+          sublabel: 'Govt Officer Landing Console',
+          href: '#dashboard',
+          isActive: activeTab === 'dashboard',
+        },
+        {
+          label: 'River Gauges & SOS (5.9)',
+          sublabel: 'DHM Telemetry & Alerts',
+          href: '#gauges',
+          isActive: activeTab === 'gauges',
+        },
+        {
+          label: 'Govt SitRep (5.8)',
+          sublabel: 'Official PDF Export',
+          href: '#sitrep',
+          isActive: activeTab === 'sitrep',
+        },
+        {
+          label: 'Terai Lowland Scope',
+          sublabel: '21 Districts Coverage',
+          href: '#dashboard',
+        },
       ],
     },
     {
-      label: 'Flood Detection',
-      description: 'Sentinel-1 SAR Radar & Earth Engine.',
+      label: '🛰️ Flood Detection & Maps',
+      description: 'Copernicus Sentinel-1 SAR & Google Maps Engine.',
       links: [
-        { label: 'Split Deluge Comparison', href: '#satellite' },
-        { label: 'Side-by-Side Dual Alignment', href: '#satellite' },
-        { label: 'Black & White SAR Radar Mode', href: '#satellite' },
-        { label: 'Terai City & Village Picker', href: '#satellite' },
+        {
+          label: 'Satellite Flood Detection',
+          sublabel: 'Google Earth Engine & SAR',
+          href: '#satellite',
+          isActive: activeTab === 'satellite',
+        },
+        {
+          label: 'Field Command Map',
+          sublabel: 'Google Maps API Engine',
+          href: '#command_map',
+          isActive: activeTab === 'command_map',
+        },
+        {
+          label: 'Split Deluge Comparison',
+          sublabel: 'Dual-Pane Slider Alignment',
+          href: '#satellite',
+        },
+        {
+          label: 'Terai Settlement Picker',
+          sublabel: 'Inundated Towns & Wards',
+          href: '#command_map',
+        },
       ],
     },
     {
-      label: 'Relief & Alternate Routes',
+      label: '🚛 Relief & Alternate Routes',
       description: 'Emergency convoys & evacuation detours.',
       links: [
-        { label: 'Emergency Routing Operations (5.6)', href: '#routing' },
-        { label: 'Safe Havens & Refugee Camps (5.7)', href: '#havens' },
-        { label: 'Point 7: Relief Convoy Router', href: '#routing' },
-        { label: 'Point 9: Civilian Evacuation Detours', href: '#routing' },
-        { label: 'Road Inundation & Bridges (5.4)', href: '#roads' },
-        { label: 'Field Command Map (Live)', href: '#command_map' },
+        {
+          label: 'Road Inundation (5.4)',
+          sublabel: 'Highways & Cut-Off Zones',
+          href: '#roads',
+          isActive: activeTab === 'roads',
+        },
+        {
+          label: 'Emergency Routes (5.6)',
+          sublabel: 'Convoys & Evacuation',
+          href: '#routing',
+          isActive: activeTab === 'routing',
+        },
+        {
+          label: 'Safe Havens (5.7)',
+          sublabel: 'Refugee Camps & HLZ',
+          href: '#havens',
+          isActive: activeTab === 'havens',
+        },
+        {
+          label: 'Point 7: Convoy Router',
+          sublabel: 'Tactical Relief Dispatch',
+          href: '#routing',
+        },
+        {
+          label: 'Point 9: Evacuation Detours',
+          sublabel: 'Civilian Safe Corridors',
+          href: '#routing',
+        },
       ],
     },
     {
-      label: 'Public Demographics & Hospitals (5.5)',
+      label: '👥 Demographics & Hospitals (5.5)',
       description: 'Grounded public data (Google, CBS & MoHP).',
       links: [
-        { label: 'Public Census Demographics (5.5)', href: '#demographics' },
-        { label: 'MoHP Hospitals & Antivenom (5.5)', href: '#hospitals' },
-        { label: 'Settlement AI Dossiers & Depths', href: '#command_map' },
+        {
+          label: 'Public Hospitals (5.5)',
+          sublabel: 'Beds, ICU & Antivenom',
+          href: '#hospitals',
+          isActive: activeTab === 'hospitals',
+        },
+        {
+          label: 'Public Demographics (5.5)',
+          sublabel: 'Census 2021 & Gemini AI',
+          href: '#demographics',
+          isActive: activeTab === 'demographics',
+        },
+        {
+          label: 'Settlement AI Dossiers',
+          sublabel: 'Grounded Vulnerability Depth',
+          href: '#demographics',
+        },
+        {
+          label: 'Emergency Antivenom Supply',
+          sublabel: 'MoHP Snakebite Treatment Depots',
+          href: '#hospitals',
+        },
       ],
     },
   ];
 
   const handleLinkClick = (link: CardNavLink) => {
     if (!link.href) return;
-    if (link.href.includes('#dashboard')) {
+    if (link.href.includes('#landing')) {
+      setActiveTab('landing');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (link.href.includes('#dashboard')) {
       setActiveTab('dashboard');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (link.href.includes('#satellite')) {
       setActiveTab('satellite');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (link.href.includes('#command_map')) {
       setActiveTab('command_map');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (link.href.includes('#roads')) {
       setActiveTab('roads');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (link.href.includes('#routing')) {
       setActiveTab('routing');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (link.href.includes('#havens')) {
       setActiveTab('havens');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (link.href.includes('#sitrep')) {
       setActiveTab('sitrep');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (link.href.includes('#gauges')) {
       setActiveTab('gauges');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (link.href.includes('#hospitals')) {
       setActiveTab('hospitals');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (link.href.includes('#demographics')) {
       setActiveTab('demographics');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
-  const tabs = [
-    {
-      id: 'dashboard' as NavigationTab,
+  const tabInfoMap: Record<
+    NavigationTab,
+    { label: string; tagline: string; icon: React.ComponentType<{ className?: string }>; badge: string; badgeColor: string }
+  > = {
+    landing: {
+      label: 'Home & Sovereign Overview',
+      tagline: 'Nepal Terai Early Defense & Satellite Radar',
+      icon: Shield,
+      badge: 'Public Portal',
+      badgeColor: 'border-cyan-500/30 bg-cyan-500/20 text-cyan-400',
+    },
+    dashboard: {
       label: 'Executive Dashboard',
       tagline: 'Govt Officer Landing Console',
       icon: ShieldAlert,
       badge: 'NEOC Command',
       badgeColor: 'border-rose-500/30 bg-rose-500/20 text-rose-400',
     },
-    {
-      id: 'satellite' as NavigationTab,
+    satellite: {
       label: 'Satellite Flood Detection',
       tagline: 'Google Earth Engine & SAR',
       icon: Satellite,
-      badge: 'Sentinel-1 Radar',
+      badge: 'Stage 5.1 Sentinel-1',
       badgeColor: 'border-cyan-500/30 bg-cyan-500/20 text-cyan-400',
     },
-    {
-      id: 'command_map' as NavigationTab,
+    command_map: {
       label: 'Field Command Map',
       tagline: 'Google Maps API Engine',
       icon: Globe,
-      badge: 'Interactive Operations',
+      badge: 'Stage 5.2/5.3 Operations',
       badgeColor: 'border-blue-500/30 bg-blue-500/20 text-blue-400',
     },
-    {
-      id: 'roads' as NavigationTab,
-      label: 'Road Inundation (5.4)',
+    roads: {
+      label: 'Road Inundation & Bridges',
       tagline: 'Highways & Cut-Off Zones',
       icon: Truck,
-      badge: 'Point 4 Disruption',
+      badge: 'Stage 5.4 Disruption',
       badgeColor: 'border-amber-500/30 bg-amber-500/20 text-amber-400',
     },
-    {
-      id: 'routing' as NavigationTab,
-      label: 'Emergency Routes (5.6)',
-      tagline: 'Convoys & Evacuation',
+    routing: {
+      label: 'Emergency Routes & Convoys',
+      tagline: 'Convoys & Evacuation Detours',
       icon: Route,
-      badge: 'Points 7 & 9',
+      badge: 'Stage 5.6 Points 7 & 9',
       badgeColor: 'border-cyan-500/30 bg-cyan-500/20 text-cyan-400',
     },
-    {
-      id: 'havens' as NavigationTab,
-      label: 'Safe Havens (5.7)',
-      tagline: 'Refugee Camps & HLZ',
+    havens: {
+      label: 'Safe Havens & Refugee Camps',
+      tagline: 'Sphere Standards & HLZ',
       icon: Tent,
-      badge: 'Point 8 Proximity',
+      badge: 'Stage 5.7 Point 8',
       badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400',
     },
-    {
-      id: 'sitrep' as NavigationTab,
-      label: 'Govt SitRep (5.8)',
-      tagline: 'Official PDF Export',
+    sitrep: {
+      label: 'Govt SitRep PDF Export',
+      tagline: 'Official UN-SPIDER SitRep',
       icon: FileDown,
-      badge: 'Point 10 PDF',
+      badge: 'Stage 5.8 Point 10',
       badgeColor: 'border-rose-500/30 bg-rose-500/20 text-rose-400',
     },
-    {
-      id: 'gauges' as NavigationTab,
-      label: 'River Gauges & SOS (5.9)',
-      tagline: 'DHM Telemetry & Alerts',
+    gauges: {
+      label: 'DHM River Gauges & SOS',
+      tagline: 'Real-Time Telemetry & Alerts',
       icon: Waves,
-      badge: 'Point 11 Early Warning',
+      badge: 'Stage 5.9 Point 11',
       badgeColor: 'border-blue-500/30 bg-blue-500/20 text-blue-400',
     },
-    {
-      id: 'hospitals' as NavigationTab,
-      label: 'Public Hospitals (5.5)',
-      tagline: 'Beds, ICU & Antivenom',
+    hospitals: {
+      label: 'Public Hospitals & Antivenom',
+      tagline: 'Beds, ICU & Antivenom Stock',
       icon: HeartPulse,
-      badge: 'Public MoHP Data',
+      badge: 'Stage 5.5 MoHP Data',
       badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400',
     },
-    {
-      id: 'demographics' as NavigationTab,
-      label: 'Public Demographics (5.5)',
+    demographics: {
+      label: 'Public Demographics & AI',
       tagline: 'Census 2021 & Gemini AI',
       icon: Users,
-      badge: 'Points 5 & 6',
+      badge: 'Stage 5.5 Points 5 & 6',
       badgeColor: 'border-purple-500/30 bg-purple-500/20 text-purple-400',
     },
-  ];
+  };
+
+  const currentTab = tabInfoMap[activeTab];
+  const CurrentIcon = currentTab.icon;
+
+  const navLeftSlot = (
+    <div className="hidden md:flex items-center gap-1 ml-1.5">
+      <button
+        onClick={() => {
+          setActiveTab('landing');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+          activeTab === 'landing'
+            ? 'text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 shadow-sm shadow-cyan-500/10'
+            : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent'
+        }`}
+        title="Go to Public Landing & Hero Overview"
+      >
+        Home
+      </button>
+      <button
+        onClick={() => {
+          setActiveTab('dashboard');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+          activeTab === 'dashboard'
+            ? 'text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 shadow-sm shadow-cyan-500/10'
+            : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent'
+        }`}
+        title="Go to Executive Overview Dashboard"
+      >
+        Dashboard
+      </button>
+      <button
+        onClick={() => setIsAboutOpen(true)}
+        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent transition-all cursor-pointer"
+        title="About FloodGuard AI Platform"
+      >
+        About
+      </button>
+      <button
+        onClick={() => setIsFaqOpen(true)}
+        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent transition-all cursor-pointer"
+        title="Frequently Asked Questions & Radar Guide"
+      >
+        FAQ
+      </button>
+      <button
+        onClick={() => setIsContactOpen(true)}
+        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent transition-all cursor-pointer"
+        title="Emergency Operations Hotlines & Signal Dispatch"
+      >
+        Contact
+      </button>
+    </div>
+  );
+
+  const dropdownHeader = (
+    <div className="flex flex-wrap items-center justify-between gap-2 w-full text-xs">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">Quick Links:</span>
+        <button
+          onClick={() => {
+            setActiveTab('landing');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+            activeTab === 'landing' ? 'text-cyan-300 bg-cyan-500/20' : 'text-slate-300 hover:text-white'
+          }`}
+        >
+          Home
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('dashboard');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
+            activeTab === 'dashboard' ? 'text-cyan-300 bg-cyan-500/20' : 'text-slate-300 hover:text-white'
+          }`}
+        >
+          Dashboard
+        </button>
+        <button
+          onClick={() => setIsAboutOpen(true)}
+          className="px-2 py-0.5 rounded text-[11px] font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+        >
+          About
+        </button>
+        <button
+          onClick={() => setIsFaqOpen(true)}
+          className="px-2 py-0.5 rounded text-[11px] font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+        >
+          FAQ
+        </button>
+        <button
+          onClick={() => setIsContactOpen(true)}
+          className="px-2 py-0.5 rounded text-[11px] font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+        >
+          Contact
+        </button>
+      </div>
+      <div className="hidden sm:flex items-center gap-1 text-[10px] font-mono text-cyan-400">
+        <span>Nepal Terai Sovereign AI Ops</span>
+      </div>
+    </div>
+  );
+
+  const navRightSlot = (
+    <button
+      onClick={toggleTheme}
+      className="rounded-xl border border-slate-700/80 bg-slate-800/80 p-2 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+      title="Toggle Light / Dark Theme"
+      aria-label="Toggle Theme"
+    >
+      {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-300" />}
+    </button>
+  );
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
       {/* ───────────────────────────────────────────────────────────────────────
-          CARDNAV MASTER NAVIGATION BAR (React Bits Component)
+          MAIN NAVIGATION BAR (Full Width Edge-to-Edge)
       ───────────────────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 w-full border-b border-slate-800/80 bg-[#07090e]/95 backdrop-blur-md px-3 py-2">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex-1">
-            <CardNav
-              logo={navLogo}
-              logoAlt="FloodGuard AI Nepal"
-              items={navItems}
-              cta={{ label: 'NEOC SOS 1155', href: 'tel:1155' }}
-              theme={isDark ? 'dark' : 'light'}
-              surface="glass"
-              cardEffect="rise"
-              openOn="click"
-              maxWidth={940}
-              accentColor="#f43f5e"
-              onLinkClick={handleLinkClick}
-            />
-          </div>
-          <div className="hidden md:flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setActiveTab('sitrep')}
-              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 px-3 py-2 text-xs font-bold text-white shadow-md shadow-rose-600/25 hover:from-rose-500 hover:to-amber-500 transition-all border border-rose-400/30 cursor-pointer"
-              title="Export Official Government Situation Report (PDF)"
-            >
-              <FileDown className="h-3.5 w-3.5" />
-              <span className="hidden lg:inline">SitRep (PDF)</span>
-            </button>
-            <button
-              onClick={toggleTheme}
-              className="rounded-xl border border-slate-700 bg-slate-800/90 p-2 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
-              title="Toggle Theme"
-            >
-              {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-300" />}
-            </button>
-          </div>
+      <header className="sticky top-0 z-50 w-full border-b border-slate-800/80 bg-[#07090e]/95 backdrop-blur-md px-2 sm:px-4 py-2">
+        <div className="w-full">
+          <CardNav
+            logo={navLogo}
+            logoAlt="FloodGuard AI Nepal"
+            items={navItems}
+            cta={{ label: 'NEOC SOS 1155', href: 'tel:1155' }}
+            theme={isDark ? 'dark' : 'light'}
+            surface="glass"
+            cardEffect="rise"
+            openOn="click"
+            cardHeight={175}
+            maxWidth="100%"
+            accentColor="#06b6d4"
+            onLinkClick={handleLinkClick}
+            leftSlot={navLeftSlot}
+            rightSlot={navRightSlot}
+            dropdownHeader={dropdownHeader}
+          />
         </div>
       </header>
 
       {/* ───────────────────────────────────────────────────────────────────────
-          PRIMARY USER-FRIENDLY NAVIGATION TABS
+          SLIM STATUS & CONTEXT BREADCRUMB STRIP (Replaces bulky secondary nav)
       ───────────────────────────────────────────────────────────────────────── */}
-      <nav className="border-b border-slate-800 bg-slate-900/60 px-4 md:px-8 py-2.5">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`group relative flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
-                    isActive
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25 ring-1 ring-blue-400/40'
-                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <Icon
-                    className={`h-4 w-4 transition-transform group-hover:scale-110 ${
-                      isActive ? 'text-white' : 'text-slate-400'
-                    }`}
-                  />
-                  <div className="text-left">
-                    <span className="block leading-tight">{tab.label}</span>
-                    <span
-                      className={`text-[10px] font-medium leading-tight block ${
-                        isActive ? 'text-blue-100' : 'text-slate-400'
-                      }`}
-                    >
-                      {tab.tagline}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="hidden xl:flex items-center gap-2 text-xs text-slate-400">
-            <span className="h-2 w-2 rounded-full bg-blue-500"></span>
-            <span>Focus: <strong>Lowland Terai Plain Only</strong> (Himalayas Excluded)</span>
-          </div>
-        </div>
-      </nav>
-
-      {/* ───────────────────────────────────────────────────────────────────────
-          ARCHITECTURE DELINEATION INFO STRIP
-      ───────────────────────────────────────────────────────────────────────── */}
-      <div className="bg-slate-900/40 border-b border-slate-800/80 px-4 md:px-8 py-2 text-xs">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-slate-400">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-slate-200">System Architecture:</span>
-            <span className="rounded bg-cyan-950/80 border border-cyan-800/60 px-2 py-0.5 text-[11px] text-cyan-300 font-medium">
-              🛰️ <strong>Earth Engine</strong>: Sentinel-1 SAR Flood Inundation &amp; Water Radar Masks
+      <div className="bg-slate-900/50 border-b border-slate-800/80 px-4 md:px-8 py-2 text-xs">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-slate-400">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500 font-mono">NEOC Command &bull;</span>
+            <span className="flex items-center gap-1.5 font-bold text-slate-200">
+              <CurrentIcon className="h-3.5 w-3.5 text-cyan-400" />
+              <span>{currentTab.label}</span>
             </span>
-            <span className="rounded bg-blue-950/80 border border-blue-800/60 px-2 py-0.5 text-[11px] text-blue-300 font-medium">
-              🗺️ <strong>Google Maps API</strong>: Settlements, Population, Hospitals, Roads &amp; Safe Refuges
+            <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono font-bold border ${currentTab.badgeColor}`}>
+              {currentTab.badge}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-            <MapPin className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Boundary: 26.25°N &ndash; 27.90°N (Terai Corridor)</span>
+          <div className="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-emerald-300 font-medium">Telemetry Online</span>
+            </div>
+            <span className="text-slate-600">|</span>
+            <div className="flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 text-cyan-400" />
+              <span>21 Southern Nepal Terai Districts (26.20°N &ndash; 28.35°N)</span>
+            </div>
           </div>
         </div>
       </div>
@@ -345,6 +505,18 @@ export const App: React.FC = () => {
           MAIN CONTENT VIEWPORT
       ───────────────────────────────────────────────────────────────────────── */}
       <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        {activeTab === 'landing' && (
+          <LandingHeroPage
+            onMoveToDashboard={() => {
+              setActiveTab('dashboard');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateToTab={(tab) => {
+              setActiveTab(tab);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
         {activeTab === 'dashboard' && (
           <ExecutiveDashboard onNavigateToTab={(tab) => setActiveTab(tab)} />
         )}
@@ -391,6 +563,11 @@ export const App: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      {/* Informational & Dispatch Modals */}
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+      <FaqModal isOpen={isFaqOpen} onClose={() => setIsFaqOpen(false)} />
+      <ContactModal isOpen={isContactOpen} onClose={() => setIsContactOpen(false)} />
     </div>
   );
 };

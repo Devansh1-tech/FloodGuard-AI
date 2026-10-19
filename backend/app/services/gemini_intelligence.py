@@ -386,7 +386,7 @@ class GeminiIntelligenceService:
         successful_model: str = "gemini"
         parsed: Dict[str, Any] = {}
 
-        async with httpx.AsyncClient(timeout=20.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             for model_name in unique_models:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
                 try:
@@ -546,7 +546,7 @@ class GeminiIntelligenceService:
                     ventilators=2,
                     antivenom_stock="45 vials (Staged on 2nd floor)" if is_sub else "60 vials available",
                     flood_status="submerged_ground_floor" if is_sub else "operational",
-                    phone=f"+977-{hash(request.district) % 90 + 10}-520111",
+                    phone=f"+977-{abs(hash(request.district)) % 90 + 10}-520111",
                 )
             )
             facilities.append(
@@ -559,7 +559,7 @@ class GeminiIntelligenceService:
                     ventilators=0,
                     antivenom_stock="Depleted — Transported to high ground" if request.is_flooded else "15 vials",
                     flood_status="inoperable" if request.is_flooded else "operational",
-                    phone=f"+977-{hash(request.district) % 90 + 10}-520222",
+                    phone=f"+977-{abs(hash(request.district)) % 90 + 10}-520222",
                 )
             )
 

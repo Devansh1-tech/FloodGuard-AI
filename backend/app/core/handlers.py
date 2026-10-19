@@ -64,7 +64,7 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
     return format_error_response(
         code="REQUEST_VALIDATION_ERROR",
         message="One or more fields in the request payload failed validation.",
-        status_code=getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY),
+        status_code=getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", 422),
         details={"validation_errors": formatted_errors},
     )
 

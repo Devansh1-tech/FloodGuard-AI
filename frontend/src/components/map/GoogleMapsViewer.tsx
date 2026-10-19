@@ -309,15 +309,31 @@ const LeafletViewController: React.FC<{
 export interface GoogleMapsViewerProps {
   apiKey?: string;
   defaultRegionKey?: string;
+  selectedRegionKey?: string;
+  selectedDistrict?: string;
+  viewLayerMode?: 'both' | 'flooded' | 'safe';
+  selectedDatePreset?: string;
+  beforeDate?: string;
+  afterDate?: string;
   initialRouteId?: string;
   onRegionChange?: (regionKey: string) => void;
+  onDistrictChange?: (district: string) => void;
+  onViewLayerModeChange?: (mode: 'both' | 'flooded' | 'safe') => void;
 }
 
 export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   apiKey: initialApiKey,
   defaultRegionKey = 'full_terai',
+  selectedRegionKey: propSelectedRegionKey,
+  selectedDistrict: propSelectedDistrict,
+  viewLayerMode: propViewLayerMode,
+  selectedDatePreset: propSelectedDatePreset,
+  beforeDate: propBeforeDate,
+  afterDate: propAfterDate,
   initialRouteId = 'none',
   onRegionChange,
+  onDistrictChange,
+  onViewLayerModeChange,
 }) => {
   // API Key State (Fallback to Vite Env or User Key)
   const [apiKey, setApiKey] = useState<string>(
@@ -334,8 +350,13 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   const [googleLoadError, setGoogleLoadError] = useState<string | null>(null);
 
   // Region & District State
-  const [selectedRegionKey, setSelectedRegionKey] = useState<string>(defaultRegionKey);
-  const [selectedDistrict, setSelectedDistrict] = useState<string>('all');
+  const [selectedRegionKey, setSelectedRegionKey] = useState<string>(
+    propSelectedRegionKey || defaultRegionKey
+  );
+  const [selectedDistrict, setSelectedDistrict] = useState<string>(
+    propSelectedDistrict || 'all'
+  );
+  const [mapRenderTrigger, setMapRenderTrigger] = useState<number>(0);
   const activeRegion: TeraiRegionData = TERAI_REGIONS[selectedRegionKey] || TERAI_REGIONS.full_terai;
 
   // Stage 5.3 Settlement Filter & Search State
@@ -357,6 +378,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   const [showNepalBorder, setShowNepalBorder] = useState<boolean>(true);
   const [showTeraiBoundary, setShowTeraiBoundary] = useState<boolean>(true);
   const [showFloodPolygons, setShowFloodPolygons] = useState<boolean>(true);
+  const [highlightFloodedDotted, setHighlightFloodedDotted] = useState<boolean>(true);
   const [showHospitals, setShowHospitals] = useState<boolean>(true);
   const [showSafeZones, setShowSafeZones] = useState<boolean>(true);
   const [showCityPoints, setShowCityPoints] = useState<boolean>(true);
@@ -487,6 +509,87 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
     }
   };
 
+  // ─── PROP SYNCHRONIZATION WITH PARENT DASHBOARD BUTTONS ─────────────────────
+  // 1. Sync incoming region from corridor / basin buttons
+  useEffect(() => {
+    if (propSelectedRegionKey && propSelectedRegionKey !== selectedRegionKey) {
+      setSelectedRegionKey(propSelectedRegionKey);
+      setSelectedDistrict('all');
+      if (googleMapInstanceRef.current && window.google) {
+        fitToActiveRegion(googleMapInstanceRef.current, propSelectedRegionKey);
+      }
+      if (leafletMapInstanceRef.current) {
+        const reg = TERAI_REGIONS[propSelectedRegionKey] || TERAI_REGIONS.full_terai;
+        leafletMapInstanceRef.current.flyTo(reg.center, reg.zoom);
+      }
+      setMapRenderTrigger((prev) => prev + 1);
+    }
+  }, [propSelectedRegionKey]);
+
+  // 2. Sync incoming district selection from dropdown
+  useEffect(() => {
+    if (propSelectedDistrict && propSelectedDistrict !== selectedDistrict) {
+      setSelectedDistrict(propSelectedDistrict);
+      if (propSelectedDistrict !== 'all') {
+        const matchCity = TERAI_CITIES_DATA.find(
+          (c) => c.district.toLowerCase() === propSelectedDistrict.toLowerCase()
+        );
+        const coords = matchCity ? matchCity.coords : null;
+        if (coords) {
+          if (googleMapInstanceRef.current && window.google) {
+            googleMapInstanceRef.current.panTo({ lat: coords[0], lng: coords[1] });
+            googleMapInstanceRef.current.setZoom(11);
+          }
+          if (leafletMapInstanceRef.current) {
+            leafletMapInstanceRef.current.flyTo(coords, 11);
+          }
+        }
+      } else {
+        if (googleMapInstanceRef.current && window.google) {
+          fitToActiveRegion(googleMapInstanceRef.current, selectedRegionKey);
+        }
+        if (leafletMapInstanceRef.current) {
+          const reg = TERAI_REGIONS[selectedRegionKey] || TERAI_REGIONS.full_terai;
+          leafletMapInstanceRef.current.flyTo(reg.center, reg.zoom);
+        }
+      }
+      setMapRenderTrigger((prev) => prev + 1);
+    }
+  }, [propSelectedDistrict]);
+
+  // 3. Sync incoming layer visibility mode buttons ('both' | 'flooded' | 'safe')
+  useEffect(() => {
+    if (propViewLayerMode) {
+      if (propViewLayerMode === 'flooded') {
+        setShowFloodPolygons(true);
+        setShowVillagePins(true);
+        setSettlementFilter('flooded_only');
+        setShowSafeZones(false);
+        setShowHospitals(false);
+      } else if (propViewLayerMode === 'safe') {
+        setShowFloodPolygons(false);
+        setShowVillagePins(true);
+        setSettlementFilter('safe_only');
+        setShowSafeZones(true);
+        setShowHospitals(true);
+      } else {
+        setShowFloodPolygons(true);
+        setShowVillagePins(true);
+        setSettlementFilter('all');
+        setShowSafeZones(true);
+        setShowHospitals(true);
+      }
+      setMapRenderTrigger((prev) => prev + 1);
+    }
+  }, [propViewLayerMode]);
+
+  // 4. Sync incoming date observation presets or custom dates
+  useEffect(() => {
+    if (propBeforeDate || propAfterDate || propSelectedDatePreset) {
+      setMapRenderTrigger((prev) => prev + 1);
+    }
+  }, [propBeforeDate, propAfterDate, propSelectedDatePreset]);
+
   // Pinpoint Village on Map (Works in both Google Maps and Leaflet engines)
   const pinpointVillageOnMap = (village: VillageTownItem) => {
     setFocusedVillage(village);
@@ -587,11 +690,13 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
 
     googleMapInstanceRef.current = map;
     fitToActiveRegion(map, selectedRegionKey);
+    setMapRenderTrigger((prev) => prev + 1);
 
     setTimeout(() => {
       if (googleMapInstanceRef.current && window.google) {
         google.maps.event.trigger(googleMapInstanceRef.current, 'resize');
         fitToActiveRegion(googleMapInstanceRef.current, selectedRegionKey);
+        setMapRenderTrigger((prev) => prev + 1);
       }
     }, 150);
 
@@ -683,58 +788,128 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
     });
     overlaysRef.current = [];
 
-    // 1. Draw Dotted Sovereign Nepal Border
+    // 1. Draw Sovereign Nepal Border & Solid Country Highlight
     if (showNepalBorder) {
       const borderPath = nepalBoundaries.nepal_border.map(([lat, lng]) => ({ lat, lng }));
-      const dottedSymbol = {
-        path: 'M 0,-1 0,1',
-        strokeOpacity: 1,
-        strokeColor: '#F59E0B',
-        strokeWeight: 2.5,
-        scale: 4,
-      };
 
-      const borderLine = new google.maps.Polyline({
-        path: borderPath,
+      // Vivid sovereign territory boundary & luminous country fill
+      const nepalPolygon = new google.maps.Polygon({
+        paths: borderPath,
         strokeColor: '#F59E0B',
-        strokeOpacity: 0,
-        icons: [
-          {
-            icon: dottedSymbol,
-            offset: '0',
-            repeat: '14px',
-          },
-        ],
+        strokeOpacity: 0.95,
+        strokeWeight: 3.5,
+        fillColor: '#F59E0B',
+        fillOpacity: 0.08,
         map,
+        clickable: false,
+        zIndex: 1,
       });
+      overlaysRef.current.push(nepalPolygon);
 
-      overlaysRef.current.push(borderLine);
+      // Outer gold glowing contour line for ultra-crisp visibility on dark satellite
+      const nepalOuterContour = new google.maps.Polyline({
+        path: borderPath,
+        strokeColor: '#FEF3C7',
+        strokeOpacity: 0.85,
+        strokeWeight: 1.5,
+        map,
+        clickable: false,
+        zIndex: 2,
+      });
+      overlaysRef.current.push(nepalOuterContour);
+
+      // Sovereign Emblem Marker at Central Nepal
+      const nepalEmblemMarker = new google.maps.Marker({
+        position: { lat: 28.3949, lng: 84.1240 },
+        map,
+        title: 'Sovereign Territory of Nepal',
+        icon: {
+          url: `data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="34" viewBox="0 0 160 34"><rect width="160" height="34" rx="8" fill="%230F172A" stroke="%23F59E0B" stroke-width="2"/><text x="12" y="21" font-family="system-ui,sans-serif" font-size="11" font-weight="900" fill="%23F59E0B">🇳🇵 NEPAL SOVEREIGN</text></svg>`,
+          anchor: new google.maps.Point(80, 17),
+        },
+        zIndex: 3,
+      });
+      overlaysRef.current.push(nepalEmblemMarker);
     }
 
     // 2. Draw Nepal Terai Lowland Plain Highlight Polygon
     if (showTeraiBoundary) {
-      let activeCoords = nepalBoundaries.terai_full;
-      if (selectedRegionKey === 'eastern_terai') activeCoords = nepalBoundaries.terai_eastern;
-      else if (selectedRegionKey === 'central_terai') activeCoords = nepalBoundaries.terai_central;
-      else if (selectedRegionKey === 'western_terai') activeCoords = nepalBoundaries.terai_western;
-      else if (selectedRegionKey === 'far_western_terai') activeCoords = nepalBoundaries.terai_far_western;
-
-      const teraiPath = activeCoords.map(([lat, lng]) => ({ lat, lng }));
-      const teraiPoly = new google.maps.Polygon({
-        paths: teraiPath,
+      const fullTeraiPath = nepalBoundaries.terai_full.map(([lat, lng]) => ({ lat, lng }));
+      const teraiBasePoly = new google.maps.Polygon({
+        paths: fullTeraiPath,
         strokeColor: '#10B981',
-        strokeOpacity: 0.9,
-        strokeWeight: 2,
+        strokeOpacity: 0.95,
+        strokeWeight: 3.0,
         fillColor: '#10B981',
-        fillOpacity: 0.12,
+        fillOpacity: 0.18,
         map,
+        zIndex: 4,
       });
 
-      overlaysRef.current.push(teraiPoly);
+      teraiBasePoly.addListener('click', (e: google.maps.PolyMouseEvent) => {
+        const info = new google.maps.InfoWindow({
+          content: `
+            <div style="color: #0F172A; font-family: sans-serif; padding: 6px; max-width: 260px;">
+              <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                <span style="font-size:9px; font-weight:800; background:#DCFCE7; color:#166534; padding:2px 6px; border-radius:4px;">
+                  TERAI LOWLAND BASIN
+                </span>
+                <span style="font-size:10px; font-weight:bold; color:#059669;">21 Districts</span>
+              </div>
+              <h4 style="margin:2px 0; font-size:12px; font-weight:bold;">Nepal Terai Flood Plain</h4>
+              <p style="margin:0; font-size:11px; color:#475569; line-height:1.4;">
+                Southern fertile lowlands vulnerable to transboundary monsoon deluge. Monitored by FloodGuard AI.
+              </p>
+            </div>
+          `,
+          position: e.latLng,
+        });
+        info.open(map);
+        activeInfoWindowRef.current = info;
+      });
+
+      overlaysRef.current.push(teraiBasePoly);
+
+      // Active sub-basin highlight if a specific corridor is chosen
+      if (selectedRegionKey !== 'full_terai') {
+        let activeCoords: [number, number][] = [];
+        if (selectedRegionKey === 'eastern_terai') activeCoords = nepalBoundaries.terai_eastern;
+        else if (selectedRegionKey === 'central_terai') activeCoords = nepalBoundaries.terai_central;
+        else if (selectedRegionKey === 'western_terai') activeCoords = nepalBoundaries.terai_western;
+        else if (selectedRegionKey === 'far_western_terai') activeCoords = nepalBoundaries.terai_far_western;
+
+        if (activeCoords.length > 0) {
+          const activeBasinPath = activeCoords.map(([lat, lng]) => ({ lat, lng }));
+          const activeBasinPoly = new google.maps.Polygon({
+            paths: activeBasinPath,
+            strokeColor: '#00F2FE',
+            strokeOpacity: 1.0,
+            strokeWeight: 4,
+            fillColor: '#06B6D4',
+            fillOpacity: 0.28,
+            map,
+            zIndex: 5,
+          });
+          overlaysRef.current.push(activeBasinPoly);
+        }
+      }
+
+      // Floating badge marker for Terai Lowlands
+      const teraiBadgeMarker = new google.maps.Marker({
+        position: { lat: 26.85, lng: 85.30 },
+        map,
+        title: 'Nepal Terai Lowland Basin',
+        icon: {
+          url: `data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="180" height="34" viewBox="0 0 180 34"><rect width="180" height="34" rx="8" fill="%23064E3B" stroke="%2310B981" stroke-width="2"/><text x="10" y="21" font-family="system-ui,sans-serif" font-size="10.5" font-weight="900" fill="%23A7F3D0">🌾 TERAI LOWLAND BASIN</text></svg>`,
+          anchor: new google.maps.Point(90, 17),
+        },
+        zIndex: 6,
+      });
+      overlaysRef.current.push(teraiBadgeMarker);
     }
 
-    // 3. Draw High-Resolution Sentinel-1 SAR Flood Corridors (Point 3)
-    if (showFloodPolygons) {
+    // 3. Draw High-Resolution Sentinel-1 SAR Flood Corridors (Dotted Lines Option - Zero Polygon Fill)
+    if (showFloodPolygons && highlightFloodedDotted) {
       TERAI_FLOOD_CORRIDORS.forEach((corridor) => {
         if (selectedRegionKey !== 'full_terai') {
           const hasCommonDistrict = corridor.districts.some((d) =>
@@ -745,34 +920,60 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
 
         const floodPath = corridor.polygon.map(([lat, lng]) => ({ lat, lng }));
         const isCritical = corridor.severity === 'critical';
+        const strokeCol = isCritical ? '#00F2FE' : '#38BDF8';
 
-        const floodPoly = new google.maps.Polygon({
-          paths: floodPath,
-          strokeColor: isCritical ? '#38BDF8' : '#06B6D4',
-          strokeOpacity: 0.95,
-          strokeWeight: 2,
-          fillColor: isCritical ? '#0284C7' : '#0369A1',
-          fillOpacity: isCritical ? 0.65 : 0.50,
+        const dottedSymbol = {
+          path: 'M 0,-1 0,1',
+          strokeOpacity: 1,
+          strokeColor: strokeCol,
+          strokeWeight: 2.8,
+          scale: 3,
+        };
+
+        const floodDottedLine = new google.maps.Polyline({
+          path: floodPath,
+          strokeColor: strokeCol,
+          strokeOpacity: 0,
+          icons: [
+            {
+              icon: dottedSymbol,
+              offset: '0',
+              repeat: '12px',
+            },
+          ],
           map,
         });
 
-        floodPoly.addListener('mouseover', () => {
-          floodPoly.setOptions({
-            strokeWeight: 3.5,
-            strokeColor: '#67E8F9',
-            fillOpacity: 0.82,
+        floodDottedLine.addListener('mouseover', () => {
+          floodDottedLine.setOptions({
+            icons: [
+              {
+                icon: {
+                  ...dottedSymbol,
+                  strokeColor: '#FFFFFF',
+                  strokeWeight: 3.5,
+                  scale: 3.5,
+                },
+                offset: '0',
+                repeat: '12px',
+              },
+            ],
           });
         });
 
-        floodPoly.addListener('mouseout', () => {
-          floodPoly.setOptions({
-            strokeWeight: 2,
-            strokeColor: isCritical ? '#38BDF8' : '#06B6D4',
-            fillOpacity: isCritical ? 0.65 : 0.50,
+        floodDottedLine.addListener('mouseout', () => {
+          floodDottedLine.setOptions({
+            icons: [
+              {
+                icon: dottedSymbol,
+                offset: '0',
+                repeat: '12px',
+              },
+            ],
           });
         });
 
-        floodPoly.addListener('click', (e: google.maps.PolyMouseEvent) => {
+        floodDottedLine.addListener('click', (e: google.maps.PolyMouseEvent) => {
           const info = new google.maps.InfoWindow({
             content: `
               <div style="color: #0F172A; font-family: sans-serif; padding: 6px; max-width: 270px;">
@@ -786,7 +987,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                     background: ${isCritical ? '#FEE2E2' : '#FEF3C7'};
                     color: ${isCritical ? '#991B1B' : '#92400E'};
                   ">
-                    ${corridor.severity.toUpperCase()} INUNDATION
+                    ${corridor.severity.toUpperCase()} INUNDATION (DOTTED BOUNDARY)
                   </span>
                   <span style="font-size: 10px; font-weight: 800; color: #0284C7;">
                     ${corridor.inundatedAreaKm2} km²
@@ -807,7 +1008,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
           activeInfoWindowRef.current = info;
         });
 
-        overlaysRef.current.push(floodPoly);
+        overlaysRef.current.push(floodDottedLine);
       });
     }
 
@@ -1074,6 +1275,12 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
     showBridges,
     displayedVillages,
     activeRoute,
+    mapRenderTrigger,
+    propViewLayerMode,
+    propSelectedDatePreset,
+    propBeforeDate,
+    propAfterDate,
+    highlightFloodedDotted,
   ]);
 
   const handleSaveApiKey = () => {
@@ -1506,6 +1713,28 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
         {/* Layer Checkboxes */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80 text-xs">
           <div className="flex flex-wrap items-center gap-4">
+            {/* Sovereign Nepal Map Highlight Toggle */}
+            <label className="flex items-center gap-1.5 cursor-pointer text-amber-300 hover:text-white select-none">
+              <input
+                type="checkbox"
+                checked={showNepalBorder}
+                onChange={(e) => setShowNepalBorder(e.target.checked)}
+                className="rounded border-amber-600 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer"
+              />
+              <span className="text-amber-400 font-bold">🇳🇵 Nepal Sovereign Map</span>
+            </label>
+
+            {/* Terai Lowlands Plain Highlight Toggle */}
+            <label className="flex items-center gap-1.5 cursor-pointer text-emerald-300 hover:text-white select-none">
+              <input
+                type="checkbox"
+                checked={showTeraiBoundary}
+                onChange={(e) => setShowTeraiBoundary(e.target.checked)}
+                className="rounded border-emerald-600 bg-slate-950 text-emerald-500 focus:ring-0 cursor-pointer"
+              />
+              <span className="text-emerald-400 font-bold">🌾 Terai Lowland Region</span>
+            </label>
+
             <button
               onClick={() => setShowTraffic(!showTraffic)}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-bold transition-all ${
@@ -1517,6 +1746,20 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
               <Car className="h-3.5 w-3.5" />
               <span>Live Traffic</span>
             </button>
+
+            {/* User Requested: Option to Highlight Flooded Area in Flooded Map with Dotted Lines */}
+            <label className="flex items-center gap-1.5 cursor-pointer text-cyan-300 hover:text-white select-none bg-cyan-950/60 px-2.5 py-1 rounded-lg border border-cyan-500/50 shadow-sm">
+              <input
+                type="checkbox"
+                checked={highlightFloodedDotted}
+                onChange={(e) => setHighlightFloodedDotted(e.target.checked)}
+                className="rounded border-cyan-500 bg-slate-950 text-cyan-400 focus:ring-0 cursor-pointer"
+              />
+              <span className="text-cyan-300 font-bold flex items-center gap-1.5 text-xs">
+                <span className="border-b-2 border-dotted border-cyan-400 w-4 inline-block"></span>
+                ⚡ Dotted Flood Lines
+              </span>
+            </label>
 
             <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
               <input
@@ -1629,13 +1872,29 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
 
             {/* Floating Terai Intelligence Badge */}
             <div className="absolute bottom-5 left-5 z-20 pointer-events-none">
-              <div className="rounded-xl border border-slate-700/80 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-slate-200 space-y-0.5">
-                <div className="flex items-center gap-1.5 text-blue-400">
-                  <Globe className="h-3.5 w-3.5" />
-                  <span>Nepal Terai Plain &bull; {mapTypeId.toUpperCase()}</span>
+              <div className="rounded-xl border border-slate-700/80 bg-slate-950/95 px-3.5 py-2.5 shadow-2xl backdrop-blur-md text-xs font-bold text-slate-200 space-y-1">
+                <div className="flex items-center justify-between gap-3 text-cyan-400">
+                  <div className="flex items-center gap-1.5">
+                    <Globe className="h-3.5 w-3.5" />
+                    <span>Nepal Terai Plain &bull; {mapTypeId.toUpperCase()}</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                    {propViewLayerMode === 'flooded' ? '🌊 Inundation Only' : propViewLayerMode === 'safe' ? '🛡️ Safe Shelters Only' : 'Both (Flood vs Safe)'}
+                  </span>
                 </div>
-                <div className="text-[10px] font-mono text-slate-400">
-                  Region: {activeRegion.shortName} &bull; Flood Corridors: {TERAI_FLOOD_CORRIDORS.length} &bull; Villages: {displayedVillages.length}
+                <div className="text-[10px] font-mono text-slate-300">
+                  Basin: <span className="text-white font-bold">{activeRegion.shortName}</span> &bull; Corridors: <span className="text-cyan-300">{TERAI_FLOOD_CORRIDORS.length}</span> &bull; Settlements: <span className="text-emerald-300">{displayedVillages.length}</span>
+                </div>
+                <div className="text-[9px] font-mono text-slate-400 border-t border-slate-800/80 pt-1 flex items-center gap-2">
+                  <span className="text-amber-400 font-bold">🇳🇵 Nepal Border: ON</span>
+                  <span>&bull;</span>
+                  <span className="text-emerald-400 font-bold">🌾 Terai Lowlands: ON</span>
+                  {propAfterDate && (
+                    <>
+                      <span>&bull;</span>
+                      <span className="text-cyan-400 font-semibold">Deluge: {propAfterDate}</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1668,45 +1927,106 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                 maxZoom={20}
               />
 
-              {/* 1. Sovereign Border (Amber Dotted) */}
+              {/* 1. Sovereign Border & Country Fill (Amber Solid & Gold Tint) */}
               {showNepalBorder && (
-                <Polyline
-                  positions={nepalBoundaries.nepal_border}
-                  pathOptions={{
-                    color: '#F59E0B',
-                    weight: 2.5,
-                    dashArray: '8, 8',
-                    opacity: 0.95,
-                  }}
-                />
+                <>
+                  <Polygon
+                    positions={nepalBoundaries.nepal_border}
+                    pathOptions={{
+                      color: '#F59E0B',
+                      weight: 3.5,
+                      opacity: 0.95,
+                      fillColor: '#F59E0B',
+                      fillOpacity: 0.08,
+                    }}
+                  />
+                  <Marker
+                    position={[28.3949, 84.1240]}
+                    icon={L.divIcon({
+                      className: 'nepal-badge',
+                      html: `
+                        <div style="
+                          background: #0F172A;
+                          color: #F59E0B;
+                          border: 2px solid #F59E0B;
+                          border-radius: 8px;
+                          padding: 3px 8px;
+                          font-size: 10.5px;
+                          font-weight: 900;
+                          white-space: nowrap;
+                          box-shadow: 0 4px 12px rgba(0,0,0,0.8);
+                        ">
+                          🇳🇵 NEPAL SOVEREIGN
+                        </div>
+                      `,
+                      iconSize: [130, 26],
+                      iconAnchor: [65, 13],
+                    })}
+                  />
+                </>
               )}
 
-              {/* 2. Terai Lowland Plains Boundary (Emerald) */}
+              {/* 2. Terai Lowland Plains Boundary (Emerald Base + Active Basin Highlight) */}
               {showTeraiBoundary && (
-                <Polygon
-                  positions={
-                    selectedRegionKey === 'eastern_terai'
-                      ? nepalBoundaries.terai_eastern
-                      : selectedRegionKey === 'central_terai'
-                      ? nepalBoundaries.terai_central
-                      : selectedRegionKey === 'western_terai'
-                      ? nepalBoundaries.terai_western
-                      : selectedRegionKey === 'far_western_terai'
-                      ? nepalBoundaries.terai_far_western
-                      : nepalBoundaries.terai_full
-                  }
-                  pathOptions={{
-                    color: '#10B981',
-                    weight: 2,
-                    dashArray: '6, 6',
-                    fillColor: '#10B981',
-                    fillOpacity: 0.12,
-                  }}
-                />
+                <>
+                  <Polygon
+                    positions={nepalBoundaries.terai_full}
+                    pathOptions={{
+                      color: '#10B981',
+                      weight: 3.0,
+                      opacity: 0.95,
+                      fillColor: '#10B981',
+                      fillOpacity: 0.18,
+                    }}
+                  />
+                  {selectedRegionKey !== 'full_terai' && (
+                    <Polygon
+                      positions={
+                        selectedRegionKey === 'eastern_terai'
+                          ? nepalBoundaries.terai_eastern
+                          : selectedRegionKey === 'central_terai'
+                          ? nepalBoundaries.terai_central
+                          : selectedRegionKey === 'western_terai'
+                          ? nepalBoundaries.terai_western
+                          : nepalBoundaries.terai_far_western
+                      }
+                      pathOptions={{
+                        color: '#00F2FE',
+                        weight: 4.0,
+                        opacity: 1.0,
+                        fillColor: '#06B6D4',
+                        fillOpacity: 0.28,
+                      }}
+                    />
+                  )}
+                  <Marker
+                    position={[26.85, 85.30]}
+                    icon={L.divIcon({
+                      className: 'terai-badge',
+                      html: `
+                        <div style="
+                          background: #064E3B;
+                          color: #A7F3D0;
+                          border: 2px solid #10B981;
+                          border-radius: 8px;
+                          padding: 3px 8px;
+                          font-size: 10px;
+                          font-weight: 900;
+                          white-space: nowrap;
+                          box-shadow: 0 4px 12px rgba(0,0,0,0.8);
+                        ">
+                          🌾 TERAI LOWLAND BASIN
+                        </div>
+                      `,
+                      iconSize: [150, 24],
+                      iconAnchor: [75, 12],
+                    })}
+                  />
+                </>
               )}
 
-              {/* 3. High-Resolution Sentinel-1 Flood Corridors (Point 3) */}
-              {showFloodPolygons &&
+              {/* 3. High-Resolution Sentinel-1 Flood Corridors (Dotted Lines Option - Zero Polygon Fill) */}
+              {showFloodPolygons && highlightFloodedDotted &&
                 TERAI_FLOOD_CORRIDORS.map((corridor) => {
                   if (selectedRegionKey !== 'full_terai') {
                     const hasCommonDistrict = corridor.districts.some((d) =>
@@ -1722,10 +2042,11 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                       key={corridor.id}
                       positions={corridor.polygon}
                       pathOptions={{
-                        color: isCritical ? '#38BDF8' : '#06B6D4',
-                        weight: 2,
-                        fillColor: isCritical ? '#0284C7' : '#0369A1',
-                        fillOpacity: isCritical ? 0.65 : 0.50,
+                        color: isCritical ? '#00F2FE' : '#38BDF8',
+                        weight: 2.8,
+                        dashArray: '8, 8',
+                        fillColor: 'transparent',
+                        fillOpacity: 0,
                       }}
                     >
                       <Popup>
@@ -1986,13 +2307,29 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
 
             {/* Floating Terai Intelligence Badge for Leaflet Engine */}
             <div className="absolute bottom-5 left-5 z-[500] pointer-events-none">
-              <div className="rounded-xl border border-slate-700/80 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-slate-200 space-y-0.5">
-                <div className="flex items-center gap-1.5 text-emerald-400">
-                  <Layers className="h-3.5 w-3.5" />
-                  <span>Nepal Terai Plain &bull; Leaflet High-Speed Engine</span>
+              <div className="rounded-xl border border-slate-700/80 bg-slate-950/95 px-3.5 py-2.5 shadow-2xl backdrop-blur-md text-xs font-bold text-slate-200 space-y-1">
+                <div className="flex items-center justify-between gap-3 text-emerald-400">
+                  <div className="flex items-center gap-1.5">
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>Nepal Terai Plain &bull; Leaflet High-Speed Engine</span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    {propViewLayerMode === 'flooded' ? '🌊 Inundation Only' : propViewLayerMode === 'safe' ? '🛡️ Safe Shelters Only' : 'Both (Flood vs Safe)'}
+                  </span>
                 </div>
-                <div className="text-[10px] font-mono text-slate-400">
-                  Region: {activeRegion.shortName} &bull; Flood Corridors: {TERAI_FLOOD_CORRIDORS.length} &bull; Route: {activeRoute ? activeRoute.name : 'None'}
+                <div className="text-[10px] font-mono text-slate-300">
+                  Basin: <span className="text-white font-bold">{activeRegion.shortName}</span> &bull; Corridors: <span className="text-cyan-300">{TERAI_FLOOD_CORRIDORS.length}</span> &bull; Route: <span className="text-amber-300">{activeRoute ? activeRoute.name : 'Standard Patrol'}</span>
+                </div>
+                <div className="text-[9px] font-mono text-slate-400 border-t border-slate-800/80 pt-1 flex items-center gap-2">
+                  <span className="text-amber-400 font-bold">🇳🇵 Nepal Border: ON</span>
+                  <span>&bull;</span>
+                  <span className="text-emerald-400 font-bold">🌾 Terai Lowlands: ON</span>
+                  {propAfterDate && (
+                    <>
+                      <span>&bull;</span>
+                      <span className="text-cyan-400 font-semibold">Deluge: {propAfterDate}</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

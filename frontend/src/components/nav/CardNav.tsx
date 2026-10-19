@@ -18,8 +18,11 @@ import './CardNav.css';
 
 export interface CardNavLink {
   label: string;
+  sublabel?: string;
   href?: string;
   ariaLabel?: string;
+  badge?: string;
+  isActive?: boolean;
 }
 
 export interface CardNavItem {
@@ -50,7 +53,7 @@ export interface CardNavProps {
   bounce?: number;
   speed?: number;
   cardHeight?: number;
-  maxWidth?: number;
+  maxWidth?: number | string;
   accentColor?: string;
   menuLabel?: boolean;
   intro?: boolean;
@@ -62,6 +65,9 @@ export interface CardNavProps {
   ariaLabel?: string;
   className?: string;
   style?: CSSProperties;
+  leftSlot?: ReactNode;
+  rightSlot?: ReactNode;
+  dropdownHeader?: ReactNode;
 }
 
 interface AnchorProps {
@@ -215,7 +221,10 @@ export const CardNav: React.FC<CardNavProps> = ({
   onLinkClick,
   ariaLabel = 'Main',
   className = '',
-  style
+  style,
+  leftSlot,
+  rightSlot,
+  dropdownHeader
 }) => {
   const contentId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -248,7 +257,7 @@ export const CardNav: React.FC<CardNavProps> = ({
   const palette = THEMES[theme] ?? THEMES.dark;
   const vars: Record<string, string> = {
     ...palette,
-    '--cn-max': `${maxWidth}px`,
+    '--cn-max': typeof maxWidth === 'string' ? maxWidth : maxWidth ? `${maxWidth}px` : '100%',
     '--cn-bar': '60px',
     '--cn-inset': '8px',
     '--cn-gap': '8px',
@@ -499,31 +508,48 @@ export const CardNav: React.FC<CardNavProps> = ({
     >
       <nav ref={panelRef} className={PANEL} aria-label={ariaLabel}>
         <div ref={barRef} className={BAR}>
-          <button
-            ref={menuRef}
-            type="button"
-            className={MENU}
-            data-icon-only={menuLabel ? undefined : ''}
-            aria-expanded={open}
-            aria-controls={contentId}
-            aria-label={menuLabel ? undefined : open ? 'Close menu' : 'Open menu'}
-            onClick={() => setOpen(!open)}
-          >
-            <span className={BURGER} aria-hidden="true">
-              <span className={LINE_TOP} />
-              <span className={LINE_BOTTOM} />
-            </span>
-            {menuLabel && (
-              <span className={MENU_LABEL}>
-                <span className={WORD_OPEN} aria-hidden={open}>
-                  Menu
-                </span>
-                <span className={WORD_CLOSE} aria-hidden={!open}>
-                  Close
-                </span>
+          <div className="card-nav__left-section">
+            <button
+              ref={menuRef}
+              type="button"
+              className={MENU}
+              data-icon-only={menuLabel ? undefined : ''}
+              aria-expanded={open}
+              aria-controls={contentId}
+              aria-label={menuLabel ? undefined : open ? 'Close dropdown menu' : 'Open dropdown menu'}
+              onClick={() => setOpen(!open)}
+            >
+              <span className={BURGER} aria-hidden="true">
+                <span className={LINE_TOP} />
+                <span className={LINE_BOTTOM} />
               </span>
-            )}
-          </button>
+              {menuLabel && (
+                <span className={MENU_LABEL}>
+                  <span className={WORD_OPEN} aria-hidden={open}>
+                    Menu
+                  </span>
+                  <span className={WORD_CLOSE} aria-hidden={!open}>
+                    Close
+                  </span>
+                </span>
+              )}
+              <svg
+                className={`card-nav__chevron ${open ? 'card-nav__chevron--open' : ''}`}
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {leftSlot}
+          </div>
 
           {logo && (
             <LinkComponent href={logoHref} className={LOGO} aria-label={logoAlt}>
@@ -531,10 +557,18 @@ export const CardNav: React.FC<CardNavProps> = ({
             </LinkComponent>
           )}
 
-          {cta && !narrow && ctaButton(cta, false)}
+          <div className="card-nav__right-section">
+            {rightSlot}
+            {cta && !narrow && ctaButton(cta, false)}
+          </div>
         </div>
 
         <div ref={contentRef} id={contentId} className={CONTENT} aria-hidden={!open}>
+          {dropdownHeader && (
+            <div className="card-nav__dropdown-header">
+              {dropdownHeader}
+            </div>
+          )}
           <div className={CARDS}>
             {items.map((item, index) => (
               <div
@@ -556,8 +590,8 @@ export const CardNav: React.FC<CardNavProps> = ({
                       {anchor(
                         link,
                         {
-                          className: LINK,
-                          'aria-label': link.ariaLabel,
+                          className: `${LINK}${link.isActive ? ' card-nav__link--active' : ''}`,
+                          'aria-label': link.ariaLabel || `${link.label}${link.sublabel ? ` - ${link.sublabel}` : ''}`,
                           tabIndex: open ? undefined : -1,
                           onClick: event => {
                             onLinkClick?.(link, item, event);
@@ -566,10 +600,14 @@ export const CardNav: React.FC<CardNavProps> = ({
                         },
                         <>
                           <span className={ARROW} aria-hidden="true">
-                            <HugeiconsIcon className={ARROW_OUT} icon={ArrowUpRight01Icon} size={14} strokeWidth={2} />
-                            <HugeiconsIcon className={ARROW_IN} icon={ArrowUpRight01Icon} size={14} strokeWidth={2} />
+                            <HugeiconsIcon className={ARROW_OUT} icon={ArrowUpRight01Icon} size={12} strokeWidth={2} />
+                            <HugeiconsIcon className={ARROW_IN} icon={ArrowUpRight01Icon} size={12} strokeWidth={2} />
                           </span>
-                          {link.label}
+                          <div className="card-nav__link-text">
+                            <span className="card-nav__link-title">{link.label}</span>
+                            {link.sublabel && <span className="card-nav__link-sublabel">{link.sublabel}</span>}
+                          </div>
+                          {link.badge && <span className="card-nav__link-badge">{link.badge}</span>}
                         </>
                       )}
                     </li>

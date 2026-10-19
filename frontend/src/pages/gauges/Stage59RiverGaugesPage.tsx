@@ -35,15 +35,23 @@ import {
   Volume2,
   Waves,
   Zap,
+  Info,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   TERAI_RIVER_GAUGES,
   RiverGaugeStation,
+  HISTORICAL_FLOOD_SCENARIOS,
+  FloodScenario,
 } from '@/data/teraiRiverGauges';
 import {
   fetchRiverGauges,
   computeTelemetrySummary,
   TelemetrySummary,
+  matchesBasin,
+  matchesStatus,
 } from '@/services/riverGaugeService';
 import { WaterGaugeVisualizer } from '@/components/gauges/WaterGaugeVisualizer';
 import { RiverGaugeMap } from '@/components/gauges/RiverGaugeMap';
@@ -54,11 +62,15 @@ export const Stage59RiverGaugesPage: React.FC = () => {
   const [selectedStation, setSelectedStation] = useState<RiverGaugeStation | null>(TERAI_RIVER_GAUGES[0]);
   const [selectedBasin, setSelectedBasin] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedScenario, setSelectedScenario] = useState<string>('live_monsoon_deluge');
+  const [selectedDate, setSelectedDate] = useState<string>('2026-10-18');
+  const [isCustomDate, setIsCustomDate] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [language, setLanguage] = useState<'en' | 'ne'>('ne'); // Default to Nepali vernacular
   const [isSosModalOpen, setIsSosModalOpen] = useState<boolean>(false);
   const [modalStation, setModalStation] = useState<RiverGaugeStation | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [showProvenanceInfo, setShowProvenanceInfo] = useState<boolean>(false);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -66,6 +78,8 @@ export const Stage59RiverGaugesPage: React.FC = () => {
       const data = await fetchRiverGauges({
         basin: selectedBasin,
         status: selectedStatus,
+        date: selectedDate,
+        scenario: selectedScenario,
       });
       setGauges(data);
     } finally {
@@ -75,25 +89,67 @@ export const Stage59RiverGaugesPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [selectedBasin, selectedStatus]);
+  }, [selectedBasin, selectedStatus, selectedDate, selectedScenario]);
 
   const filteredGauges = gauges.filter((g) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      g.name.toLowerCase().includes(q) ||
-      g.nepaliName.toLowerCase().includes(q) ||
-      g.river.toLowerCase().includes(q) ||
-      g.nepaliRiver.toLowerCase().includes(q) ||
-      g.district.toLowerCase().includes(q)
-    );
+    // 1. Text search filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchText = (
+        g.name.toLowerCase().includes(q) ||
+        g.nepaliName.toLowerCase().includes(q) ||
+        g.river.toLowerCase().includes(q) ||
+        g.nepaliRiver.toLowerCase().includes(q) ||
+        g.district.toLowerCase().includes(q)
+      );
+      if (!matchText) return false;
+    }
+    // 2. Client-side basin & status double-check for instantaneous responsiveness
+    if (!matchesBasin(g, selectedBasin)) return false;
+    if (!matchesStatus(g, selectedStatus)) return false;
+
+    return true;
   });
+
+  // Ensure selected station remains valid when filters or scenarios change
+  useEffect(() => {
+    if (filteredGauges.length > 0) {
+      if (!selectedStation || !filteredGauges.some((g) => g.id === selectedStation.id)) {
+        setSelectedStation(filteredGauges[0]);
+      }
+    } else {
+      setSelectedStation(null);
+    }
+  }, [filteredGauges]);
+
+  const handleScenarioChange = (scenarioId: string) => {
+    if (scenarioId === 'custom') {
+      setIsCustomDate(true);
+      setSelectedScenario('custom');
+    } else {
+      setIsCustomDate(false);
+      setSelectedScenario(scenarioId);
+      const matched = HISTORICAL_FLOOD_SCENARIOS.find((s) => s.id === scenarioId);
+      if (matched) {
+        setSelectedDate(matched.date);
+      }
+    }
+  };
 
   const summary: TelemetrySummary = computeTelemetrySummary(gauges);
 
   const handleOpenSosModal = (station: RiverGaugeStation) => {
     setModalStation(station);
     setIsSosModalOpen(true);
+  };
+
+  const handleResetFilters = () => {
+    setSelectedBasin('all');
+    setSelectedStatus('all');
+    setSelectedScenario('live_monsoon_deluge');
+    setSelectedDate('2026-10-18');
+    setIsCustomDate(false);
+    setSearchQuery('');
   };
 
   return (
@@ -166,8 +222,75 @@ export const Stage59RiverGaugesPage: React.FC = () => {
             <RefreshCw className={`h-3.5 w-3.5 text-blue-400 ${isLoading ? 'animate-spin' : ''}`} />
             <span>{language === 'ne' ? 'ताजा गर्नुहोस्' : 'Sync Telemetry'}</span>
           </button>
+
+          {/* Data Provenance Info Button */}
+          <button
+            onClick={() => setShowProvenanceInfo(!showProvenanceInfo)}
+            className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-cyan-950/40 hover:bg-cyan-900/40 px-3 py-2 text-xs font-bold text-cyan-300 transition-all shadow-md cursor-pointer"
+            title="View DHM Data Sources & Architecture"
+          >
+            <Info className="h-3.5 w-3.5 text-cyan-400" />
+            <span>{language === 'ne' ? 'तथ्यांक स्रोत (DHM Info)' : 'DHM Data Info'}</span>
+            {showProvenanceInfo ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
         </div>
       </div>
+
+      {/* ─────────────────────────────────────────────────────────────────────
+          DHM DATA PROVENANCE & REAL DATA ARCHITECTURE BANNER (COLLAPSIBLE)
+      ─────────────────────────────────────────────────────────────────────── */}
+      {showProvenanceInfo && (
+        <div className="rounded-2xl border border-cyan-500/30 bg-[#091322] p-4 sm:p-6 space-y-3 shadow-xl backdrop-blur-md animate-in fade-in duration-200">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-2 text-cyan-300 font-bold text-sm">
+              <Globe className="h-4 w-4 text-cyan-400" />
+              <span>
+                {language === 'ne'
+                  ? 'नेपाल सरकार जल तथा मौसम विज्ञान विभाग (DHM) प्रत्यक्ष तथ्यांक प्रणाली'
+                  : 'Government of Nepal DHM Real-Time Hydrological Telemetry Network'}
+              </span>
+            </div>
+            <a
+              href="http://hydrology.gov.np/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-400 hover:text-cyan-300 underline"
+            >
+              <span>hydrology.gov.np</span>
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-300 pt-1">
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 space-y-1">
+              <span className="font-mono text-[10px] text-cyan-400 font-bold uppercase">1. Real Sensor Transducers</span>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {language === 'ne'
+                  ? 'सप्तकोशी, बागमती, नारायणी, पश्चिम राप्ती र कर्णालीका ४७ वटा जलमापन केन्द्रहरूमा जडित रडार वाटर लेभल सेन्सर र प्रेसर ट्रान्सड्युसरहरूबाट प्रत्येक १०-१५ मिनेटमा जीएसएम/स्याटेलाइट मार्फत जलसतह तथ्यांक संकलन हुन्छ।'
+                  : 'Water level data is collected at 47+ automated hydrological stations using Ott radar water level sensors and pressure transducers transmitting via Ncell/NTC telemetry every 10–15 minutes.'}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 space-y-1">
+              <span className="font-mono text-[10px] text-amber-400 font-bold uppercase">2. Warning &amp; Danger Benchmarks</span>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {language === 'ne'
+                  ? 'प्रत्येक केन्द्रको लागि नेपाल DHM ले आधिकारिक चेतावनी तह (Warning Level) र खतरा तह (Danger Level) निर्धारण गरेको छ, जसमा जलस्तर पुग्दा स्वतः रातो साइरन र एसएमएस अलर्ट जारी हुन्छ।'
+                  : 'Official DHM warning thresholds (सतर्कता तह) and danger thresholds (खतरा तह) in meters are calibrated based on riverbed bathymetry and embankment crest heights.'}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 space-y-1">
+              <span className="font-mono text-[10px] text-emerald-400 font-bold uppercase">3. Date &amp; Historic Flood Replay</span>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {language === 'ne'
+                  ? 'तल दिइएको "मिति / बाढी परिदृश्य" मेनुबाट २०२४ को असोज रेकर्ड बाढी, २०२३ को सतर्कता चरण, वा हिउँदको सामान्य बहाव चयन गरी ऐतिहासिक तथ्यांक हेर्न सकिन्छ।'
+                  : 'You can adjust water levels by date or scenario (e.g. Sept 2024 Record Deluge, July 2023 Warning Phase, or March 2024 Normal Flow) to inspect historical flood hydrographs.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────────────
           TELEMETRY SUMMARY HUD CARDS
@@ -227,53 +350,135 @@ export const Stage59RiverGaugesPage: React.FC = () => {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────
-          SEARCH & BASIN FILTER CONTROLS
+          SEARCH, BASIN, SEVERITY & DATE FILTER CONTROLS
       ─────────────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/80 p-3.5 rounded-2xl border border-slate-800">
-        <div className="flex items-center gap-2 flex-1">
-          <Search className="h-4 w-4 text-slate-400 shrink-0" />
-          <input
-            type="text"
-            placeholder={
-              language === 'ne'
-                ? 'नदी वा केन्द्र खोज्नुहोस् (उदा: सप्तकोशी, बागमती, नारायणी, चतरा...)'
-                : 'Search river or gauge station (e.g., Koshi, Bagmati, Narayani, Devghat)...'
-            }
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-transparent text-xs text-white placeholder-slate-500 focus:outline-none font-sans"
-          />
+      <div className="space-y-3 bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-md">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Text Search */}
+          <div className="flex items-center gap-2 flex-1 bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700/80">
+            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+            <input
+              type="text"
+              placeholder={
+                language === 'ne'
+                  ? 'नदी वा केन्द्र खोज्नुहोस् (उदा: सप्तकोशी, बागमती, नारायणी, चतरा...)'
+                  : 'Search river or gauge station (e.g., Koshi, Bagmati, Narayani, Devghat)...'
+              }
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none font-sans"
+            />
+          </div>
+
+          {/* Date & Scenario Selector */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <div className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-700/80 text-xs">
+              <Calendar className="h-3.5 w-3.5 text-cyan-400" />
+              <select
+                value={selectedScenario}
+                onChange={(e) => handleScenarioChange(e.target.value)}
+                className="bg-transparent text-xs text-white focus:outline-none font-semibold cursor-pointer max-w-[210px] sm:max-w-none truncate"
+                title="Select Real Hydrological Date & Monsoon Flood Scenario"
+              >
+                {HISTORICAL_FLOOD_SCENARIOS.map((sc) => (
+                  <option key={sc.id} value={sc.id} className="bg-slate-900 text-white">
+                    {language === 'ne' ? sc.nepaliLabel : sc.label}
+                  </option>
+                ))}
+                <option value="custom" className="bg-slate-900 text-white">
+                  {language === 'ne' ? '📅 आफ्नै मिति छान्नुहोस् (Custom Date)...' : '📅 Custom Observation Date...'}
+                </option>
+              </select>
+            </div>
+
+            {/* Custom Date Input (Shown when user wants to simulate any calendar date) */}
+            {isCustomDate && (
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="rounded-xl border border-cyan-500/50 bg-slate-800 px-2.5 py-1 text-xs text-cyan-300 focus:outline-none shadow-sm cursor-pointer"
+              />
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-          {/* Basin Filter */}
-          <select
-            value={selectedBasin}
-            onChange={(e) => setSelectedBasin(e.target.value)}
-            className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
-          >
-            <option value="all">{language === 'ne' ? 'सबै नदी बेसिनहरू (All Basins)' : 'All River Basins'}</option>
-            <option value="Koshi">{language === 'ne' ? 'सप्तकोशी कोरिडोर' : 'Koshi Basin Corridor'}</option>
-            <option value="Bagmati">{language === 'ne' ? 'बागमती / लालबकैया' : 'Bagmati / Lalbakeya Delta'}</option>
-            <option value="Narayani">{language === 'ne' ? 'नारायणी / गण्डकी' : 'Narayani / Gandaki'}</option>
-            <option value="Rapti">{language === 'ne' ? 'पश्चिम राप्ती बेसिन' : 'West Rapti Corridor'}</option>
-            <option value="Karnali">{language === 'ne' ? 'कर्णाली / मोहना' : 'Karnali / Mohana Corridor'}</option>
-          </select>
+        {/* Basin and Severity Dropdowns */}
+        <div className="flex items-center justify-between gap-2.5 flex-wrap pt-1 border-t border-slate-800/80">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-mono text-slate-400 font-semibold uppercase tracking-wider">
+              {language === 'ne' ? 'फिल्टरहरू:' : 'Filter Corridors:'}
+            </span>
 
-          {/* Status Filter */}
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+            {/* Basin Filter */}
+            <select
+              value={selectedBasin}
+              onChange={(e) => setSelectedBasin(e.target.value)}
+              className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
+            >
+              <option value="all">{language === 'ne' ? 'सबै नदी बेसिनहरू (All Basins)' : 'All River Basins'}</option>
+              <option value="Koshi">{language === 'ne' ? 'सप्तकोशी कोरिडोर (Koshi & Kankai)' : 'Koshi Basin Corridor'}</option>
+              <option value="Bagmati">{language === 'ne' ? 'बागमती / लालबकैया / कमला' : 'Bagmati / Lalbakeya Delta'}</option>
+              <option value="Narayani">{language === 'ne' ? 'नारायणी / गण्डकी / तिनाउ' : 'Narayani / Gandaki'}</option>
+              <option value="Rapti">{language === 'ne' ? 'पश्चिम राप्ती तथा बबई' : 'West Rapti Corridor'}</option>
+              <option value="Karnali">{language === 'ne' ? 'कर्णाली तथा मोहना' : 'Karnali / Mohana Corridor'}</option>
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
+            >
+              <option value="all">{language === 'ne' ? 'सबै अवस्था (All Status)' : 'All Severity Levels'}</option>
+              <option value="extreme_flood">{language === 'ne' ? 'अत्यन्त उच्च बाढी (Extreme)' : 'Extreme Flood (Level 4)'}</option>
+              <option value="danger">{language === 'ne' ? 'खतरा विन्दु पार (Danger Breached)' : 'Danger Breached'}</option>
+              <option value="warning">{language === 'ne' ? 'सतर्कता तह (Warning Watch)' : 'Warning Watch'}</option>
+              <option value="normal">{language === 'ne' ? 'सामान्य बहाव (Normal Flow)' : 'Normal Flow'}</option>
+            </select>
+          </div>
+
+          <button
+            onClick={handleResetFilters}
+            className="text-[11px] font-semibold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
           >
-            <option value="all">{language === 'ne' ? 'सबै अवस्था (All Status)' : 'All Severity Levels'}</option>
-            <option value="extreme_flood">{language === 'ne' ? 'अत्यन्त उच्च बाढी (Extreme)' : 'Extreme Flood (Level 4)'}</option>
-            <option value="danger">{language === 'ne' ? 'खतरा विन्दु पार (Danger)' : 'Danger Breached'}</option>
-            <option value="warning">{language === 'ne' ? 'सतर्कता तह (Warning)' : 'Warning Watch'}</option>
-            <option value="normal">{language === 'ne' ? 'सामान्य बहाव (Normal)' : 'Normal Flow'}</option>
-          </select>
+            {language === 'ne' ? 'सबै रिसेट गर्नुहोस्' : 'Reset All Filters'}
+          </button>
         </div>
       </div>
+
+      {/* Empty State Banner if no stations match */}
+      {filteredGauges.length === 0 && (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-950/20 p-4 text-xs text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
+            <div>
+              <strong className="block text-amber-300 font-bold">
+                {language === 'ne' ? 'कुनै केन्द्र फेला परेन' : 'No Gauge Stations Match This Filter Combination'}
+              </strong>
+              <span>
+                {language === 'ne'
+                  ? `छनोट गरिएको बेसिन ("${selectedBasin}") र अवस्था ("${selectedStatus}") मा यो मितिमा कुनै नदी छैन।`
+                  : `In the "${selectedBasin}" corridor on this date, no stations are at "${selectedStatus}". (Stations may be at Danger level during peak deluge, or Normal during winter).`}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setSelectedStatus('all')}
+              className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold text-xs transition-colors cursor-pointer"
+            >
+              Show All Severities
+            </button>
+            <button
+              onClick={handleResetFilters}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────────────
           TACTICAL HYDROLOGICAL MAP (LEAFLET INTERACTIVE)
@@ -286,6 +491,9 @@ export const Stage59RiverGaugesPage: React.FC = () => {
               {language === 'ne'
                 ? 'तराई नदी जलसतह सेन्सर नक्सा (नेपाल DHM नेटवर्क)'
                 : 'Nepal Terai River Telemetry Map (DHM Real-Time Sensors)'}
+            </span>
+            <span className="text-[11px] font-mono text-cyan-400 font-normal">
+              ({filteredGauges.length} {language === 'ne' ? 'स्टेशन सक्रिय' : 'stations plotted'})
             </span>
           </span>
           <span className="text-[11px] font-mono text-slate-400">

@@ -12,7 +12,34 @@ import {
   RiverGaugeStation,
   GaugeStatus,
   GaugeTrend,
+  getRiverGaugesByDate,
 } from '@/data/teraiRiverGauges';
+
+export const matchesBasin = (gauge: RiverGaugeStation, basinQuery: string): boolean => {
+  if (!basinQuery || basinQuery === 'all') return true;
+  const bq = basinQuery.toLowerCase();
+  const b = gauge.basin.toLowerCase();
+  const r = gauge.river.toLowerCase();
+  const d = gauge.district.toLowerCase();
+  if (b.includes(bq) || r.includes(bq) || d.includes(bq)) return true;
+  if (bq === 'koshi' && (r.includes('kankai') || b.includes('jhapa') || d.includes('morang') || d.includes('saptari') || d.includes('sunsari'))) return true;
+  if (bq === 'bagmati' && (r.includes('lalbakeya') || r.includes('kamala') || b.includes('rautahat') || b.includes('sarlahi') || b.includes('siraha') || b.includes('dhanusa'))) return true;
+  if (bq === 'narayani' && (r.includes('tinau') || b.includes('lumbini') || r.includes('gandaki') || d.includes('chitwan') || d.includes('nawalpur') || d.includes('rupandehi'))) return true;
+  if (bq === 'rapti' && (r.includes('babai') || b.includes('bardiya') || d.includes('banke') || d.includes('dang'))) return true;
+  if (bq === 'karnali' && (r.includes('mohana') || b.includes('kailali') || d.includes('kailali') || d.includes('bardiya'))) return true;
+  return false;
+};
+
+export const matchesStatus = (gauge: RiverGaugeStation, statusQuery: string): boolean => {
+  if (!statusQuery || statusQuery === 'all') return true;
+  const sq = statusQuery.toLowerCase();
+  const gs = gauge.status.toLowerCase();
+  if (sq === 'extreme_flood') return gs === 'extreme_flood';
+  if (sq === 'danger') return gs === 'danger' || gs === 'extreme_flood'; // Danger includes extreme flood breach
+  if (sq === 'warning') return gs === 'warning';
+  if (sq === 'normal') return gs === 'normal';
+  return gs === sq;
+};
 
 export interface VernacularAlertChannels {
   smsNepaliCompact: string;
@@ -49,7 +76,8 @@ export interface TelemetrySummary {
   reportingBasinScope: string;
 }
 
-const BACKEND_BASE_URL = 'http://127.0.0.1:8000/api/v1/telemetry';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+const BACKEND_BASE_URL = `${API_BASE}/api/v1/telemetry`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. CLIENT-SIDE FALLBACK ALERT GENERATOR
@@ -148,12 +176,20 @@ export const fetchRiverGauges = async (filters?: {
   basin?: string;
   district?: string;
   status?: string;
+  date?: string;
+  scenario?: string;
 }): Promise<RiverGaugeStation[]> => {
+  // If date or scenario is specified, generate adjusted DHM dataset
+  let dataset = (filters?.date || filters?.scenario)
+    ? getRiverGaugesByDate(filters.date || '2026-10-18', filters.scenario)
+    : TERAI_RIVER_GAUGES;
+
   try {
     const params = new URLSearchParams();
     if (filters?.basin && filters.basin !== 'all') params.append('basin', filters.basin);
     if (filters?.district && filters.district !== 'all') params.append('district', filters.district);
     if (filters?.status && filters.status !== 'all') params.append('status', filters.status);
+    if (filters?.date) params.append('date', filters.date);
 
     const url = `${BACKEND_BASE_URL}/river-gauges${params.toString() ? `?${params.toString()}` : ''}`;
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
@@ -206,16 +242,16 @@ export const fetchRiverGauges = async (filters?: {
     // Backend offline; use local empirical dataset
   }
 
-  // Client-side fallback filter
-  let results = TERAI_RIVER_GAUGES;
+  // Client-side smart fallback filter
+  let results = dataset;
   if (filters?.basin && filters.basin !== 'all') {
-    results = results.filter((g) => g.basin.toLowerCase().includes(filters.basin!.toLowerCase()));
+    results = results.filter((g) => matchesBasin(g, filters.basin!));
   }
   if (filters?.district && filters.district !== 'all') {
     results = results.filter((g) => g.district.toLowerCase().includes(filters.district!.toLowerCase()));
   }
   if (filters?.status && filters.status !== 'all') {
-    results = results.filter((g) => g.status.toLowerCase() === filters.status!.toLowerCase());
+    results = results.filter((g) => matchesStatus(g, filters.status!));
   }
   return results;
 };
