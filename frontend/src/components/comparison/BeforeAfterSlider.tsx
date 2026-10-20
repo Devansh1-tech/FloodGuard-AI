@@ -228,8 +228,6 @@ const ClippedFloodPane: React.FC<{
   const map = useMap();
 
   useEffect(() => {
-    let animFrame: number;
-
     const filterClass = isBwRadar
       ? 'sar-bw-mode'
       : floodImageryMode === 'sar_specular'
@@ -276,7 +274,7 @@ const ClippedFloodPane: React.FC<{
     };
 
     applyPaneStyles();
-    animFrame = requestAnimationFrame(applyPaneStyles);
+    const animFrame = requestAnimationFrame(applyPaneStyles);
 
     return () => cancelAnimationFrame(animFrame);
   }, [sliderPosition, viewMode, floodImageryMode, isBwRadar, map]);

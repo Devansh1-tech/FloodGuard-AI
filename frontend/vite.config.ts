@@ -1,7 +1,13 @@
-/// <reference types="vitest" />
 import { defineConfig } from 'vite';
+import type { InlineConfig } from 'vitest';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+
+declare module 'vite' {
+  interface UserConfig {
+    test?: InlineConfig;
+  }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
