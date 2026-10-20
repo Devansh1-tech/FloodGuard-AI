@@ -127,19 +127,31 @@
 }
 
 .leaflet-popup-content-wrapper {
-  background: #1E293B !important;
+  background: #0F172A !important;
   color: #F8FAFC !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.75rem !important;
   border: 1px solid #334155 !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7) !important;
+  padding: 2px !important;
 }
 
 .leaflet-popup-tip {
-  background: #1E293B !important;
+  background: #0F172A !important;
+}
+
+.leaflet-popup-close-button {
+  color: #94A3B8 !important;
+  padding: 6px 8px !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: #FFFFFF !important;
 }
 
 /* Sentinel-1 SAR Microwave Radar Black & White Intensity Filter */
-.sar-bw-mode .leaflet-tile {
+.sar-bw-mode .leaflet-tile,
+.leaflet-afterDelugePane-pane.sar-bw-mode .leaflet-tile,
+.leaflet-afterDelugePane-pane.sar-bw-mode img {
   filter: grayscale(100%) contrast(185%) brightness(82%) !important;
 }
 
@@ -149,16 +161,48 @@
 }
 
 /* Real Flood Deluge Sentinel-1 SAR Specular Radar Mode */
-.sar-specular-mode .leaflet-tile {
+.sar-specular-mode .leaflet-tile,
+.leaflet-afterDelugePane-pane.sar-specular-mode .leaflet-tile,
+.leaflet-afterDelugePane-pane.sar-specular-mode img {
   filter: contrast(145%) brightness(88%) saturate(135%) hue-rotate(190deg) !important;
 }
 
 /* Real Flood Deluge Sentinel-2 False Color NIR Moisture Mode */
-.deluge-false-color-mode .leaflet-tile {
+.deluge-false-color-mode .leaflet-tile,
+.leaflet-afterDelugePane-pane.deluge-false-color-mode .leaflet-tile,
+.leaflet-afterDelugePane-pane.deluge-false-color-mode img {
   filter: contrast(135%) brightness(92%) saturate(160%) hue-rotate(150deg) !important;
 }
 
 /* Real Flood Optical Deluge Mode */
-.deluge-optical-mode .leaflet-tile {
+.deluge-optical-mode .leaflet-tile,
+.leaflet-afterDelugePane-pane.deluge-optical-mode .leaflet-tile,
+.leaflet-afterDelugePane-pane.deluge-optical-mode img {
   filter: contrast(124%) brightness(96%) saturate(125%) !important;
 }
+
+/* Clipped Panes for Split Slider */
+.leaflet-afterDelugePane-pane,
+.leaflet-floodInundationPane-pane {
+  pointer-events: none !important;
+}
+
+/* Custom Telemetry Card Sleek Glass Scrollbar */
+.custom-card-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(71, 85, 105, 0.6) transparent;
+}
+.custom-card-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-card-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-card-scroll::-webkit-scrollbar-thumb {
+  background: rgba(71, 85, 105, 0.5);
+  border-radius: 9999px;
+}
+.custom-card-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.7);
+}
+

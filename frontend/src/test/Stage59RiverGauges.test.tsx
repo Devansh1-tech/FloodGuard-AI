@@ -45,8 +45,17 @@ vi.mock('react-leaflet', () => ({
       {children}
     </div>
   ),
-  Popup: ({ children }: { children: React.ReactNode }) => (
+  Popup: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="mock-popup">{children}</div>
+  ),
+  Polygon: ({ children, positions, pathOptions }: any) => (
+    <div data-testid="mock-polygon" data-dash={pathOptions?.dashArray}>{children}</div>
+  ),
+  Polyline: ({ children, positions, pathOptions, eventHandlers }: any) => (
+    <div data-testid="mock-polyline" data-dash={pathOptions?.dashArray} onClick={eventHandlers?.click}>{children}</div>
+  ),
+  Tooltip: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="mock-tooltip">{children}</div>
   ),
   useMap: () => ({
     flyTo: vi.fn(),
@@ -262,6 +271,55 @@ describe('Stage 5.9: DHM River Gauge Telemetry & Vernacular SOS Alerts Suite', (
       // Karmaiya / Bagmati should be displayed, Chatara should be filtered out
       expect(screen.getAllByText(/बागमती नदी - कर्मैया/i).length).toBeGreaterThan(0);
       expect(screen.queryByText(/सप्तकोशी - चतरा/i)).toBeNull();
+    });
+
+    it('matches gauge stations by DHM station number (e.g., 695) and clears with X button', () => {
+      render(<Stage59RiverGaugesPage />);
+
+      const searchInput = screen.getByPlaceholderText(/नदी वा केन्द्र खोज्नुहोस्/i);
+      fireEvent.change(searchInput, { target: { value: '695' } });
+
+      // DHM-695 (Saptakoshi Chatara) should match
+      expect(screen.getAllByText(/सप्तकोशी - चतरा/i).length).toBeGreaterThan(0);
+      expect(screen.queryByText(/बागमती नदी - कर्मैया/i)).toBeNull();
+
+      // Click clear search button
+      const clearBtn = screen.getByTitle(/Clear search query/i);
+      fireEvent.click(clearBtn);
+
+      expect(searchInput).toHaveValue('');
+      expect(screen.getAllByText(/सप्तकोशी - चतरा/i).length).toBeGreaterThan(0);
+    });
+
+    it('updates telemetry and clears danger breaches when switching to Dry Season scenario', async () => {
+      render(<Stage59RiverGaugesPage />);
+
+      const scenarioSelect = screen.getByTitle(/Select Real Hydrological Date & Monsoon Flood Scenario/i);
+      fireEvent.change(scenarioSelect, { target: { value: 'dry_baseline' } });
+
+      // Wait for dry season baseline to compute and render
+      await waitFor(() => {
+        expect(screen.getAllByText(/कुनै खतरा छैन • सामान्य सुरक्षित बहाव/i).length).toBeGreaterThan(0);
+      });
+    });
+
+    it('resets all filters back to default live deluge telemetry', async () => {
+      render(<Stage59RiverGaugesPage />);
+
+      // Apply non-default search and scenario
+      const searchInput = screen.getByPlaceholderText(/नदी वा केन्द्र खोज्नुहोस्/i);
+      fireEvent.change(searchInput, { target: { value: 'NonExistentPlace' } });
+
+      expect(screen.getByText(/कुनै केन्द्र फेला परेन/i)).toBeDefined();
+
+      // Click Reset All Filters
+      const resetBtn = screen.getByRole('button', { name: /सबै रिसेट गर्नुहोस्/i });
+      fireEvent.click(resetBtn);
+
+      expect(searchInput).toHaveValue('');
+      await waitFor(() => {
+        expect(screen.getAllByText(/सप्तकोशी - चतरा/i).length).toBeGreaterThan(0);
+      });
     });
   });
 });

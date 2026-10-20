@@ -39,6 +39,7 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
+  X,
 } from 'lucide-react';
 import {
   TERAI_RIVER_GAUGES,
@@ -56,6 +57,8 @@ import {
 import { WaterGaugeVisualizer } from '@/components/gauges/WaterGaugeVisualizer';
 import { RiverGaugeMap } from '@/components/gauges/RiverGaugeMap';
 import { VernacularSosModal } from '@/components/gauges/VernacularSosModal';
+import { NEPAL_RIVERS, LiveRiverData, syncNepalRiversWithGauges } from '@/data/nepalRiverBasinsAndRivers';
+import { LiveRiverTelemetryModal } from '@/components/gauges/LiveRiverTelemetryModal';
 
 export const Stage59RiverGaugesPage: React.FC = () => {
   const [gauges, setGauges] = useState<RiverGaugeStation[]>(TERAI_RIVER_GAUGES);
@@ -69,6 +72,8 @@ export const Stage59RiverGaugesPage: React.FC = () => {
   const [language, setLanguage] = useState<'en' | 'ne'>('ne'); // Default to Nepali vernacular
   const [isSosModalOpen, setIsSosModalOpen] = useState<boolean>(false);
   const [modalStation, setModalStation] = useState<RiverGaugeStation | null>(null);
+  const [selectedRiverForModal, setSelectedRiverForModal] = useState<LiveRiverData | null>(null);
+  const [isRiverModalOpen, setIsRiverModalOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showProvenanceInfo, setShowProvenanceInfo] = useState<boolean>(false);
 
@@ -91,16 +96,29 @@ export const Stage59RiverGaugesPage: React.FC = () => {
     loadData();
   }, [selectedBasin, selectedStatus, selectedDate, selectedScenario]);
 
+  // Synchronize Nepal rivers with active DHM gauges and selected scenario
+  const activeRivers = React.useMemo(() => {
+    return syncNepalRiversWithGauges(NEPAL_RIVERS, gauges);
+  }, [gauges]);
+
   const filteredGauges = gauges.filter((g) => {
-    // 1. Text search filter
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    // 1. Text search filter: Match names, rivers, districts, basins, DHM station numbers, officer, settlements
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const qDigits = q.replace(/[^0-9]/g, '');
       const matchText = (
         g.name.toLowerCase().includes(q) ||
         g.nepaliName.toLowerCase().includes(q) ||
         g.river.toLowerCase().includes(q) ||
         g.nepaliRiver.toLowerCase().includes(q) ||
-        g.district.toLowerCase().includes(q)
+        g.district.toLowerCase().includes(q) ||
+        g.basin.toLowerCase().includes(q) ||
+        g.dhmStationNumber.toLowerCase().includes(q) ||
+        (qDigits.length > 0 && g.dhmStationNumber.replace(/[^0-9]/g, '').includes(qDigits)) ||
+        g.stationOfficer.toLowerCase().includes(q) ||
+        (g.downstreamSettlements && g.downstreamSettlements.some(
+          (s) => s.settlementName.toLowerCase().includes(q) || s.nepaliName.toLowerCase().includes(q)
+        ))
       );
       if (!matchText) return false;
     }
@@ -136,7 +154,17 @@ export const Stage59RiverGaugesPage: React.FC = () => {
     }
   };
 
-  const summary: TelemetrySummary = computeTelemetrySummary(gauges);
+  const isFilterActive =
+    selectedBasin !== 'all' ||
+    selectedStatus !== 'all' ||
+    selectedScenario !== 'live_monsoon_deluge' ||
+    searchQuery.trim() !== '' ||
+    isCustomDate;
+
+  // Compute telemetry summary reflecting active filtered subset (or full gauges)
+  const summary: TelemetrySummary = computeTelemetrySummary(
+    filteredGauges.length > 0 ? filteredGauges : gauges
+  );
 
   const handleOpenSosModal = (station: RiverGaugeStation) => {
     setModalStation(station);
@@ -301,24 +329,43 @@ export const Stage59RiverGaugesPage: React.FC = () => {
             <span className="font-semibold">{language === 'ne' ? 'अनुगमन गरिएका केन्द्र' : 'Monitored DHM Gauges'}</span>
             <Waves className="h-4 w-4 text-cyan-400" />
           </div>
-          <div className="text-xl sm:text-2xl font-black text-white font-mono mt-1">
-            {summary.totalStationsMonitored}
+          <div className="text-xl sm:text-2xl font-black text-white font-mono mt-1 flex items-baseline gap-1.5">
+            <span>{summary.totalStationsMonitored}</span>
+            {filteredGauges.length !== gauges.length && (
+              <span className="text-xs text-slate-400 font-normal font-sans">
+                ({language === 'ne' ? `${gauges.length} मध्ये` : `of ${gauges.length}`})
+              </span>
+            )}
           </div>
-          <span className="text-[10px] text-cyan-400 font-medium block mt-0.5">
-            {language === 'ne' ? '२१ तराई जिल्ला कोरिडोर' : '21 Lowland Terai Districts'}
+          <span className="text-[10px] text-cyan-400 font-medium block mt-0.5 truncate">
+            {filteredGauges.length !== gauges.length
+              ? (language === 'ne' ? 'फिल्टर गरिएको सक्रिय केन्द्रहरू' : 'Filtered Subset Active')
+              : (language === 'ne' ? '२१ तराई जिल्ला कोरिडोर' : '21 Lowland Terai Districts')}
           </span>
         </div>
 
-        <div className="rounded-2xl border border-rose-500/40 bg-rose-950/20 p-4 shadow-lg backdrop-blur-sm ring-1 ring-rose-500/20">
-          <div className="flex items-center justify-between text-rose-300 text-xs">
+        <div className={`rounded-2xl border p-4 shadow-lg backdrop-blur-sm ring-1 transition-colors ${
+          summary.stationsInDangerOrExtreme > 0
+            ? 'border-rose-500/40 bg-rose-950/20 ring-rose-500/20'
+            : 'border-emerald-500/40 bg-emerald-950/20 ring-emerald-500/20'
+        }`}>
+          <div className={`flex items-center justify-between text-xs ${
+            summary.stationsInDangerOrExtreme > 0 ? 'text-rose-300' : 'text-emerald-300'
+          }`}>
             <span className="font-semibold">{language === 'ne' ? 'खतरा विन्दु पार गरेका नदी' : 'Danger Level Breached'}</span>
-            <AlertOctagon className="h-4 w-4 text-rose-400 animate-pulse" />
+            <AlertOctagon className={`h-4 w-4 ${summary.stationsInDangerOrExtreme > 0 ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`} />
           </div>
-          <div className="text-xl sm:text-2xl font-black text-rose-400 font-mono mt-1">
+          <div className={`text-xl sm:text-2xl font-black font-mono mt-1 ${
+            summary.stationsInDangerOrExtreme > 0 ? 'text-rose-400' : 'text-emerald-400'
+          }`}>
             {summary.stationsInDangerOrExtreme} / {summary.totalStationsMonitored}
           </div>
-          <span className="text-[10px] text-rose-300/80 font-medium block mt-0.5">
-            {language === 'ne' ? 'तुरुन्त निकासी निर्देशन जारी' : 'Immediate Evacuation Orders Active'}
+          <span className={`text-[10px] font-medium block mt-0.5 truncate ${
+            summary.stationsInDangerOrExtreme > 0 ? 'text-rose-300/80' : 'text-emerald-300/80'
+          }`}>
+            {summary.stationsInDangerOrExtreme > 0
+              ? (language === 'ne' ? 'तुरुन्त निकासी निर्देशन जारी' : 'Immediate Evacuation Orders Active')
+              : (language === 'ne' ? 'कुनै खतरा छैन • सामान्य सुरक्षित बहाव' : 'Safe Baseline • Zero Danger Breaches')}
           </span>
         </div>
 
@@ -343,8 +390,10 @@ export const Stage59RiverGaugesPage: React.FC = () => {
           <div className="text-xl sm:text-2xl font-black text-amber-300 font-mono mt-1">
             {summary.totalDownstreamPopulationAtRisk.toLocaleString()}
           </div>
-          <span className="text-[10px] text-amber-400/80 font-medium block mt-0.5">
-            {language === 'ne' ? 'तुरुन्त अलर्ट सन्देश प्रेषित' : 'Receiving Vernacular SOS Alerts'}
+          <span className="text-[10px] text-amber-400/80 font-medium block mt-0.5 truncate">
+            {summary.totalDownstreamPopulationAtRisk > 0
+              ? (language === 'ne' ? 'तुरुन्त अलर्ट सन्देश प्रेषित' : 'Receiving Vernacular SOS Alerts')
+              : (language === 'ne' ? 'जोखिममुक्त • सुरक्षित अवस्था' : 'Standard Baseline • Riparian Zones Safe')}
           </span>
         </div>
       </div>
@@ -354,25 +403,35 @@ export const Stage59RiverGaugesPage: React.FC = () => {
       ─────────────────────────────────────────────────────────────────────── */}
       <div className="space-y-3 bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-md">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* Text Search */}
-          <div className="flex items-center gap-2 flex-1 bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700/80">
+          {/* Text Search with Clear Button and Focus Glow */}
+          <div className="flex items-center gap-2 flex-1 bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700/80 focus-within:border-cyan-500/70 focus-within:ring-1 focus-within:ring-cyan-500/30 transition-all">
             <Search className="h-4 w-4 text-slate-400 shrink-0" />
             <input
               type="text"
               placeholder={
                 language === 'ne'
-                  ? 'नदी वा केन्द्र खोज्नुहोस् (उदा: सप्तकोशी, बागमती, नारायणी, चतरा...)'
-                  : 'Search river or gauge station (e.g., Koshi, Bagmati, Narayani, Devghat)...'
+                  ? 'नदी वा केन्द्र खोज्नुहोस् (उदा: सप्तकोशी, बागमती, नारायणी, चतरा, DHM-695...)'
+                  : 'Search river or gauge station (e.g., Koshi, Bagmati, Narayani, Devghat, DHM-695)...'
               }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none font-sans"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="text-slate-400 hover:text-white p-0.5 rounded-full hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
+                title="Clear search query"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Date & Scenario Selector */}
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-700/80 text-xs">
+            <div className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-700/80 text-xs focus-within:border-cyan-500/70">
               <Calendar className="h-3.5 w-3.5 text-cyan-400" />
               <select
                 value={selectedScenario}
@@ -393,12 +452,16 @@ export const Stage59RiverGaugesPage: React.FC = () => {
 
             {/* Custom Date Input (Shown when user wants to simulate any calendar date) */}
             {isCustomDate && (
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="rounded-xl border border-cyan-500/50 bg-slate-800 px-2.5 py-1 text-xs text-cyan-300 focus:outline-none shadow-sm cursor-pointer"
-              />
+              <div className="flex items-center gap-1 bg-slate-800/90 px-2.5 py-1 rounded-xl border border-cyan-500/60 shadow-inner">
+                <span className="text-[10px] text-cyan-400 font-mono font-bold">DATE:</span>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="bg-transparent text-xs text-cyan-300 focus:outline-none font-mono cursor-pointer"
+                  title="Choose any calendar date to replay seasonal flow"
+                />
+              </div>
             )}
           </div>
         </div>
@@ -438,13 +501,86 @@ export const Stage59RiverGaugesPage: React.FC = () => {
             </select>
           </div>
 
+          {/* Reset All Filters Button */}
           <button
             onClick={handleResetFilters}
-            className="text-[11px] font-semibold text-slate-400 hover:text-white px-2.5 py-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              isFilterActive
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 shadow-sm'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
           >
-            {language === 'ne' ? 'सबै रिसेट गर्नुहोस्' : 'Reset All Filters'}
+            <RefreshCw className="h-3 w-3" />
+            <span>{language === 'ne' ? 'सबै रिसेट गर्नुहोस्' : 'Reset All Filters'}</span>
           </button>
         </div>
+
+        {/* Active Filter Chips Bar (Visible when any filter is non-default) */}
+        {isFilterActive && (
+          <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-800/60 text-[11px]">
+            <span className="text-slate-400 font-mono text-[10px] uppercase font-bold">Active:</span>
+
+            {selectedScenario !== 'live_monsoon_deluge' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/20 border border-blue-500/40 text-blue-300 font-medium">
+                <span>{selectedScenario === 'custom' ? `Custom: ${selectedDate}` : selectedScenario.replace('_', ' ')}</span>
+                <button
+                  onClick={() => {
+                    setSelectedScenario('live_monsoon_deluge');
+                    setSelectedDate('2026-10-18');
+                    setIsCustomDate(false);
+                  }}
+                  className="hover:text-white cursor-pointer"
+                  title="Remove scenario filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            {selectedBasin !== 'all' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-medium">
+                <span>Basin: {selectedBasin}</span>
+                <button
+                  onClick={() => setSelectedBasin('all')}
+                  className="hover:text-white cursor-pointer"
+                  title="Remove basin filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            {selectedStatus !== 'all' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 font-medium">
+                <span>Severity: {selectedStatus.replace('_', ' ')}</span>
+                <button
+                  onClick={() => setSelectedStatus('all')}
+                  className="hover:text-white cursor-pointer"
+                  title="Remove severity filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-medium">
+                <span>Query: "{searchQuery}"</span>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="hover:text-white cursor-pointer"
+                  title="Remove search query"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            <span className="text-[10px] font-mono text-slate-400 ml-auto">
+              {filteredGauges.length} {language === 'ne' ? 'स्टेशन म्याच भयो' : 'stations matched'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Empty State Banner if no stations match */}
@@ -481,24 +617,58 @@ export const Stage59RiverGaugesPage: React.FC = () => {
       )}
 
       {/* ─────────────────────────────────────────────────────────────────────
-          TACTICAL HYDROLOGICAL MAP (LEAFLET INTERACTIVE)
+          TACTICAL HYDROLOGICAL MAP (LEAFLET INTERACTIVE WITH DOTTED BASINS & RIVERS)
       ─────────────────────────────────────────────────────────────────────── */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-slate-300">
           <span className="flex items-center gap-2">
             <Compass className="h-4 w-4 text-cyan-400" />
             <span>
               {language === 'ne'
-                ? 'तराई नदी जलसतह सेन्सर नक्सा (नेपाल DHM नेटवर्क)'
-                : 'Nepal Terai River Telemetry Map (DHM Real-Time Sensors)'}
+                ? 'तराई नदी तथा बेसिन जलसतह नक्सा (DHM नेटवर्क • थोप्ला रेखाहरू)'
+                : 'Nepal Terai River Telemetry Map (DHM Sensors • Dotted Basins & Rivers)'}
             </span>
             <span className="text-[11px] font-mono text-cyan-400 font-normal">
-              ({filteredGauges.length} {language === 'ne' ? 'स्टेशन सक्रिय' : 'stations plotted'})
+              ({filteredGauges.length} {language === 'ne' ? 'स्टेशन' : 'stations'} &bull; 12 {language === 'ne' ? 'नदीहरू' : 'rivers'})
             </span>
           </span>
-          <span className="text-[11px] font-mono text-slate-400">
-            {language === 'ne' ? 'केन्द्र छनोट गर्न पिनमा क्लिक गर्नुहोस्' : 'Click any pin to inspect station'}
+          <span className="text-[11px] font-mono text-cyan-300 flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping"></span>
+            <span>
+              {language === 'ne'
+                ? 'नदी रेखा वा पिनमा ट्याप गरी प्रत्यक्ष विवरण हेर्नुहोस्'
+                : 'Tap any dotted river line or station pin for live telemetry updates'}
+            </span>
           </span>
+        </div>
+
+        {/* Quick Tap River Pills Bar */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar">
+          <span className="text-[10px] font-mono text-slate-400 uppercase font-bold shrink-0 flex items-center gap-1">
+            <Waves className="h-3 w-3 text-cyan-400" />
+            <span>{language === 'ne' ? 'नदीहरू' : 'Rivers'}:</span>
+          </span>
+          {activeRivers.map((riv) => {
+            const isDanger = riv.status === 'extreme_flood' || riv.status === 'danger';
+            return (
+              <button
+                key={riv.id}
+                onClick={() => {
+                  setSelectedRiverForModal(riv);
+                  setIsRiverModalOpen(true);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold shrink-0 border transition-all cursor-pointer ${
+                  isDanger
+                    ? 'bg-rose-950/40 border-rose-500/50 text-rose-300 hover:bg-rose-900/60 shadow-sm shadow-rose-950/40'
+                    : 'bg-slate-900 border-slate-700/80 text-cyan-300 hover:border-cyan-500/50'
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${isDanger ? 'bg-rose-500 animate-ping' : 'bg-cyan-400'}`}></span>
+                <span>{language === 'ne' ? riv.nepaliName.split(' ')[0] : riv.name.replace(' River', '')}</span>
+                <span className="text-[10px] opacity-80">({riv.currentLevelMeters}m)</span>
+              </button>
+            );
+          })}
         </div>
 
         <RiverGaugeMap
@@ -548,6 +718,28 @@ export const Stage59RiverGaugesPage: React.FC = () => {
         isOpen={isSosModalOpen}
         onClose={() => setIsSosModalOpen(false)}
         language={language}
+      />
+
+      {/* ─────────────────────────────────────────────────────────────────────
+          LIVE RIVER TELEMETRY INSPECTOR MODAL
+      ─────────────────────────────────────────────────────────────────────── */}
+      <LiveRiverTelemetryModal
+        river={selectedRiverForModal}
+        isOpen={isRiverModalOpen}
+        onClose={() => setIsRiverModalOpen(false)}
+        language={language}
+        onOpenSosModal={(riv) => {
+          const matchingStation = gauges.find(
+            (g) =>
+              g.river.toLowerCase().includes(riv.name.toLowerCase()) ||
+              riv.name.toLowerCase().includes(g.river.toLowerCase())
+          );
+          if (matchingStation) {
+            handleOpenSosModal(matchingStation);
+          } else if (gauges.length > 0) {
+            handleOpenSosModal(gauges[0]);
+          }
+        }}
       />
     </div>
   );

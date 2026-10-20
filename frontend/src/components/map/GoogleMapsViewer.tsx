@@ -77,6 +77,7 @@ import {
 } from '@/data/teraiRegions';
 import { nepalBoundaries } from '@/data/nepalBoundaries';
 import { TERAI_HOSPITALS, HospitalFacility } from '@/data/teraiInfrastructure';
+import { TERAI_SAFE_HAVENS, SafeHavenFacility } from '@/data/teraiSafeHavens';
 import {
   TERAI_CITIES_DATA,
   TeraiCityData,
@@ -99,6 +100,14 @@ import {
 } from '@/data/teraiRoadNetwork';
 import { CityVillagesModal } from '@/components/map/CityVillagesModal';
 import { SettlementDossierModal } from '@/components/intelligence/SettlementDossierModal';
+import {
+  NEPAL_RIVER_BASINS,
+  NEPAL_RIVERS,
+  LiveRiverData,
+  RiverBasinData,
+  getRiverStatusColor,
+} from '@/data/nepalRiverBasinsAndRivers';
+import { LiveRiverTelemetryModal } from '@/components/gauges/LiveRiverTelemetryModal';
 
 // Strict geographical bounds for Nepal Terai Lowlands (excludes high mountain ranges)
 const NEPAL_TERAI_BOUNDS = {
@@ -269,6 +278,33 @@ const createBridgeLeafletIcon = (bridge: TeraiBridge) => {
   });
 };
 
+const createSafeHavenLeafletIcon = (haven: SafeHavenFacility) => {
+  return L.divIcon({
+    className: 'shelter-pin',
+    html: `
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        background: #10B981;
+        border-radius: 50%;
+        border: 2px solid #FFFFFF;
+        box-shadow: 0 0 10px #10B981;
+        color: #FFFFFF;
+        font-size: 11px;
+        font-weight: 900;
+      ">
+        🛡️
+      </div>
+    `,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -12],
+  });
+};
+
 // Controller to sync Leaflet container size and flyTo region
 const LeafletViewController: React.FC<{
   center: [number, number];
@@ -385,6 +421,10 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   const [showVillagePins, setShowVillagePins] = useState<boolean>(true);
   const [showRoadNetwork, setShowRoadNetwork] = useState<boolean>(true);
   const [showBridges, setShowBridges] = useState<boolean>(true);
+  const [showDottedRivers, setShowDottedRivers] = useState<boolean>(true);
+  const [showDottedBasins, setShowDottedBasins] = useState<boolean>(true);
+  const [selectedRiver, setSelectedRiver] = useState<LiveRiverData | null>(null);
+  const [isRiverModalOpen, setIsRiverModalOpen] = useState<boolean>(false);
   const [selectedCity, setSelectedCity] = useState<TeraiCityData | null>(null);
   const [isCityModalOpen, setIsCityModalOpen] = useState<boolean>(false);
   const [dossierTarget, setDossierTarget] = useState<{
@@ -496,6 +536,9 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
     const matchCity = TERAI_CITIES_DATA.find(
       (c) => c.district.toLowerCase() === districtName.toLowerCase()
     );
+    if (matchCity) {
+      setSelectedRegionKey(matchCity.regionKey);
+    }
     const coords = matchCity ? matchCity.coords : null;
 
     if (coords) {
@@ -507,6 +550,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
         leafletMapInstanceRef.current.flyTo(coords, 11);
       }
     }
+    setMapRenderTrigger((prev) => prev + 1);
   };
 
   // ─── PROP SYNCHRONIZATION WITH PARENT DASHBOARD BUTTONS ─────────────────────
@@ -893,29 +937,93 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
           overlaysRef.current.push(activeBasinPoly);
         }
       }
-
-      // Floating badge marker for Terai Lowlands
-      const teraiBadgeMarker = new google.maps.Marker({
-        position: { lat: 26.85, lng: 85.30 },
-        map,
-        title: 'Nepal Terai Lowland Basin',
-        icon: {
-          url: `data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="180" height="34" viewBox="0 0 180 34"><rect width="180" height="34" rx="8" fill="%23064E3B" stroke="%2310B981" stroke-width="2"/><text x="10" y="21" font-family="system-ui,sans-serif" font-size="10.5" font-weight="900" fill="%23A7F3D0">🌾 TERAI LOWLAND BASIN</text></svg>`,
-          anchor: new google.maps.Point(90, 17),
-        },
-        zIndex: 6,
-      });
-      overlaysRef.current.push(teraiBadgeMarker);
     }
 
-    // 3. Draw High-Resolution Sentinel-1 SAR Flood Corridors (Dotted Lines Option - Zero Polygon Fill)
-    if (showFloodPolygons && highlightFloodedDotted) {
+    // 3. Draw High-Resolution Sentinel-1 SAR Flood Corridors (Filled Deluge Extent)
+    if (showFloodPolygons) {
       TERAI_FLOOD_CORRIDORS.forEach((corridor) => {
         if (selectedRegionKey !== 'full_terai') {
           const hasCommonDistrict = corridor.districts.some((d) =>
             activeRegion.districts.includes(d)
           );
           if (!hasCommonDistrict) return;
+        }
+        if (selectedDistrict !== 'all') {
+          const matches = corridor.districts.some(
+            (d) => d.toLowerCase() === selectedDistrict.toLowerCase()
+          );
+          if (!matches) return;
+        }
+
+        const floodPath = corridor.polygon.map(([lat, lng]) => ({ lat, lng }));
+        const isCritical = corridor.severity === 'critical';
+        const strokeCol = isCritical ? '#00F2FE' : '#38BDF8';
+        const fillCol = isCritical ? '#0284C7' : '#0369A1';
+
+        const floodPolygon = new google.maps.Polygon({
+          paths: floodPath,
+          strokeColor: strokeCol,
+          strokeOpacity: highlightFloodedDotted ? 0 : 0.85,
+          strokeWeight: highlightFloodedDotted ? 0 : 2.5,
+          fillColor: fillCol,
+          fillOpacity: 0.35,
+          map,
+          zIndex: 4,
+        });
+
+        floodPolygon.addListener('click', (e: google.maps.PolyMouseEvent) => {
+          const info = new google.maps.InfoWindow({
+            content: `
+              <div style="color: #0F172A; font-family: sans-serif; padding: 6px; max-width: 270px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
+                  <span style="
+                    font-size: 9px;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    background: ${isCritical ? '#FEE2E2' : '#FEF3C7'};
+                    color: ${isCritical ? '#991B1B' : '#92400E'};
+                  ">
+                    ${corridor.severity.toUpperCase()} INUNDATION CORRIDOR
+                  </span>
+                  <span style="font-size: 10px; font-weight: 800; color: #0284C7;">
+                    ${corridor.inundatedAreaKm2} km²
+                  </span>
+                </div>
+                <h4 style="margin: 6px 0 2px 0; font-size: 13px; font-weight: bold;">${corridor.name}</h4>
+                <p style="margin: 0 0 6px 0; font-size: 10px; color: #64748B;">${corridor.nepaliName}</p>
+                <div style="font-size: 11px; color: #334155; line-height: 1.4; border-top: 1px solid #E2E8F0; padding-top: 4px;">
+                  <strong>Water Depth:</strong> <span style="color: #DC2626; font-weight: bold;">${corridor.waterDepthRange}</span><br/>
+                  <strong>Districts:</strong> ${corridor.districts.join(', ')}<br/>
+                  <strong>Key Submerged Cities:</strong> ${corridor.keySubmergedCities.join(', ')}
+                </div>
+              </div>
+            `,
+            position: e.latLng,
+          });
+          info.open(map);
+          activeInfoWindowRef.current = info;
+        });
+
+        overlaysRef.current.push(floodPolygon);
+      });
+    }
+
+    // 3a. Draw High-Visibility Dotted Flood Lines (Perimeter Dotted Contour)
+    if (highlightFloodedDotted) {
+      TERAI_FLOOD_CORRIDORS.forEach((corridor) => {
+        if (selectedRegionKey !== 'full_terai') {
+          const hasCommonDistrict = corridor.districts.some((d) =>
+            activeRegion.districts.includes(d)
+          );
+          if (!hasCommonDistrict) return;
+        }
+        if (selectedDistrict !== 'all') {
+          const matches = corridor.districts.some(
+            (d) => d.toLowerCase() === selectedDistrict.toLowerCase()
+          );
+          if (!matches) return;
         }
 
         const floodPath = corridor.polygon.map(([lat, lng]) => ({ lat, lng }));
@@ -942,6 +1050,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
             },
           ],
           map,
+          zIndex: 5,
         });
 
         floodDottedLine.addListener('mouseover', () => {
@@ -1012,25 +1121,147 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
       });
     }
 
+    // 3b. Draw Nepal River Basins (Dotted Boundaries)
+    if (showDottedBasins) {
+      NEPAL_RIVER_BASINS.forEach((basin) => {
+        const basinPath = basin.boundaryPolygon.map(([lat, lng]) => ({ lat, lng }));
+        const basinPoly = new google.maps.Polygon({
+          paths: basinPath,
+          strokeColor: basin.color,
+          strokeOpacity: 0,
+          fillColor: basin.color,
+          fillOpacity: 0.04,
+          map,
+        });
+
+        const basinDottedBorder = new google.maps.Polyline({
+          path: basinPath,
+          strokeColor: basin.color,
+          strokeOpacity: 0,
+          icons: [
+            {
+              icon: {
+                path: 'M 0,-1 0,1',
+                strokeOpacity: 1,
+                strokeColor: basin.color,
+                strokeWeight: 2,
+                scale: 2.5,
+              },
+              offset: '0',
+              repeat: '10px',
+            },
+          ],
+          map,
+        });
+
+        basinDottedBorder.addListener('click', (e: google.maps.PolyMouseEvent) => {
+          const info = new google.maps.InfoWindow({
+            content: `
+              <div style="color: #0F172A; font-family: sans-serif; padding: 6px; max-width: 260px;">
+                <span style="font-size: 9px; font-weight: 800; background: #E0F2FE; color: #0369A1; padding: 2px 6px; border-radius: 4px;">
+                  RIVER BASIN WATERSHED
+                </span>
+                <h4 style="margin: 4px 0 2px 0; font-size: 13px; font-weight: bold;">${basin.name}</h4>
+                <p style="margin: 0 0 4px 0; font-size: 10px; color: #64748B;">${basin.nepaliName}</p>
+                <div style="font-size: 11px; color: #334155; line-height: 1.4; border-top: 1px solid #E2E8F0; padding-top: 4px;">
+                  <strong>Catchment Area:</strong> ${basin.catchmentAreaKm2.toLocaleString()} km²<br/>
+                  <strong>Risk Level:</strong> <span style="font-weight: bold; color: ${basin.color};">${basin.riskLevel.toUpperCase()}</span><br/>
+                  <strong>Key Rivers:</strong> ${basin.keyRivers.join(', ')}
+                </div>
+              </div>
+            `,
+            position: e.latLng,
+          });
+          info.open(map);
+          activeInfoWindowRef.current = info;
+        });
+
+        overlaysRef.current.push(basinPoly, basinDottedBorder);
+      });
+    }
+
+    // 3c. Draw Nepal Rivers (Dotted Lines with Live Telemetry Tap)
+    if (showDottedRivers) {
+      NEPAL_RIVERS.forEach((river) => {
+        const riverPath = river.coordinates.map(([lat, lng]) => ({ lat, lng }));
+        const riverCol = getRiverStatusColor(river.status);
+
+        // Continuous luminous water glow underlay
+        const riverGlowLine = new google.maps.Polyline({
+          path: riverPath,
+          strokeColor: riverCol,
+          strokeOpacity: 0.45,
+          strokeWeight: 4.5,
+          map,
+          zIndex: 48,
+        });
+
+        // Invisible wider stroke for easy click hit-testing
+        const hitTargetLine = new google.maps.Polyline({
+          path: riverPath,
+          strokeColor: '#000000',
+          strokeOpacity: 0.001,
+          strokeWeight: 16,
+          map,
+          zIndex: 49,
+        });
+
+        const riverDottedLine = new google.maps.Polyline({
+          path: riverPath,
+          strokeColor: riverCol,
+          strokeOpacity: 0,
+          icons: [
+            {
+              icon: {
+                path: 'M 0,-1 0,1',
+                strokeOpacity: 1,
+                strokeColor: riverCol,
+                strokeWeight: 3.5,
+                scale: 3,
+              },
+              offset: '0',
+              repeat: '10px',
+            },
+          ],
+          map,
+          zIndex: 50,
+        });
+
+        const openRiverModal = () => {
+          setSelectedRiver(river);
+          setIsRiverModalOpen(true);
+        };
+
+        hitTargetLine.addListener('click', openRiverModal);
+        riverGlowLine.addListener('click', openRiverModal);
+        riverDottedLine.addListener('click', openRiverModal);
+
+        overlaysRef.current.push(riverGlowLine, hitTargetLine, riverDottedLine);
+      });
+    }
+
     // 4. Draw All 21 Terai Cities with Color Points (Points 3, 5 & 6)
     if (showCityPoints) {
       TERAI_CITIES_DATA.forEach((city) => {
         if (selectedRegionKey !== 'full_terai' && city.regionKey !== selectedRegionKey) {
           return;
         }
+        if (selectedDistrict !== 'all' && city.district.toLowerCase() !== selectedDistrict.toLowerCase()) {
+          return;
+        }
 
+        const labelText = city.name.split(' / ')[0];
+        const badgeWidth = Math.max(76, labelText.length * 8 + 28);
         const cityMarker = new google.maps.Marker({
           position: { lat: city.coords[0], lng: city.coords[1] },
           map,
-          title: `${city.name} (${city.district})`,
+          title: `📍 ${city.name} (${city.district}) - ${city.nepaliName}`,
           icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 12,
-            fillColor: city.color,
-            fillOpacity: 1,
-            strokeColor: '#FFFFFF',
-            strokeWeight: 2.5,
+            url: `data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="${badgeWidth}" height="28" viewBox="0 0 ${badgeWidth} 28"><rect width="${badgeWidth}" height="28" rx="14" fill="%230F172A" stroke="${encodeURIComponent(city.color)}" stroke-width="2.5"/><circle cx="14" cy="14" r="5" fill="${encodeURIComponent(city.color)}"/><text x="25" y="18" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="900" fill="%23FFFFFF">${labelText}</text></svg>`,
+            scaledSize: new google.maps.Size(badgeWidth, 28),
+            anchor: new google.maps.Point(14, 14),
           },
+          zIndex: 45,
         });
 
         cityMarker.addListener('click', () => {
@@ -1154,6 +1385,13 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
     // 7. Draw Terai Highway & Road Inundation Segments (Stage 5.4)
     if (showRoadNetwork) {
       TERAI_ROAD_SEGMENTS.forEach((seg) => {
+        if (selectedRegionKey !== 'full_terai' && !activeRegion.districts.includes(seg.district)) {
+          return;
+        }
+        if (selectedDistrict !== 'all' && seg.district.toLowerCase() !== selectedDistrict.toLowerCase()) {
+          return;
+        }
+
         const isSubmerged = seg.status === 'submerged';
         const isRestricted = seg.status === 'restricted';
         const color = isSubmerged ? '#EF4444' : isRestricted ? '#F59E0B' : '#10B981';
@@ -1209,6 +1447,13 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
     // 8. Draw Terai Critical Bridges & Barrages (Stage 5.4)
     if (showBridges) {
       TERAI_BRIDGES.forEach((bridge) => {
+        if (selectedRegionKey !== 'full_terai' && !activeRegion.districts.includes(bridge.district)) {
+          return;
+        }
+        if (selectedDistrict !== 'all' && bridge.district.toLowerCase() !== selectedDistrict.toLowerCase()) {
+          return;
+        }
+
         const isCrit = bridge.status === 'critical_danger';
         const isWarn = bridge.status === 'high_warning';
         const color = isCrit ? '#EF4444' : isWarn ? '#F59E0B' : '#06B6D4';
@@ -1216,15 +1461,13 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
         const marker = new google.maps.Marker({
           position: { lat: bridge.coords[0], lng: bridge.coords[1] },
           map,
-          title: `${bridge.name} (${bridge.river})`,
+          title: `🌉 ${bridge.name} (${bridge.river} River, ${bridge.district}) - ${bridge.status.replace(/_/g, ' ').toUpperCase()}`,
           icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 9,
-            fillColor: color,
-            fillOpacity: 1,
-            strokeColor: '#FFFFFF',
-            strokeWeight: 2.5,
+            url: `data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30"><rect width="30" height="30" rx="8" fill="%230F172A" stroke="${encodeURIComponent(color)}" stroke-width="2.5"/><text x="15" y="20.5" font-family="system-ui,sans-serif" font-size="14" text-anchor="middle">🌉</text></svg>`,
+            scaledSize: new google.maps.Size(28, 28),
+            anchor: new google.maps.Point(14, 14),
           },
+          zIndex: 38,
         });
 
         marker.addListener('click', () => {
@@ -1262,8 +1505,133 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
         overlaysRef.current.push(marker);
       });
     }
+
+    // 9. Draw Terai Hospitals & Emergency Medical Infrastructure
+    if (showHospitals) {
+      TERAI_HOSPITALS.forEach((hosp) => {
+        if (selectedRegionKey !== 'full_terai' && !activeRegion.districts.includes(hosp.district)) {
+          return;
+        }
+        if (selectedDistrict !== 'all' && hosp.district.toLowerCase() !== selectedDistrict.toLowerCase()) {
+          return;
+        }
+
+        const isFlooded = hosp.isFlooded;
+        const color = isFlooded ? '#DC2626' : '#2563EB';
+
+        const hospMarker = new google.maps.Marker({
+          position: { lat: hosp.coords[0], lng: hosp.coords[1] },
+          map,
+          title: `${hosp.name} (${hosp.district})`,
+          icon: {
+            url: `data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="${encodeURIComponent(color)}" stroke="%23FFFFFF" stroke-width="2"/><text x="14" y="19" font-family="system-ui,sans-serif" font-size="13" text-anchor="middle">🏥</text></svg>`,
+            scaledSize: new google.maps.Size(26, 26),
+            anchor: new google.maps.Point(13, 13),
+          },
+          zIndex: 8,
+        });
+
+        hospMarker.addListener('click', () => {
+          const info = new google.maps.InfoWindow({
+            content: `
+              <div style="color: #0F172A; font-family: sans-serif; padding: 6px; max-width: 270px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+                  <span style="
+                    font-size: 9px;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    background: ${isFlooded ? '#FEE2E2' : '#DBEAFE'};
+                    color: ${isFlooded ? '#991B1B' : '#1E40AF'};
+                  ">
+                    ${hosp.status.toUpperCase()}
+                  </span>
+                  <span style="font-size: 10px; font-weight: 800; color: #2563EB;">
+                    ${hosp.beds} Beds
+                  </span>
+                </div>
+                <h4 style="margin: 2px 0; font-size: 13px; font-weight: bold;">${hosp.name}</h4>
+                <p style="margin: 0 0 4px 0; font-size: 10px; color: #64748B;">${hosp.type} &bull; ${hosp.district} District</p>
+                <div style="font-size: 11px; color: #334155; line-height: 1.4; border-top: 1px solid #E2E8F0; padding-top: 4px;">
+                  <strong>Condition:</strong> ${hosp.isFlooded ? '<span style="color:#DC2626;font-weight:bold;">Submerged / Inundated</span>' : '<span style="color:#16A34A;font-weight:bold;">Operational</span>'}<br/>
+                  ${hosp.nearestSafeHaven ? `<strong>Nearest Safe Refuge:</strong> ${hosp.nearestSafeHaven}<br/>` : ''}
+                  <strong>Emergency Hotline:</strong> <a href="tel:${hosp.phone}" style="color: #2563EB; font-weight: bold;">${hosp.phone}</a>
+                </div>
+              </div>
+            `,
+          });
+          info.open(map, hospMarker);
+          activeInfoWindowRef.current = info;
+        });
+
+        overlaysRef.current.push(hospMarker);
+      });
+    }
+
+    // 10. Draw Terai Safe Havens & Refugee Relief Shelters (Stage 5.7)
+    if (showSafeZones) {
+      TERAI_SAFE_HAVENS.forEach((haven) => {
+        if (selectedRegionKey !== 'full_terai' && !activeRegion.districts.includes(haven.district)) {
+          return;
+        }
+        if (selectedDistrict !== 'all' && haven.district.toLowerCase() !== selectedDistrict.toLowerCase()) {
+          return;
+        }
+
+        const havenMarker = new google.maps.Marker({
+          position: { lat: haven.coords[0], lng: haven.coords[1] },
+          map,
+          title: `${haven.name} (${haven.district})`,
+          icon: {
+            url: `data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill="%23059669" stroke="%23FFFFFF" stroke-width="2"/><text x="14" y="19" font-family="system-ui,sans-serif" font-size="13" text-anchor="middle">🛡️</text></svg>`,
+            scaledSize: new google.maps.Size(26, 26),
+            anchor: new google.maps.Point(13, 13),
+          },
+          zIndex: 8,
+        });
+
+        havenMarker.addListener('click', () => {
+          const info = new google.maps.InfoWindow({
+            content: `
+              <div style="color: #0F172A; font-family: sans-serif; padding: 6px; max-width: 280px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+                  <span style="
+                    font-size: 9px;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    background: #DCFCE7;
+                    color: #166534;
+                  ">
+                    SAFE HAVEN &bull; GRADE ${haven.suitabilityGrade}
+                  </span>
+                  <span style="font-size: 10px; font-weight: 800; color: #059669;">
+                    +${haven.elevationAboveFloodPlainMeters}m high ground
+                  </span>
+                </div>
+                <h4 style="margin: 2px 0; font-size: 13px; font-weight: bold;">${haven.name}</h4>
+                <p style="margin: 0 0 4px 0; font-size: 10px; color: #64748B;">${haven.nepaliName} &bull; ${haven.district} District</p>
+                <div style="font-size: 11px; color: #334155; line-height: 1.4; border-top: 1px solid #E2E8F0; padding-top: 4px;">
+                  <strong>Capacity:</strong> ${haven.currentOccupancy.toLocaleString()} / ${haven.totalCapacity.toLocaleString()} persons<br/>
+                  <strong>Structure:</strong> ${haven.structure.replace(/_/g, ' ')}<br/>
+                  <strong>Helipad:</strong> ${haven.hasHelipad ? '🚁 Nepal Army Helipad Ready' : '❌ No Helipad'}<br/>
+                  <strong>Warden:</strong> ${haven.wardenName} (${haven.wardenPhone})
+                </div>
+              </div>
+            `,
+          });
+          info.open(map, havenMarker);
+          activeInfoWindowRef.current = info;
+        });
+
+        overlaysRef.current.push(havenMarker);
+      });
+    }
   }, [
     selectedRegionKey,
+    selectedDistrict,
     showNepalBorder,
     showTeraiBoundary,
     showFloodPolygons,
@@ -1281,6 +1649,8 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
     propBeforeDate,
     propAfterDate,
     highlightFloodedDotted,
+    showDottedBasins,
+    showDottedRivers,
   ]);
 
   const handleSaveApiKey = () => {
@@ -1289,7 +1659,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   };
 
   return (
-    <div className={`space-y-4 ${isFullscreen ? 'fixed inset-0 z-[100] h-screen w-screen overflow-y-auto bg-slate-950 p-4' : ''}`}>
+    <div className={`space-y-4 relative isolate z-10 ${isFullscreen ? 'fixed inset-0 z-[1000] h-screen w-screen overflow-y-auto bg-slate-950 p-4' : ''}`}>
       {/* ───────────────────────────────────────────────────────────────────────
           TERAI DISASTER COMMAND HUD & ROUTE DISPATCH CONTROLS
       ───────────────────────────────────────────────────────────────────────── */}
@@ -1711,124 +2081,257 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
         </div>
 
         {/* Layer Checkboxes */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80 text-xs">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="pt-3 border-t border-slate-800/80 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Sovereign Nepal Map Highlight Toggle */}
-            <label className="flex items-center gap-1.5 cursor-pointer text-amber-300 hover:text-white select-none">
+            <label
+              htmlFor="toggle-nepal-border"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                showNepalBorder
+                  ? 'border-amber-500/70 bg-amber-500/15 text-amber-300 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
               <input
+                id="toggle-nepal-border"
                 type="checkbox"
                 checked={showNepalBorder}
                 onChange={(e) => setShowNepalBorder(e.target.checked)}
-                className="rounded border-amber-600 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer"
+                className="rounded border-amber-600 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer accent-amber-500"
               />
-              <span className="text-amber-400 font-bold">🇳🇵 Nepal Sovereign Map</span>
+              <span>🇳🇵 Nepal Sovereign Map</span>
             </label>
 
             {/* Terai Lowlands Plain Highlight Toggle */}
-            <label className="flex items-center gap-1.5 cursor-pointer text-emerald-300 hover:text-white select-none">
+            <label
+              htmlFor="toggle-terai-boundary"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                showTeraiBoundary
+                  ? 'border-emerald-500/70 bg-emerald-500/15 text-emerald-300 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
               <input
+                id="toggle-terai-boundary"
                 type="checkbox"
                 checked={showTeraiBoundary}
                 onChange={(e) => setShowTeraiBoundary(e.target.checked)}
-                className="rounded border-emerald-600 bg-slate-950 text-emerald-500 focus:ring-0 cursor-pointer"
+                className="rounded border-emerald-600 bg-slate-950 text-emerald-500 focus:ring-0 cursor-pointer accent-emerald-500"
               />
-              <span className="text-emerald-400 font-bold">🌾 Terai Lowland Region</span>
+              <span>🌾 Terai Lowland Region</span>
             </label>
 
+            {/* Live Traffic Toggle */}
             <button
+              id="toggle-traffic"
               onClick={() => setShowTraffic(!showTraffic)}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                 showTraffic
-                  ? 'border-amber-500 bg-amber-500/20 text-amber-300'
-                  : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
+                  ? 'border-amber-500 bg-amber-500/25 text-amber-300 ring-1 ring-amber-500/40 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-white'
               }`}
             >
               <Car className="h-3.5 w-3.5" />
               <span>Live Traffic</span>
             </button>
 
-            {/* User Requested: Option to Highlight Flooded Area in Flooded Map with Dotted Lines */}
-            <label className="flex items-center gap-1.5 cursor-pointer text-cyan-300 hover:text-white select-none bg-cyan-950/60 px-2.5 py-1 rounded-lg border border-cyan-500/50 shadow-sm">
+            {/* Dotted Flood Lines Toggle */}
+            <label
+              htmlFor="toggle-dotted-flood"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                highlightFloodedDotted
+                  ? 'border-cyan-400/80 bg-cyan-950/80 text-cyan-300 shadow-sm ring-1 ring-cyan-500/30'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
               <input
+                id="toggle-dotted-flood"
                 type="checkbox"
                 checked={highlightFloodedDotted}
                 onChange={(e) => setHighlightFloodedDotted(e.target.checked)}
-                className="rounded border-cyan-500 bg-slate-950 text-cyan-400 focus:ring-0 cursor-pointer"
+                className="rounded border-cyan-500 bg-slate-950 text-cyan-400 focus:ring-0 cursor-pointer accent-cyan-400"
               />
-              <span className="text-cyan-300 font-bold flex items-center gap-1.5 text-xs">
-                <span className="border-b-2 border-dotted border-cyan-400 w-4 inline-block"></span>
+              <span className="flex items-center gap-1.5">
+                <span className="border-b-2 border-dotted border-cyan-400 w-3.5 inline-block"></span>
                 ⚡ Dotted Flood Lines
               </span>
             </label>
 
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+            {/* Dotted Basins Toggle */}
+            <label
+              htmlFor="toggle-dotted-basins"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                showDottedBasins
+                  ? 'border-cyan-500/70 bg-cyan-500/15 text-cyan-300 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
               <input
+                id="toggle-dotted-basins"
+                type="checkbox"
+                checked={showDottedBasins}
+                onChange={(e) => setShowDottedBasins(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-0 cursor-pointer accent-cyan-500"
+              />
+              <span className="flex items-center gap-1">
+                <span className="border-b border-dotted border-cyan-400 w-3 inline-block"></span>
+                ⚡ Dotted Basins
+              </span>
+            </label>
+
+            {/* Dotted Rivers (Live) Toggle */}
+            <label
+              htmlFor="toggle-dotted-rivers"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                showDottedRivers
+                  ? 'border-blue-500/70 bg-blue-500/15 text-blue-300 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
+              <input
+                id="toggle-dotted-rivers"
+                type="checkbox"
+                checked={showDottedRivers}
+                onChange={(e) => setShowDottedRivers(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-0 cursor-pointer accent-blue-500"
+              />
+              <span className="flex items-center gap-1">
+                <span className="border-b-2 border-dotted border-blue-400 w-3 inline-block"></span>
+                🌊 Dotted Rivers (Live)
+              </span>
+            </label>
+
+            {/* 11 Flood Corridors Toggle */}
+            <label
+              htmlFor="toggle-flood-polygons"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                showFloodPolygons
+                  ? 'border-sky-500/70 bg-sky-500/15 text-sky-300 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
+              <input
+                id="toggle-flood-polygons"
                 type="checkbox"
                 checked={showFloodPolygons}
                 onChange={(e) => setShowFloodPolygons(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-cyan-600 focus:ring-0"
+                className="rounded border-slate-700 bg-slate-950 text-cyan-600 focus:ring-0 cursor-pointer accent-sky-500"
               />
-              <span className="text-cyan-400 font-semibold">🌊 11 Flood Corridors</span>
+              <span>🌊 11 Flood Corridors</span>
             </label>
 
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+            {/* All 21 Terai Cities Toggle */}
+            <label
+              htmlFor="toggle-city-points"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                showCityPoints
+                  ? 'border-blue-500/70 bg-blue-500/15 text-blue-300 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
               <input
+                id="toggle-city-points"
                 type="checkbox"
                 checked={showCityPoints}
                 onChange={(e) => setShowCityPoints(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-0"
+                className="rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-0 cursor-pointer accent-blue-500"
               />
-              <span className="text-blue-300 font-semibold">🏙️ All 21 Terai Cities</span>
+              <span>🏙️ All 21 Terai Cities</span>
             </label>
 
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+            {/* Village Hazard Pins Toggle */}
+            <label
+              htmlFor="toggle-village-pins"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                showVillagePins
+                  ? 'border-rose-500/70 bg-rose-500/15 text-rose-300 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
               <input
+                id="toggle-village-pins"
                 type="checkbox"
                 checked={showVillagePins}
                 onChange={(e) => setShowVillagePins(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-rose-600 focus:ring-0"
+                className="rounded border-slate-700 bg-slate-950 text-rose-600 focus:ring-0 cursor-pointer accent-rose-500"
               />
-              <span className="text-rose-400 font-semibold">📍 Village Hazard Pins</span>
+              <span>📍 Village Hazard Pins</span>
             </label>
 
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+            {/* Hospitals Toggle */}
+            <label
+              htmlFor="toggle-hospitals"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                showHospitals
+                  ? 'border-red-500/70 bg-red-500/15 text-red-300 shadow-sm ring-1 ring-red-500/20'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
               <input
+                id="toggle-hospitals"
                 type="checkbox"
                 checked={showHospitals}
                 onChange={(e) => setShowHospitals(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-0"
+                className="rounded border-slate-700 bg-slate-950 text-red-600 focus:ring-0 cursor-pointer accent-red-500"
               />
-              <span className="text-blue-400 font-semibold">🏥 Hospitals</span>
+              <span>🏥 Hospitals</span>
             </label>
 
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+            {/* Safe Shelters Toggle */}
+            <label
+              htmlFor="toggle-safe-zones"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                showSafeZones
+                  ? 'border-emerald-500/70 bg-emerald-500/15 text-emerald-300 shadow-sm ring-1 ring-emerald-500/20'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
               <input
+                id="toggle-safe-zones"
                 type="checkbox"
                 checked={showSafeZones}
                 onChange={(e) => setShowSafeZones(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-emerald-600 focus:ring-0"
+                className="rounded border-slate-700 bg-slate-950 text-emerald-600 focus:ring-0 cursor-pointer accent-emerald-500"
               />
-              <span className="text-emerald-400 font-semibold">🛡️ Safe Shelters</span>
+              <span>🛡️ Safe Shelters</span>
             </label>
 
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+            {/* Stage 5.4 Road Inundation Toggle */}
+            <label
+              htmlFor="toggle-road-network"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                showRoadNetwork
+                  ? 'border-amber-500/70 bg-amber-500/15 text-amber-300 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
               <input
+                id="toggle-road-network"
                 type="checkbox"
                 checked={showRoadNetwork}
                 onChange={(e) => setShowRoadNetwork(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-rose-500 focus:ring-0"
+                className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer accent-amber-500"
               />
-              <span className="text-rose-400 font-semibold">🛣️ Stage 5.4 Road Inundation</span>
+              <span>🛣️ Stage 5.4 Road Inundation</span>
             </label>
 
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+            {/* Critical Bridges Toggle */}
+            <label
+              htmlFor="toggle-bridges"
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
+                showBridges
+                  ? 'border-cyan-500/70 bg-cyan-500/15 text-cyan-300 shadow-sm'
+                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+              }`}
+            >
               <input
+                id="toggle-bridges"
                 type="checkbox"
                 checked={showBridges}
                 onChange={(e) => setShowBridges(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-0"
+                className="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-0 cursor-pointer accent-cyan-500"
               />
-              <span className="text-cyan-400 font-semibold">🌉 Critical Bridges</span>
+              <span>🌉 Critical Bridges</span>
             </label>
           </div>
         </div>
@@ -1837,7 +2340,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
       {/* ───────────────────────────────────────────────────────────────────────
           MAIN VIEWPORT: DUAL ENGINE (GOOGLE MAPS V3 OR CRISP LEAFLET)
       ───────────────────────────────────────────────────────────────────────── */}
-      <div className={`relative w-full rounded-2xl border border-slate-700/80 bg-slate-950 shadow-2xl overflow-hidden ${isFullscreen ? 'h-[calc(100vh-280px)] min-h-[500px]' : 'h-[680px]'}`}>
+      <div className={`relative isolate z-10 w-full rounded-2xl border border-slate-700/80 bg-slate-950 shadow-2xl overflow-hidden ${isFullscreen ? 'h-[calc(100vh-280px)] min-h-[500px]' : 'h-[680px]'}`}>
         {provider === 'google_maps' ? (
           <>
             <div ref={mapContainerRef} className="h-full w-full" style={{ height: '100%', width: '100%' }} />
@@ -1886,9 +2389,17 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                   Basin: <span className="text-white font-bold">{activeRegion.shortName}</span> &bull; Corridors: <span className="text-cyan-300">{TERAI_FLOOD_CORRIDORS.length}</span> &bull; Settlements: <span className="text-emerald-300">{displayedVillages.length}</span>
                 </div>
                 <div className="text-[9px] font-mono text-slate-400 border-t border-slate-800/80 pt-1 flex items-center gap-2">
-                  <span className="text-amber-400 font-bold">🇳🇵 Nepal Border: ON</span>
+                  <span className={showNepalBorder ? 'text-amber-400 font-bold' : 'text-slate-500 line-through'}>
+                    🇳🇵 Nepal Border: {showNepalBorder ? 'ON' : 'OFF'}
+                  </span>
                   <span>&bull;</span>
-                  <span className="text-emerald-400 font-bold">🌾 Terai Lowlands: ON</span>
+                  <span className={showTeraiBoundary ? 'text-emerald-400 font-bold' : 'text-slate-500 line-through'}>
+                    🌾 Terai Lowlands: {showTeraiBoundary ? 'ON' : 'OFF'}
+                  </span>
+                  <span>&bull;</span>
+                  <span className={showFloodPolygons ? 'text-cyan-400 font-bold' : 'text-slate-500 line-through'}>
+                    🌊 Flood Corridors: {showFloodPolygons ? 'ON' : 'OFF'}
+                  </span>
                   {propAfterDate && (
                     <>
                       <span>&bull;</span>
@@ -1999,34 +2510,11 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                       }}
                     />
                   )}
-                  <Marker
-                    position={[26.85, 85.30]}
-                    icon={L.divIcon({
-                      className: 'terai-badge',
-                      html: `
-                        <div style="
-                          background: #064E3B;
-                          color: #A7F3D0;
-                          border: 2px solid #10B981;
-                          border-radius: 8px;
-                          padding: 3px 8px;
-                          font-size: 10px;
-                          font-weight: 900;
-                          white-space: nowrap;
-                          box-shadow: 0 4px 12px rgba(0,0,0,0.8);
-                        ">
-                          🌾 TERAI LOWLAND BASIN
-                        </div>
-                      `,
-                      iconSize: [150, 24],
-                      iconAnchor: [75, 12],
-                    })}
-                  />
                 </>
               )}
 
-              {/* 3. High-Resolution Sentinel-1 Flood Corridors (Dotted Lines Option - Zero Polygon Fill) */}
-              {showFloodPolygons && highlightFloodedDotted &&
+              {/* 3. High-Resolution Sentinel-1 Flood Corridors (Filled Water Polygon Layer) */}
+              {showFloodPolygons &&
                 TERAI_FLOOD_CORRIDORS.map((corridor) => {
                   if (selectedRegionKey !== 'full_terai') {
                     const hasCommonDistrict = corridor.districts.some((d) =>
@@ -2034,19 +2522,24 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                     );
                     if (!hasCommonDistrict) return null;
                   }
+                  if (selectedDistrict !== 'all') {
+                    const matches = corridor.districts.some(
+                      (d) => d.toLowerCase() === selectedDistrict.toLowerCase()
+                    );
+                    if (!matches) return null;
+                  }
 
                   const isCritical = corridor.severity === 'critical';
 
                   return (
                     <Polygon
-                      key={corridor.id}
+                      key={`flood-poly-${corridor.id}`}
                       positions={corridor.polygon}
                       pathOptions={{
                         color: isCritical ? '#00F2FE' : '#38BDF8',
-                        weight: 2.8,
-                        dashArray: '8, 8',
-                        fillColor: 'transparent',
-                        fillOpacity: 0,
+                        weight: highlightFloodedDotted ? 1 : 2.5,
+                        fillColor: isCritical ? '#0284C7' : '#0369A1',
+                        fillOpacity: 0.35,
                       }}
                     >
                       <Popup>
@@ -2075,10 +2568,141 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                   );
                 })}
 
+              {/* 3a. Dotted Flood Lines (High-Visibility Dotted Perimeter) */}
+              {highlightFloodedDotted &&
+                TERAI_FLOOD_CORRIDORS.map((corridor) => {
+                  if (selectedRegionKey !== 'full_terai') {
+                    const hasCommonDistrict = corridor.districts.some((d) =>
+                      activeRegion.districts.includes(d)
+                    );
+                    if (!hasCommonDistrict) return null;
+                  }
+                  if (selectedDistrict !== 'all') {
+                    const matches = corridor.districts.some(
+                      (d) => d.toLowerCase() === selectedDistrict.toLowerCase()
+                    );
+                    if (!matches) return null;
+                  }
+
+                  const isCritical = corridor.severity === 'critical';
+
+                  return (
+                    <Polyline
+                      key={`flood-dotted-${corridor.id}`}
+                      positions={corridor.polygon}
+                      pathOptions={{
+                        color: isCritical ? '#00F2FE' : '#38BDF8',
+                        weight: 3.2,
+                        dashArray: '8, 8',
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-1 space-y-1 max-w-[250px]">
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                isCritical ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                              }`}
+                            >
+                              {corridor.severity.toUpperCase()} INUNDATION LINE
+                            </span>
+                            <span className="text-xs font-bold text-cyan-400">
+                              {corridor.inundatedAreaKm2} km²
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-sm text-white">{corridor.name}</h4>
+                          <p className="text-[10px] text-slate-400">{corridor.nepaliName}</p>
+                          <div className="text-xs text-slate-300 space-y-0.5 border-t border-slate-800 pt-1">
+                            <p><strong>Water Depth:</strong> <span className="text-rose-400 font-bold">{corridor.waterDepthRange}</span></p>
+                            <p><strong>Districts:</strong> {corridor.districts.join(', ')}</p>
+                          </div>
+                        </div>
+                      </Popup>
+                    </Polyline>
+                  );
+                })}
+
+              {/* 3b. Nepal River Basins (Dotted Boundaries) */}
+              {showDottedBasins &&
+                NEPAL_RIVER_BASINS.map((basin) => (
+                  <Polygon
+                    key={`leaflet-basin-${basin.id}`}
+                    positions={basin.boundaryPolygon}
+                    pathOptions={{
+                      color: basin.color,
+                      weight: 2.2,
+                      dashArray: '8, 8',
+                      fillColor: basin.color,
+                      fillOpacity: 0.04,
+                    }}
+                  >
+                    <Popup>
+                      <div className="p-1 space-y-1 text-slate-900">
+                        <h4 className="font-bold text-xs">{basin.name}</h4>
+                        <p className="text-[10px] text-slate-600">{basin.nepaliName}</p>
+                        <p className="text-[10px] text-cyan-700 font-mono">
+                          Catchment: {basin.catchmentAreaKm2.toLocaleString()} km²
+                        </p>
+                      </div>
+                    </Popup>
+                  </Polygon>
+                ))}
+
+              {/* 3c. Nepal Rivers (Dotted Lines with Live Telemetry Tap) */}
+              {showDottedRivers &&
+                NEPAL_RIVERS.map((river) => {
+                  const riverCol = getRiverStatusColor(river.status);
+                  return (
+                    <Polyline
+                      key={`leaflet-river-${river.id}`}
+                      positions={river.coordinates}
+                      pathOptions={{
+                        color: riverCol,
+                        weight: 3.8,
+                        dashArray: '8, 8',
+                      }}
+                      eventHandlers={{
+                        click: () => {
+                          setSelectedRiver(river);
+                          setIsRiverModalOpen(true);
+                        },
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-1 space-y-1.5 text-slate-900 min-w-[210px]">
+                          <div className="flex items-center justify-between border-b pb-1">
+                            <h4 className="font-bold text-xs">🌊 {river.name}</h4>
+                            <span className="text-[8px] font-bold uppercase px-1 rounded bg-rose-100 text-rose-700">
+                              {river.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-600">{river.nepaliName}</p>
+                          <div className="text-[10px] font-mono text-slate-700">
+                            Level: <strong className="text-rose-600">{river.currentLevelMeters}m</strong> | Flow:{' '}
+                            <strong className="text-cyan-700">{river.dischargeCusecs.toLocaleString()} cusecs</strong>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedRiver(river);
+                              setIsRiverModalOpen(true);
+                            }}
+                            className="w-full mt-1 px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-[10px] font-bold text-white rounded cursor-pointer transition-all"
+                          >
+                            ⚡ View Live Telemetry Update
+                          </button>
+                        </div>
+                      </Popup>
+                    </Polyline>
+                  );
+                })}
+
               {/* 4. Terai City Color Points (User Feature) */}
               {showCityPoints &&
                 TERAI_CITIES_DATA.map((city) => {
                   if (selectedRegionKey !== 'full_terai' && city.regionKey !== selectedRegionKey) {
+                    return null;
+                  }
+                  if (selectedDistrict !== 'all' && city.district.toLowerCase() !== selectedDistrict.toLowerCase()) {
                     return null;
                   }
                   return (
@@ -2207,6 +2831,12 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
               {/* 7. Stage 5.4 Road Inundation Segments */}
               {showRoadNetwork &&
                 TERAI_ROAD_SEGMENTS.map((seg) => {
+                  if (selectedRegionKey !== 'full_terai' && !activeRegion.districts.includes(seg.district)) {
+                    return null;
+                  }
+                  if (selectedDistrict !== 'all' && seg.district.toLowerCase() !== selectedDistrict.toLowerCase()) {
+                    return null;
+                  }
                   const isSubmerged = seg.status === 'submerged';
                   const isRestricted = seg.status === 'restricted';
                   const color = isSubmerged ? '#EF4444' : isRestricted ? '#F59E0B' : '#10B981';
@@ -2264,45 +2894,134 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
 
               {/* 8. Stage 5.4 Critical Bridges & Barrages */}
               {showBridges &&
-                TERAI_BRIDGES.map((bridge) => (
-                  <Marker
-                    key={bridge.id}
-                    position={bridge.coords}
-                    icon={createBridgeLeafletIcon(bridge)}
-                  >
-                    <Popup>
-                      <div className="p-1 space-y-1 max-w-[240px]">
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
-                              bridge.status === 'critical_danger'
-                                ? 'bg-red-500/20 text-red-400'
-                                : bridge.status === 'high_warning'
-                                ? 'bg-amber-500/20 text-amber-400'
-                                : 'bg-cyan-500/20 text-cyan-400'
-                            }`}
-                          >
-                            {bridge.status.replace(/_/g, ' ').toUpperCase()}
-                          </span>
-                          {bridge.dischargeCusecs && (
-                            <span className="text-[10px] font-bold text-rose-400">
-                              {bridge.dischargeCusecs.toLocaleString()} cusecs
+                TERAI_BRIDGES.map((bridge) => {
+                  if (selectedRegionKey !== 'full_terai' && !activeRegion.districts.includes(bridge.district)) {
+                    return null;
+                  }
+                  if (selectedDistrict !== 'all' && bridge.district.toLowerCase() !== selectedDistrict.toLowerCase()) {
+                    return null;
+                  }
+                  return (
+                    <Marker
+                      key={bridge.id}
+                      position={bridge.coords}
+                      icon={createBridgeLeafletIcon(bridge)}
+                    >
+                      <Popup>
+                        <div className="p-1 space-y-1 max-w-[240px]">
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                bridge.status === 'critical_danger'
+                                  ? 'bg-red-500/20 text-red-400'
+                                  : bridge.status === 'high_warning'
+                                  ? 'bg-amber-500/20 text-amber-400'
+                                  : 'bg-cyan-500/20 text-cyan-400'
+                              }`}
+                            >
+                              {bridge.status.replace(/_/g, ' ').toUpperCase()}
                             </span>
-                          )}
+                            {bridge.dischargeCusecs && (
+                              <span className="text-[10px] font-bold text-rose-400">
+                                {bridge.dischargeCusecs.toLocaleString()} cusecs
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="font-bold text-sm text-white">{bridge.name}</h4>
+                          <p className="text-[10px] text-slate-400">River: {bridge.river} &bull; {bridge.district}</p>
+                          <div className="text-xs text-slate-300 space-y-0.5 border-t border-slate-800 pt-1">
+                            {bridge.waterLevelMeters && (
+                              <p><strong>Level:</strong> {bridge.waterLevelMeters}m (Danger: {bridge.dangerLevelMeters}m)</p>
+                            )}
+                            <p><strong>Structure:</strong> {bridge.structuralStatus}</p>
+                            <p><strong>Traffic:</strong> <span className="font-bold text-amber-300">{bridge.trafficStatus.replace(/_/g, ' ').toUpperCase()}</span></p>
+                          </div>
                         </div>
-                        <h4 className="font-bold text-sm text-white">{bridge.name}</h4>
-                        <p className="text-[10px] text-slate-400">River: {bridge.river} &bull; {bridge.district}</p>
-                        <div className="text-xs text-slate-300 space-y-0.5 border-t border-slate-800 pt-1">
-                          {bridge.waterLevelMeters && (
-                            <p><strong>Level:</strong> {bridge.waterLevelMeters}m (Danger: {bridge.dangerLevelMeters}m)</p>
-                          )}
-                          <p><strong>Structure:</strong> {bridge.structuralStatus}</p>
-                          <p><strong>Traffic:</strong> <span className="font-bold text-amber-300">{bridge.trafficStatus.replace(/_/g, ' ').toUpperCase()}</span></p>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+
+              {/* 9. Terai Referral Hospitals & Healthcare Facilities */}
+              {showHospitals &&
+                TERAI_HOSPITALS.map((hosp) => {
+                  if (selectedRegionKey !== 'full_terai' && !activeRegion.districts.includes(hosp.district)) {
+                    return null;
+                  }
+                  if (selectedDistrict !== 'all' && hosp.district.toLowerCase() !== selectedDistrict.toLowerCase()) {
+                    return null;
+                  }
+                  const isFlooded = hosp.isFlooded;
+                  return (
+                    <Marker
+                      key={`leaflet-hosp-${hosp.id}`}
+                      position={hosp.coords}
+                      icon={createHospitalLeafletIcon(hosp.isFlooded)}
+                    >
+                      <Popup>
+                        <div className="p-1 space-y-1 max-w-[250px]">
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                isFlooded ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                              }`}
+                            >
+                              {hosp.status.toUpperCase()}
+                            </span>
+                            <span className="text-[10px] font-bold text-cyan-400">
+                              {hosp.beds} beds
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-sm text-white">{hosp.name}</h4>
+                          <p className="text-[10px] text-slate-400">{hosp.type} &bull; {hosp.district}</p>
+                          <div className="text-xs text-slate-300 space-y-0.5 border-t border-slate-800 pt-1">
+                            <p><strong>Status:</strong> {hosp.isFlooded ? 'Submerged' : 'Operational'}</p>
+                            {hosp.nearestSafeHaven && <p><strong>Refuge:</strong> {hosp.nearestSafeHaven}</p>}
+                            <p><strong>Hotline:</strong> <span className="text-blue-300 font-bold">{hosp.phone}</span></p>
+                          </div>
                         </div>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+
+              {/* 10. Terai Safe Havens & Refugee Relief Compounds */}
+              {showSafeZones &&
+                TERAI_SAFE_HAVENS.map((haven) => {
+                  if (selectedRegionKey !== 'full_terai' && !activeRegion.districts.includes(haven.district)) {
+                    return null;
+                  }
+                  if (selectedDistrict !== 'all' && haven.district.toLowerCase() !== selectedDistrict.toLowerCase()) {
+                    return null;
+                  }
+                  return (
+                    <Marker
+                      key={`leaflet-haven-${haven.id}`}
+                      position={haven.coords}
+                      icon={createSafeHavenLeafletIcon(haven)}
+                    >
+                      <Popup>
+                        <div className="p-1 space-y-1 max-w-[260px]">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              GRADE {haven.suitabilityGrade} HAVEN
+                            </span>
+                            <span className="text-[10px] font-bold text-emerald-400">
+                              +{haven.elevationAboveFloodPlainMeters}m high ground
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-sm text-white">{haven.name}</h4>
+                          <p className="text-[10px] text-slate-400">{haven.nepaliName} &bull; {haven.district}</p>
+                          <div className="text-xs text-slate-300 space-y-0.5 border-t border-slate-800 pt-1">
+                            <p><strong>Capacity:</strong> {haven.currentOccupancy.toLocaleString()} / {haven.totalCapacity.toLocaleString()}</p>
+                            <p><strong>Helipad:</strong> {haven.hasHelipad ? '🚁 Nepal Army Helipad Ready' : 'None'}</p>
+                            <p><strong>Warden:</strong> {haven.wardenName} ({haven.wardenPhone})</p>
+                          </div>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
             </MapContainer>
 
             {/* Floating Terai Intelligence Badge for Leaflet Engine */}
@@ -2321,9 +3040,17 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                   Basin: <span className="text-white font-bold">{activeRegion.shortName}</span> &bull; Corridors: <span className="text-cyan-300">{TERAI_FLOOD_CORRIDORS.length}</span> &bull; Route: <span className="text-amber-300">{activeRoute ? activeRoute.name : 'Standard Patrol'}</span>
                 </div>
                 <div className="text-[9px] font-mono text-slate-400 border-t border-slate-800/80 pt-1 flex items-center gap-2">
-                  <span className="text-amber-400 font-bold">🇳🇵 Nepal Border: ON</span>
+                  <span className={showNepalBorder ? 'text-amber-400 font-bold' : 'text-slate-500 line-through'}>
+                    🇳🇵 Nepal Border: {showNepalBorder ? 'ON' : 'OFF'}
+                  </span>
                   <span>&bull;</span>
-                  <span className="text-emerald-400 font-bold">🌾 Terai Lowlands: ON</span>
+                  <span className={showTeraiBoundary ? 'text-emerald-400 font-bold' : 'text-slate-500 line-through'}>
+                    🌾 Terai Lowlands: {showTeraiBoundary ? 'ON' : 'OFF'}
+                  </span>
+                  <span>&bull;</span>
+                  <span className={showFloodPolygons ? 'text-cyan-400 font-bold' : 'text-slate-500 line-through'}>
+                    🌊 Flood Corridors: {showFloodPolygons ? 'ON' : 'OFF'}
+                  </span>
                   {propAfterDate && (
                     <>
                       <span>&bull;</span>
@@ -2356,6 +3083,24 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
         floodDepthMeters={dossierTarget?.depth}
         isOpen={Boolean(dossierTarget)}
         onClose={() => setDossierTarget(null)}
+      />
+
+      {/* Real-Time Live River Telemetry Inspector Modal */}
+      <LiveRiverTelemetryModal
+        river={selectedRiver}
+        isOpen={isRiverModalOpen}
+        onClose={() => setIsRiverModalOpen(false)}
+        language="ne"
+        onFocusRiver={(riv) => {
+          if (googleMapInstanceRef.current && window.google) {
+            const bounds = new google.maps.LatLngBounds();
+            riv.coordinates.forEach(([lat, lng]) => bounds.extend({ lat, lng }));
+            googleMapInstanceRef.current.fitBounds(bounds);
+          }
+          if (leafletMapInstanceRef.current) {
+            leafletMapInstanceRef.current.fitBounds(riv.coordinates as L.LatLngBoundsExpression);
+          }
+        }}
       />
     </div>
   );

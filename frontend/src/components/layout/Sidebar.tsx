@@ -138,14 +138,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {isOpen && (
         <div
           onClick={onCloseMobile}
-          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-[150] bg-slate-950/80 backdrop-blur-sm md:hidden"
         />
       )}
 
       {/* Mobile Drawer */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-72 border-r border-slate-800 bg-slate-900 shadow-2xl transition-transform duration-300 ease-in-out md:hidden',
+          'fixed inset-y-0 left-0 z-[160] w-72 border-r border-slate-800 bg-slate-900 shadow-2xl transition-transform duration-300 ease-in-out md:hidden',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >

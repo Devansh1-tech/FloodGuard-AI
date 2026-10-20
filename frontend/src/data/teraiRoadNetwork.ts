@@ -261,7 +261,7 @@ export const TERAI_ROAD_SEGMENTS: RoadSegment[] = [
     bypassRecommendation: 'North half completely dry. Relief staging post operating at Pipra high school.',
     path: [
       [27.13, 85.24], // Chandranigahapur
-      [27.05, 27.05],
+      [27.05, 85.25],
       [26.98, 85.26], // Pipra
       [26.88, 85.27],
       [26.78, 85.28], // Gaur north approach

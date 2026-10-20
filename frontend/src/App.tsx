@@ -62,6 +62,31 @@ export const App: React.FC = () => {
   useEffect(() => {
     document.documentElement.classList.add('dark');
     document.documentElement.classList.remove('light');
+
+    const handleHash = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (
+        hash &&
+        [
+          'landing',
+          'dashboard',
+          'satellite',
+          'command_map',
+          'roads',
+          'routing',
+          'havens',
+          'sitrep',
+          'gauges',
+          'hospitals',
+          'demographics',
+        ].includes(hash)
+      ) {
+        setActiveTab(hash as NavigationTab);
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
   }, []);
 
   const toggleTheme = () => {
@@ -449,7 +474,7 @@ export const App: React.FC = () => {
       {/* ───────────────────────────────────────────────────────────────────────
           MAIN NAVIGATION BAR (Full Width Edge-to-Edge)
       ───────────────────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 w-full border-b border-slate-800/80 bg-[#07090e]/95 backdrop-blur-md px-2 sm:px-4 py-2">
+      <header className="sticky top-0 z-[100] w-full border-b border-slate-800/80 bg-[#07090e]/95 backdrop-blur-md px-2 sm:px-4 py-2">
         <div className="w-full">
           <CardNav
             logo={navLogo}

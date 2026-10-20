@@ -222,29 +222,64 @@ const MapViewController: React.FC<{
 const ClippedFloodPane: React.FC<{
   sliderPosition: number;
   viewMode: 'split' | 'overlay' | 'difference';
-}> = ({ sliderPosition, viewMode }) => {
+  floodImageryMode: 'sar_specular' | 'false_color' | 'optical_deluge';
+  isBwRadar: boolean;
+}> = ({ sliderPosition, viewMode, floodImageryMode, isBwRadar }) => {
   const map = useMap();
 
   useEffect(() => {
-    const afterDelugePane = map.getPane('afterDelugePane');
-    const floodPane = map.getPane('floodInundationPane');
+    let animFrame: number;
 
-    const updatePane = (pane: HTMLElement | undefined) => {
-      if (!pane) return;
-      if (viewMode === 'split') {
-        pane.style.clipPath = `polygon(${sliderPosition}% 0%, 100% 0%, 100% 100%, ${sliderPosition}% 100%)`;
-        pane.style.display = 'block';
-      } else if (viewMode === 'overlay') {
-        pane.style.clipPath = 'none';
-        pane.style.display = 'block';
-      } else {
-        pane.style.display = 'none';
-      }
+    const filterClass = isBwRadar
+      ? 'sar-bw-mode'
+      : floodImageryMode === 'sar_specular'
+      ? 'sar-specular-mode'
+      : floodImageryMode === 'false_color'
+      ? 'deluge-false-color-mode'
+      : 'deluge-optical-mode';
+
+    const applyPaneStyles = () => {
+      const afterDelugePane = map.getPane('afterDelugePane');
+      const floodPane = map.getPane('floodInundationPane');
+
+      const clipVal =
+        viewMode === 'split'
+          ? `polygon(${sliderPosition}% 0%, 100% 0%, 100% 100%, ${sliderPosition}% 100%)`
+          : viewMode === 'overlay'
+          ? 'none'
+          : 'polygon(0 0, 0 0, 0 0, 0 0)';
+
+      const updatePane = (pane: HTMLElement | undefined, isTileLayer = false) => {
+        if (!pane) return;
+        pane.style.position = 'absolute';
+        pane.style.top = '0';
+        pane.style.left = '0';
+        pane.style.width = '100%';
+        pane.style.height = '100%';
+        pane.style.clipPath = clipVal;
+        (pane.style as any).webkitClipPath = clipVal;
+        pane.style.pointerEvents = 'none';
+
+        if (isTileLayer) {
+          pane.className = `leaflet-pane leaflet-afterDelugePane-pane ${filterClass}`;
+        }
+
+        if (viewMode === 'difference') {
+          pane.style.display = 'none';
+        } else {
+          pane.style.display = 'block';
+        }
+      };
+
+      updatePane(afterDelugePane, true);
+      updatePane(floodPane, false);
     };
 
-    updatePane(afterDelugePane);
-    updatePane(floodPane);
-  }, [sliderPosition, viewMode, map]);
+    applyPaneStyles();
+    animFrame = requestAnimationFrame(applyPaneStyles);
+
+    return () => cancelAnimationFrame(animFrame);
+  }, [sliderPosition, viewMode, floodImageryMode, isBwRadar, map]);
 
   return null;
 };
@@ -400,6 +435,43 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
     handleMove(e.touches[0].clientX);
   };
 
+  // Global window pointer listeners for buttery-smooth slider dragging across screen & fast moves
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const onPointerMove = (e: MouseEvent | TouchEvent) => {
+      if (!containerRef.current) return;
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+      setSliderPosition(percentage);
+    };
+
+    const onPointerUp = () => {
+      setIsDragging(false);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'ew-resize';
+
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+    window.addEventListener('touchmove', onPointerMove, { passive: true });
+    window.addEventListener('touchend', onPointerUp);
+
+    return () => {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      window.removeEventListener('mousemove', onPointerMove);
+      window.removeEventListener('mouseup', onPointerUp);
+      window.removeEventListener('touchmove', onPointerMove);
+      window.removeEventListener('touchend', onPointerUp);
+    };
+  }, [isDragging]);
+
   const triggerGeeqRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
@@ -412,41 +484,106 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
       {/* ───────────────────────────────────────────────────────────────────────
           PANEL 1: MASTER COMMAND & NAVIGATION HEADER
       ───────────────────────────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/95 p-5 shadow-2xl backdrop-blur-xl space-y-5">
-        {/* Top Tier: Title, Sensor Badge & Actions */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-blue-500/20 px-2.5 py-0.5 text-xs font-black tracking-wide text-blue-400 border border-blue-500/30">
-                GOOGLE EARTH ENGINE &bull; COPERNICUS
-              </span>
-              <span className={`rounded-md px-2.5 py-0.5 text-xs font-bold border ${activeSensor.badgeColor}`}>
-                {activeSensor.name} ({activeSensor.bands})
-              </span>
-              <span className="rounded-md bg-amber-500/20 px-2.5 py-0.5 text-xs font-semibold text-amber-300 border border-amber-500/30">
-                ⚪ Dotted Line: Nepal Sovereign Border
-              </span>
-              <span className="rounded-md bg-emerald-500/20 px-2.5 py-0.5 text-xs font-semibold text-emerald-300 border border-emerald-500/30">
-                🟢 Highlight: Nepal Terai Plains
-              </span>
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/95 p-4 sm:p-5 shadow-2xl backdrop-blur-xl space-y-4">
+        {/* Top Tier: 4 Unified Mini Telemetry Cards in One-Line Alignment */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 w-full">
+          {/* Card 1: GEE & Copernicus */}
+          <div className="flex items-center gap-2.5 rounded-xl border border-blue-500/40 bg-gradient-to-br from-blue-950/60 to-slate-950/80 p-2.5 shadow-sm backdrop-blur-md hover:border-blue-500/60 transition-colors">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30">
+              <Satellite className="h-4 w-4" />
             </div>
-            <h2 className="text-2xl font-black text-white flex items-center gap-2.5 tracking-tight">
-              <Globe className="h-6 w-6 text-blue-400 shrink-0" />
-              <span>{activeRegion.name}</span>
-            </h2>
-            <p className="text-xs text-slate-400 max-w-3xl">
-              {activeRegion.basin} &mdash; Monitoring <strong>{activeRegion.districts.length} Terai Districts</strong> with real Sentinel SAR microwave inundation vs pre-monsoon baseline.
-            </p>
+            <div className="min-w-0 flex-1">
+              <div className="text-[9.5px] font-bold uppercase tracking-wider text-blue-400">
+                Observation Platform
+              </div>
+              <div className="text-xs font-black text-white leading-tight">
+                Google Earth Engine &bull; Copernicus
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* Alignment Mode: Split Slider vs Side-by-Side Dual Alignment (User Requirement) */}
-            <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1 text-xs">
+          {/* Card 2: Active SAR Sensor */}
+          <div className="flex items-center gap-2.5 rounded-xl border border-cyan-500/40 bg-gradient-to-br from-cyan-950/60 to-slate-950/80 p-2.5 shadow-sm backdrop-blur-md hover:border-cyan-500/60 transition-colors">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+              <Radio className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[9.5px] font-bold uppercase tracking-wider text-cyan-400">
+                Microwave Sensor
+              </div>
+              <div className="text-xs font-black text-white leading-tight">
+                {activeSensor.id === 'sentinel1_sar'
+                  ? 'Sentinel-1 C-SAR (VV/VH Polarization)'
+                  : 'Sentinel-2 MSI (Multispectral Optical)'}
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Nepal Sovereign Border */}
+          <div className="flex items-center gap-2.5 rounded-xl border border-amber-500/40 bg-gradient-to-br from-amber-950/60 to-slate-950/80 p-2.5 shadow-sm backdrop-blur-md hover:border-amber-500/60 transition-colors">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <Shield className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[9.5px] font-bold uppercase tracking-wider text-amber-400">
+                Sovereign Territory
+              </div>
+              <div className="text-xs font-black text-white leading-tight flex items-center gap-1">
+                <span className="text-[10px]">⚪</span>
+                <span>Nepal Sovereign Border (Dotted Line)</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Nepal Terai Plains */}
+          <div className="flex items-center gap-2.5 rounded-xl border border-emerald-500/40 bg-gradient-to-br from-emerald-950/60 to-slate-950/80 p-2.5 shadow-sm backdrop-blur-md hover:border-emerald-500/60 transition-colors">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <Waves className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-400">
+                Flood Deluge Basin
+              </div>
+              <div className="text-xs font-black text-white leading-tight flex items-center gap-1">
+                <span className="text-[10px]">🟢</span>
+                <span>Highlight: Nepal Terai Plains</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Second Tier: Title & Region Scope (Full Width) */}
+        <div className="border-t border-slate-800/80 pt-3.5 space-y-1">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/40 shrink-0">
+              <Globe className="h-4 w-4" />
+            </div>
+            <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">
+              {activeRegion.name}
+            </h2>
+            <span className="font-mono text-[10px] font-bold text-cyan-300 bg-cyan-950/80 border border-cyan-800/60 px-2 py-0.5 rounded-full">
+              {activeRegion.districts.length} Terai Districts Scope
+            </span>
+            <span className="font-mono text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-full">
+              SAR Microwave Telemetry
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 max-w-4xl leading-relaxed pl-0 sm:pl-10">
+            {activeRegion.basin} &mdash; Monitoring <strong className="text-slate-200">{activeRegion.districts.length} Terai Districts</strong> with real Sentinel SAR microwave inundation vs pre-monsoon baseline.
+          </p>
+        </div>
+
+        {/* Third Tier: Dedicated Command & Interactive Control Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-slate-800/90 bg-slate-950/90 p-2 shadow-inner">
+          {/* Left Group: Comparison Mode & Radar Toggle */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Alignment Mode Switcher */}
+            <div className="flex rounded-lg border border-slate-800 bg-slate-900/90 p-0.5 text-xs">
               <button
                 onClick={() => setAlignmentMode('split_slider')}
-                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 font-semibold transition-all ${
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1 font-bold text-xs transition-all cursor-pointer ${
                   alignmentMode === 'split_slider'
-                    ? 'bg-blue-600 text-white shadow-sm'
+                    ? 'bg-blue-600 text-white shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
                 title="Interactive Split Swipe Comparison Slider"
@@ -456,9 +593,9 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
               </button>
               <button
                 onClick={() => setAlignmentMode('side_by_side')}
-                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 font-semibold transition-all ${
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1 font-bold text-xs transition-all cursor-pointer ${
                   alignmentMode === 'side_by_side'
-                    ? 'bg-cyan-600 text-white shadow-sm'
+                    ? 'bg-cyan-600 text-white shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
                 title="Parallel Side-by-Side Dual Alignment (Dry vs Flood)"
@@ -468,55 +605,58 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
               </button>
             </div>
 
-            {/* Black & White Radar SAR Toggle (User Requirement) */}
+            {/* Black & White Radar SAR Toggle */}
             <button
               onClick={() => setIsBwRadar(!isBwRadar)}
-              className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 ${
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                 isBwRadar
-                  ? 'border-cyan-400 bg-slate-100 text-slate-950 font-black shadow-md'
-                  : 'border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700 hover:text-white'
+                  ? 'border-cyan-400 bg-cyan-950/90 text-cyan-200 shadow ring-1 ring-cyan-500/40 font-black'
+                  : 'border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700 hover:text-white'
               }`}
               title="Toggle Black & White Sentinel-1 SAR Backscatter intensity"
             >
-              <Radio className="h-3.5 w-3.5 text-cyan-500" />
+              <Radio className={`h-3.5 w-3.5 ${isBwRadar ? 'text-cyan-400 animate-pulse' : 'text-slate-400'}`} />
               <span>{isBwRadar ? 'B&W Radar SAR: ON' : 'B&W Radar SAR'}</span>
             </button>
+          </div>
 
+          {/* Right Group: Basemap Engine & Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
             {/* Basemap Switcher */}
-            <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1 text-xs">
+            <div className="flex rounded-lg border border-slate-800 bg-slate-900/90 p-0.5 text-xs">
               <button
                 onClick={() => setMapType('google_hybrid')}
-                className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
-                  mapType === 'google_hybrid' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                className={`rounded-md px-2.5 py-1 font-semibold text-xs transition-all cursor-pointer ${
+                  mapType === 'google_hybrid' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 Hybrid
               </button>
               <button
                 onClick={() => setMapType('google_satellite')}
-                className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
-                  mapType === 'google_satellite' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                className={`rounded-md px-2.5 py-1 font-semibold text-xs transition-all cursor-pointer ${
+                  mapType === 'google_satellite' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 Satellite
               </button>
               <button
                 onClick={() => setMapType('google_terrain')}
-                className={`rounded-lg px-2.5 py-1 font-semibold transition-all ${
-                  mapType === 'google_terrain' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                className={`rounded-md px-2.5 py-1 font-semibold text-xs transition-all cursor-pointer ${
+                  mapType === 'google_terrain' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 Terrain
               </button>
             </div>
 
-            {/* Map Fullscreen Toggle (User Requirement) */}
+            {/* Fullscreen Button */}
             <button
               onClick={() => setIsFullscreen(!isFullscreen)}
-              className={`flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 ${
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-bold transition-all cursor-pointer active:scale-95 ${
                 isFullscreen
-                  ? 'border-purple-500 bg-purple-600 text-white shadow-md'
-                  : 'border-slate-800 bg-slate-950 text-slate-400 hover:text-white'
+                  ? 'border-purple-500 bg-purple-600 text-white shadow'
+                  : 'border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700 hover:text-white'
               }`}
               title="Toggle Fullscreen Map View"
             >
@@ -524,18 +664,20 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
               <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
             </button>
 
+            {/* Refresh Button */}
             <button
               onClick={triggerGeeqRefresh}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 rounded-xl border border-blue-500/40 bg-blue-600/20 px-3 py-1.5 text-xs font-bold text-blue-300 hover:bg-blue-600/30 transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-600/20 px-3 py-1 text-xs font-bold text-blue-300 hover:bg-blue-600/30 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
               <span>{isRefreshing ? 'Querying GEE...' : 'Refresh'}</span>
             </button>
 
+            {/* GEE Script Button */}
             <button
               onClick={() => setIsScriptModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-600/20 px-3 py-1.5 text-xs font-bold text-cyan-300 hover:bg-cyan-600/30 transition-all active:scale-95"
+              className="flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-600/20 px-3 py-1 text-xs font-bold text-cyan-300 hover:bg-cyan-600/30 transition-all cursor-pointer active:scale-95"
               title="View Google Earth Engine Sentinel-1 SAR script"
             >
               <Code2 className="h-3.5 w-3.5 text-cyan-400" />
@@ -981,7 +1123,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
           PANEL 2: INTERACTIVE MAP CONTAINER (SIDE-BY-SIDE DUAL ALIGNMENT OR SPLIT SLIDER)
       ───────────────────────────────────────────────────────────────────────── */}
       <div
-        className={`space-y-4 ${
+        className={`space-y-4 relative isolate z-10 ${
           isFullscreen ? 'fixed inset-0 z-[1000] h-screen w-screen overflow-y-auto bg-slate-950 p-4' : ''
         }`}
       >
@@ -1003,9 +1145,9 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
 
         {/* SIDE-BY-SIDE DUAL ALIGNMENT MODE (User Requirement: Flooded & Non-Flooded in One Alignment) */}
         {alignmentMode === 'side_by_side' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[680px] w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[680px] w-full relative isolate z-10">
             {/* LEFT MAP: NON-FLOODED PRE-MONSOON DRY BASELINE (REAL OPTICAL DRY BASELINE) */}
-            <div className="relative h-full w-full rounded-2xl border border-emerald-500/50 bg-slate-950 shadow-2xl overflow-hidden select-none dry-baseline-mode">
+            <div className="relative isolate z-10 h-full w-full rounded-2xl border border-emerald-500/50 bg-slate-950 shadow-2xl overflow-hidden select-none dry-baseline-mode">
               <div className="absolute top-4 left-4 z-[500] pointer-events-auto rounded-xl border border-emerald-500/60 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-emerald-300">
                 <div className="flex items-center gap-1.5">
                   <ShieldCheck className="h-4 w-4 text-emerald-400" />
@@ -1111,7 +1253,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             </div>
 
             {/* RIGHT MAP: FLOODED POST-DELUGE SENTINEL-1 SAR EXTENT */}
-            <div className={`relative h-full w-full rounded-2xl border border-cyan-500/50 bg-slate-950 shadow-2xl overflow-hidden select-none ${
+            <div className={`relative isolate z-10 h-full w-full rounded-2xl border border-cyan-500/50 bg-slate-950 shadow-2xl overflow-hidden select-none ${
               isBwRadar
                 ? 'sar-bw-mode'
                 : floodImageryMode === 'sar_specular'
@@ -1164,18 +1306,18 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
                   />
                 )}
 
-                {/* Flooded Areas: Dotted Line Highlight Option (No Solid Polygon Shape) */}
-                {highlightFloodedDotted &&
+                {/* Flooded Areas: Sentinel-1 SAR Deluge Inundation Water Layer */}
+                {showFloodPolygons &&
                   activeRegion.floodPolygons.map((polyCoords, idx) => (
                     <Polygon
-                      key={`side-flood-dotted-${idx}`}
+                      key={`side-flood-${idx}`}
                       positions={polyCoords}
                       pathOptions={{
                         color: '#00F2FE',
-                        weight: 2.8,
-                        dashArray: '8, 8',
-                        fillColor: 'transparent',
-                        fillOpacity: 0,
+                        weight: highlightFloodedDotted ? 2.5 : 1.5,
+                        dashArray: highlightFloodedDotted ? '8, 8' : undefined,
+                        fillColor: '#00E5FF',
+                        fillOpacity: 0.38,
                       }}
                     >
                       <Popup>
@@ -1286,7 +1428,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             onTouchMove={handleTouchMove}
             onMouseUp={() => setIsDragging(false)}
             onTouchEnd={() => setIsDragging(false)}
-            className={`relative h-[660px] w-full rounded-2xl border border-slate-700/80 bg-slate-950 shadow-2xl overflow-hidden select-none ${
+            className={`relative isolate z-10 h-[660px] w-full rounded-2xl border border-slate-700/80 bg-slate-950 shadow-2xl overflow-hidden select-none ${
               isBwRadar ? 'sar-bw-mode' : ''
             }`}
           >
@@ -1300,7 +1442,12 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
               className="h-full w-full"
             >
               <MapViewController center={effectiveCenter} zoom={effectiveZoom} />
-              <ClippedFloodPane sliderPosition={sliderPosition} viewMode={viewMode} />
+              <ClippedFloodPane
+                sliderPosition={sliderPosition}
+                viewMode={viewMode}
+                floodImageryMode={floodImageryMode}
+                isBwRadar={isBwRadar}
+              />
 
               {/* BASE LAYER (BEFORE): Google Satellite Pre-Monsoon Dry Baseline */}
               <TileLayer
@@ -1334,19 +1481,19 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
                 />
               )}
 
-              {/* 3. Flooded Areas: Dotted Line Highlight Option (Zero Polygon Fill) */}
+              {/* 3. Flooded Areas: Sentinel-1 SAR Deluge Inundation Water Layer */}
               <Pane name="floodInundationPane" style={{ zIndex: 450 }}>
-                {highlightFloodedDotted &&
+                {showFloodPolygons &&
                   activeRegion.floodPolygons.map((polyCoords, idx) => (
                     <Polygon
-                      key={`flood-poly-dotted-${idx}`}
+                      key={`flood-poly-${idx}`}
                       positions={polyCoords}
                       pathOptions={{
                         color: '#00F2FE',
-                        weight: 2.8,
-                        dashArray: '8, 8',
-                        fillColor: 'transparent',
-                        fillOpacity: 0,
+                        weight: highlightFloodedDotted ? 2.5 : 1.5,
+                        dashArray: highlightFloodedDotted ? '8, 8' : undefined,
+                        fillColor: '#00E5FF',
+                        fillOpacity: 0.38,
                       }}
                     >
                       <Popup>
@@ -1515,7 +1662,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             </MapContainer>
 
             {/* Floating Master Legend */}
-            <div className="absolute top-4 left-4 z-[500] pointer-events-auto max-w-sm rounded-2xl border border-slate-700/80 bg-slate-950/90 p-3.5 shadow-2xl backdrop-blur-md space-y-2 text-xs">
+            <div className="absolute top-4 left-4 z-30 pointer-events-auto max-w-sm rounded-2xl border border-slate-700/80 bg-slate-950/90 p-3.5 shadow-2xl backdrop-blur-md space-y-2 text-xs">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <span className="font-extrabold text-white flex items-center gap-1.5">
                   <ShieldAlert className="h-4 w-4 text-cyan-400" />
@@ -1555,29 +1702,41 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             </div>
 
             {/* Quick Split View Controls */}
-            <div className="absolute top-4 right-4 z-[500] flex items-center gap-1.5 bg-slate-950/90 border border-slate-700/80 p-1 rounded-xl shadow-2xl backdrop-blur-md text-xs">
+            <div className="absolute top-4 right-4 z-30 flex items-center gap-1.5 bg-slate-950/90 border border-slate-700/80 p-1 rounded-xl shadow-2xl backdrop-blur-md text-xs">
               <button
                 onClick={() => setSliderPosition(0)}
-                className="rounded-lg px-2.5 py-1 text-slate-300 hover:text-white transition-colors"
+                className={`rounded-lg px-2.5 py-1 text-xs transition-all ${
+                  sliderPosition === 0
+                    ? 'bg-cyan-600 font-bold text-white shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
               >
                 100% Flood Deluge
               </button>
               <button
                 onClick={() => setSliderPosition(50)}
-                className="rounded-lg bg-blue-600 px-3 py-1 font-bold text-white shadow-md"
+                className={`rounded-lg px-3 py-1 text-xs transition-all ${
+                  Math.round(sliderPosition) === 50
+                    ? 'bg-blue-600 font-bold text-white shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
               >
                 50/50 Split Swipe
               </button>
               <button
                 onClick={() => setSliderPosition(100)}
-                className="rounded-lg px-2.5 py-1 text-slate-300 hover:text-white transition-colors"
+                className={`rounded-lg px-2.5 py-1 text-xs transition-all ${
+                  sliderPosition === 100
+                    ? 'bg-emerald-600 font-bold text-white shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
               >
                 100% Dry Baseline
               </button>
             </div>
 
             {/* Bottom Left: Baseline Label */}
-            <div className="absolute bottom-5 left-5 z-[500] pointer-events-none">
+            <div className="absolute bottom-5 left-5 z-20 pointer-events-none">
               <div className="rounded-xl border border-emerald-500/50 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-emerald-300 space-y-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
@@ -1590,7 +1749,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             </div>
 
             {/* Bottom Right: After Flood Deluge Label */}
-            <div className="absolute bottom-5 right-5 z-[500] pointer-events-none">
+            <div className="absolute bottom-5 right-5 z-20 pointer-events-none">
               <div className="rounded-xl border border-cyan-500/50 bg-slate-950/90 px-3.5 py-2 shadow-2xl backdrop-blur-md text-xs font-bold text-cyan-300 space-y-0.5 text-right">
                 <div className="flex items-center justify-end gap-1.5">
                   <span>AFTER FLOOD &mdash; {activeSensor.name} Deluge Peak</span>
@@ -1605,17 +1764,27 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
             {/* Draggable Vertical Split Divider Line */}
             {viewMode === 'split' && (
               <div
-                className="absolute top-0 bottom-0 z-[600] w-1 bg-white shadow-[0_0_24px_rgba(255,255,255,0.95)] cursor-ew-resize"
+                className="absolute top-0 bottom-0 z-30 w-1 bg-white shadow-[0_0_24px_rgba(255,255,255,0.95)] cursor-ew-resize select-none"
                 style={{ left: `${sliderPosition}%` }}
-                onMouseDown={() => setIsDragging(true)}
-                onTouchStart={() => setIsDragging(true)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(true);
+                }}
+                onTouchStart={(e) => {
+                  e.stopPropagation();
+                  setIsDragging(true);
+                }}
               >
-                <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center rounded-full bg-blue-600 text-white shadow-2xl border-2 border-white cursor-ew-resize active:scale-105 transition-transform px-3 py-1.5 text-[10px] font-black whitespace-nowrap gap-1.5 select-none">
+                {/* 36px wide transparent hit zone to easily grab the slider */}
+                <div className="absolute inset-y-0 -left-4 -right-4 cursor-ew-resize" />
+
+                <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex items-center justify-center rounded-full bg-blue-600 text-white shadow-2xl border-2 border-white cursor-ew-resize active:scale-105 transition-transform px-3 py-1.5 text-[10px] font-black whitespace-nowrap gap-1.5 select-none pointer-events-auto">
                   <span className="text-emerald-300 font-bold">DRY</span>
                   <ArrowLeftRight className="h-3.5 w-3.5" />
                   <span className="text-cyan-300 font-bold">FLOOD</span>
                 </div>
-                <div className="absolute top-5 -translate-x-1/2 rounded-md bg-slate-950 border border-slate-700 px-2 py-0.5 text-[11px] font-mono font-bold text-white shadow-xl">
+                <div className="absolute top-5 -translate-x-1/2 rounded-md bg-slate-950 border border-slate-700 px-2 py-0.5 text-[11px] font-mono font-bold text-white shadow-xl pointer-events-none">
                   {Math.round(sliderPosition)}%
                 </div>
               </div>

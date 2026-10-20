@@ -277,7 +277,7 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
   }, [route.blockedDirectPath]);
 
   return (
-    <div className="relative w-full h-[520px] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-950">
+    <div className="relative isolate z-10 w-full h-[520px] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-950">
       <MapContainer
         center={defaultCenter}
         zoom={8}
@@ -309,15 +309,15 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
               }}
             >
               <Popup>
-                <div className="p-2 space-y-1 font-sans text-xs">
-                  <div className="font-bold text-rose-600 flex items-center gap-1">
+                <div className="p-2 space-y-1 font-sans text-xs text-white">
+                  <div className="font-bold text-rose-400 text-sm flex items-center gap-1.5 border-b border-slate-700/80 pb-1">
                     <span>⛔</span> Direct Highway Submerged &amp; Impassable
                   </div>
-                  <p className="text-slate-600 text-[11px]">
+                  <p className="text-slate-300 text-[11px] leading-relaxed">
                     This road has floodwater exceeding 1.5m. The system has automatically calculated a safe high-ground detour.
                   </p>
-                  <div className="font-mono text-[10px] text-rose-500 font-bold">
-                    Bypassed: {route.submergedKmBypassed} km of floodwater
+                  <div className="font-mono text-[11px] text-rose-200 bg-rose-500/20 border border-rose-500/30 px-2 py-1 rounded">
+                    Bypassed: <strong>{route.submergedKmBypassed} km</strong> of floodwater
                   </div>
                 </div>
               </Popup>
@@ -354,15 +354,15 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
             }}
           >
             <Popup>
-              <div className="p-2 space-y-1 font-sans text-xs">
-                <div className="font-bold text-emerald-600 flex items-center gap-1">
+              <div className="p-2 space-y-1.5 font-sans text-xs text-white">
+                <div className="font-bold text-emerald-400 text-sm flex items-center gap-1.5 border-b border-slate-700/80 pb-1">
                   <span>✅</span> {route.title}
                 </div>
-                <div className="text-slate-600 text-[11px]">
-                  Distance: <strong>{route.distanceKm} km</strong> &bull; Est. Time: <strong>{route.estimatedMinutes} mins</strong>
+                <div className="text-slate-300 text-[11px]">
+                  Distance: <strong className="text-white font-bold">{route.distanceKm} km</strong> &bull; Est. Time: <strong className="text-cyan-400 font-bold">{route.estimatedMinutes} mins</strong>
                 </div>
-                <div className="text-slate-500 text-[10px]">
-                  Vehicle: {route.vehicleClass.replace('_', ' ').toUpperCase()} &bull; 100% Flood-Clear
+                <div className="text-slate-400 text-[10px]">
+                  Vehicle: <span className="text-white font-bold">{route.vehicleClass.replace('_', ' ').toUpperCase()}</span> &bull; 100% Flood-Clear
                 </div>
               </div>
             </Popup>
@@ -372,13 +372,13 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
         {/* ── 4. ORIGIN MARKER ──────────────────────────────────────────────── */}
         <Marker position={route.origin.coords} icon={createOriginIcon(route.origin)}>
           <Popup>
-            <div className="p-2 font-sans text-xs space-y-1">
-              <div className="font-bold text-slate-800 flex items-center gap-1">
+            <div className="p-2 font-sans text-xs space-y-1.5 text-white">
+              <div className="font-bold text-white text-sm flex items-center gap-1.5 border-b border-slate-700/80 pb-1">
                 <span>📍</span> {route.origin.name}
               </div>
-              <div className="text-slate-500 text-[11px]">{route.origin.nepaliName}</div>
-              <div className="text-slate-600 text-[11px]">{route.origin.description}</div>
-              <div className="font-mono text-[10px] text-emerald-600 font-bold">
+              <div className="text-cyan-400 text-[11px] font-medium">{route.origin.nepaliName}</div>
+              <div className="text-slate-300 text-[11px] leading-relaxed">{route.origin.description}</div>
+              <div className="font-mono text-[10px] text-emerald-400 bg-emerald-500/20 border border-emerald-500/30 px-2 py-1 rounded">
                 Elevation: {route.origin.elevationMeters}m ASL &bull; Phone: {route.origin.contactPhone || 'N/A'}
               </div>
             </div>
@@ -388,15 +388,15 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
         {/* ── 5. DESTINATION MARKER ─────────────────────────────────────────── */}
         <Marker position={route.destination.coords} icon={createDestinationIcon(route.destination)}>
           <Popup>
-            <div className="p-2 font-sans text-xs space-y-1">
-              <div className="font-bold text-slate-800 flex items-center gap-1">
+            <div className="p-2 font-sans text-xs space-y-1.5 text-white">
+              <div className="font-bold text-white text-sm flex items-center gap-1.5 border-b border-slate-700/80 pb-1">
                 <span>🎯</span> {route.destination.name}
               </div>
-              <div className="text-slate-500 text-[11px]">{route.destination.nepaliName}</div>
-              <div className="text-slate-600 text-[11px]">{route.destination.description}</div>
+              <div className="text-cyan-400 text-[11px] font-medium">{route.destination.nepaliName}</div>
+              <div className="text-slate-300 text-[11px] leading-relaxed">{route.destination.description}</div>
               {route.destination.capacity && (
-                <div className="font-mono text-[10px] text-blue-600 font-bold">
-                  Capacity / Population: {route.destination.capacity.toLocaleString()} persons
+                <div className="font-mono text-[10px] text-cyan-300 bg-cyan-500/20 border border-cyan-500/30 px-2 py-1 rounded">
+                  Capacity / Population: <strong className="text-white font-bold">{route.destination.capacity.toLocaleString()} persons</strong>
                 </div>
               )}
             </div>
@@ -418,19 +418,19 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
               }}
             >
               <Popup>
-                <div className="p-2 font-sans text-xs space-y-1">
-                  <div className="font-bold text-slate-800">
+                <div className="p-2 font-sans text-xs space-y-1.5 text-white">
+                  <div className="font-bold text-white text-sm border-b border-slate-700/80 pb-1">
                     Step {step.stepNumber}: {step.roadName}
                   </div>
-                  <div className="text-slate-600 text-[11px]">{step.instruction}</div>
-                  <div className="text-slate-500 text-[10px] italic">{step.nepaliInstruction}</div>
+                  <div className="text-slate-300 text-[11px] leading-relaxed">{step.instruction}</div>
+                  <div className="text-cyan-400 text-[10px] italic">{step.nepaliInstruction}</div>
                   {step.hazardAlert && (
-                    <div className="text-amber-600 font-medium text-[10px] bg-amber-50 p-1 rounded border border-amber-200">
+                    <div className="text-amber-300 font-medium text-[10px] bg-amber-500/20 p-1.5 rounded border border-amber-500/30">
                       ⚠️ {step.hazardAlert}
                     </div>
                   )}
-                  <div className="font-mono text-[10px] text-slate-400">
-                    Cumul. Dist: {step.cumulativeKm} km &bull; Elev: {step.elevationMeters}m ASL
+                  <div className="font-mono text-[10px] text-slate-400 pt-0.5">
+                    Cumul. Dist: <strong className="text-white">{step.cumulativeKm} km</strong> &bull; Elev: <strong className="text-cyan-400">{step.elevationMeters}m ASL</strong>
                   </div>
                 </div>
               </Popup>

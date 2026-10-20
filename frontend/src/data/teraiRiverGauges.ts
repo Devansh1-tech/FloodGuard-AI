@@ -670,10 +670,37 @@ export const HISTORICAL_FLOOD_SCENARIOS: FloodScenario[] = [
  * Returns DHM gauge telemetry adjusted as per selected date or flood scenario.
  */
 export const getRiverGaugesByDate = (dateString: string, scenarioId?: string): RiverGaugeStation[] => {
+  // Helper to scale hourly history along with level adjustment
+  const scaleHourly = (station: RiverGaugeStation, newLevel: number, dischargeScale: number) => {
+    const scale = newLevel / Math.max(station.currentLevelMeters, 0.1);
+    return station.hourlyHistory.map((h) => ({
+      ...h,
+      levelMeters: Number((h.levelMeters * scale).toFixed(2)),
+      dischargeCusecs: h.dischargeCusecs ? Math.round(h.dischargeCusecs * dischargeScale) : undefined,
+    }));
+  };
+
   // 1. Direct Scenario Lookup
+  if (scenarioId === '2024_historic_peak') {
+    return TERAI_RIVER_GAUGES.map((g) => {
+      const peakLevel = Math.max(g.currentLevelMeters, Number((g.highestHistoricalLevelMeters * 0.98).toFixed(2)));
+      return {
+        ...g,
+        currentLevelMeters: peakLevel,
+        status: 'extreme_flood' as GaugeStatus,
+        trend: 'rising_rapidly' as GaugeTrend,
+        rateOfRiseCmPerHour: 24,
+        dischargeCusecs: Math.round(g.dischargeCusecs * 1.08),
+        sluiceGatesOpen: g.isBarrageControlled ? g.totalSluiceGates : undefined,
+        lastUpdatedNst: `${dateString} 12:00 NST`,
+        hourlyHistory: scaleHourly(g, peakLevel, 1.08),
+      };
+    });
+  }
+
   if (scenarioId === 'warning_phase') {
     return TERAI_RIVER_GAUGES.map((g) => {
-      // Scale to between warning and danger level
+      // Scale to between warning and danger level (alert phase)
       const midLevel = Number((g.warningLevelMeters + (g.dangerLevelMeters - g.warningLevelMeters) * 0.45).toFixed(2));
       return {
         ...g,
@@ -682,14 +709,16 @@ export const getRiverGaugesByDate = (dateString: string, scenarioId?: string): R
         trend: 'rising' as GaugeTrend,
         rateOfRiseCmPerHour: 8,
         dischargeCusecs: Math.round(g.dischargeCusecs * 0.55),
+        sluiceGatesOpen: g.isBarrageControlled && g.totalSluiceGates ? Math.round(g.totalSluiceGates * 0.5) : undefined,
         lastUpdatedNst: `${dateString} 12:00 NST`,
+        hourlyHistory: scaleHourly(g, midLevel, 0.55),
       };
     });
   }
 
   if (scenarioId === 'dry_baseline') {
     return TERAI_RIVER_GAUGES.map((g) => {
-      // Scale down to ~50% of warning level
+      // Scale down to ~52% of warning level (safe baseline)
       const lowLevel = Number((g.warningLevelMeters * 0.52).toFixed(2));
       return {
         ...g,
@@ -700,46 +729,58 @@ export const getRiverGaugesByDate = (dateString: string, scenarioId?: string): R
         dischargeCusecs: Math.round(g.dischargeCusecs * 0.18),
         sluiceGatesOpen: g.isBarrageControlled ? 4 : undefined,
         lastUpdatedNst: `${dateString} 12:00 NST`,
+        hourlyHistory: scaleHourly(g, lowLevel, 0.18),
       };
     });
   }
 
-  // 2. Custom Date Parsing
-  const parsedDate = new Date(dateString);
-  const month = parsedDate.getMonth() + 1; // 1 to 12
+  if (scenarioId === 'live_monsoon_deluge') {
+    return TERAI_RIVER_GAUGES.map((g) => ({
+      ...g,
+      lastUpdatedNst: `${dateString} 12:00 NST`,
+    }));
+  }
+
+  // 2. Custom Date Parsing (Timezone-safe month extraction)
+  const monthParts = dateString ? dateString.split('-') : [];
+  const month = monthParts.length >= 2 ? parseInt(monthParts[1], 10) : 10;
 
   // Winter & Pre-Monsoon Dry Season (November - April: Months 11, 12, 1, 2, 3, 4)
   if (month >= 11 || month <= 4) {
     return TERAI_RIVER_GAUGES.map((g) => {
-      const lowLevel = Number((g.warningLevelMeters * 0.55).toFixed(2));
+      const lowLevel = Number((g.warningLevelMeters * 0.52).toFixed(2));
       return {
         ...g,
         currentLevelMeters: lowLevel,
         status: 'normal' as GaugeStatus,
         trend: 'steady' as GaugeTrend,
         rateOfRiseCmPerHour: 0,
-        dischargeCusecs: Math.round(g.dischargeCusecs * 0.2),
+        dischargeCusecs: Math.round(g.dischargeCusecs * 0.18),
+        sluiceGatesOpen: g.isBarrageControlled ? 4 : undefined,
         lastUpdatedNst: `${dateString} 12:00 NST`,
+        hourlyHistory: scaleHourly(g, lowLevel, 0.18),
       };
     });
   }
 
-  // Monsoon Onset / Warning Watch (June - July: Months 6, 7)
-  if (month === 6 || month === 7) {
+  // Monsoon Onset / Warning Watch (May - July: Months 5, 6, 7)
+  if (month === 5 || month === 6 || month === 7) {
     return TERAI_RIVER_GAUGES.map((g, idx) => {
-      // Some in warning, some normal
+      // Alternating warning and normal for realistic monsoon onset distribution
       const isWarning = idx % 2 === 0;
       const level = isWarning
-        ? Number((g.warningLevelMeters + (g.dangerLevelMeters - g.warningLevelMeters) * 0.5).toFixed(2))
-        : Number((g.warningLevelMeters * 0.85).toFixed(2));
+        ? Number((g.warningLevelMeters + (g.dangerLevelMeters - g.warningLevelMeters) * 0.45).toFixed(2))
+        : Number((g.warningLevelMeters * 0.82).toFixed(2));
       return {
         ...g,
         currentLevelMeters: level,
         status: (isWarning ? 'warning' : 'normal') as GaugeStatus,
         trend: 'rising' as GaugeTrend,
         rateOfRiseCmPerHour: isWarning ? 7 : 3,
-        dischargeCusecs: Math.round(g.dischargeCusecs * (isWarning ? 0.6 : 0.4)),
+        dischargeCusecs: Math.round(g.dischargeCusecs * (isWarning ? 0.58 : 0.4)),
+        sluiceGatesOpen: g.isBarrageControlled && g.totalSluiceGates ? Math.round(g.totalSluiceGates * 0.5) : undefined,
         lastUpdatedNst: `${dateString} 12:00 NST`,
+        hourlyHistory: scaleHourly(g, level, isWarning ? 0.58 : 0.4),
       };
     });
   }

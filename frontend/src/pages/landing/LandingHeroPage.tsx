@@ -155,7 +155,7 @@ export const LandingHeroPage: React.FC<LandingHeroPageProps> = ({
         </div>
 
         {/* Floating Live Command Preview Card (Rich Glassmorphism) */}
-        <div className="mt-8 relative max-w-4xl mx-auto w-full rounded-2xl border border-cyan-500/40 bg-[#070b16]/92 p-4 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.9)] backdrop-blur-xl ring-1 ring-cyan-500/10">
+        <div className="mt-8 relative max-w-4xl mx-auto w-full rounded-2xl border border-cyan-500/40 bg-[#070b16]/95 p-4 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.9)] backdrop-blur-xl ring-1 ring-cyan-500/10">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3 text-xs">
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" />

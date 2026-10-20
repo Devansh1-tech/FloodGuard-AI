@@ -190,13 +190,14 @@ export const fetchRiverGauges = async (filters?: {
     if (filters?.district && filters.district !== 'all') params.append('district', filters.district);
     if (filters?.status && filters.status !== 'all') params.append('status', filters.status);
     if (filters?.date) params.append('date', filters.date);
+    if (filters?.scenario) params.append('scenario', filters.scenario);
 
     const url = `${BACKEND_BASE_URL}/river-gauges${params.toString() ? `?${params.toString()}` : ''}`;
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
     if (res.ok) {
       const json = await res.json();
       if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-        return json.data.map((item: any) => ({
+        dataset = json.data.map((item: any) => ({
           id: item.id,
           dhmStationNumber: item.dhm_station_number,
           name: item.name,
@@ -239,10 +240,10 @@ export const fetchRiverGauges = async (filters?: {
       }
     }
   } catch {
-    // Backend offline; use local empirical dataset
+    // Backend offline; use local adjusted dataset
   }
 
-  // Client-side smart fallback filter
+  // Client-side instant filter to guarantee exact responsiveness
   let results = dataset;
   if (filters?.basin && filters.basin !== 'all') {
     results = results.filter((g) => matchesBasin(g, filters.basin!));

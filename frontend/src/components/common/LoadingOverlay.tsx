@@ -37,7 +37,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ visible, message
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm transition-all duration-300">
+    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-sm transition-all duration-300">
       <div className="flex flex-col items-center gap-4 p-6 rounded-2xl glass-card max-w-sm text-center">
         <Spinner size="xl" />
         <h3 className="text-base font-semibold text-white">FloodGuard AI</h3>

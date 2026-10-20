@@ -59,7 +59,7 @@ export const VernacularSosModal: React.FC<VernacularSosModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Modal Header */}
         <div className="flex items-start justify-between p-5 sm:p-6 border-b border-slate-800 bg-gradient-to-r from-rose-950/60 via-slate-900 to-amber-950/40">

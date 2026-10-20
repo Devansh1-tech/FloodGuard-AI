@@ -210,7 +210,7 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
   scanRadiusKm,
 }) => {
   return (
-    <div className="relative w-full h-[540px] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-950">
+    <div className="relative isolate z-10 w-full h-[540px] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-950">
       <MapContainer
         center={centerSettlement.coords}
         zoom={9}
@@ -280,18 +280,21 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
           )}
         >
           <Popup>
-            <div className="p-2 font-sans text-xs space-y-1">
-              <div className="font-bold text-rose-600 flex items-center gap-1">
-                <span>🌊</span> {centerSettlement.name}
+            <div className="p-2 font-sans text-xs space-y-1.5 max-w-[260px] text-white">
+              <div className="font-bold text-rose-400 text-sm flex items-center gap-1.5 border-b border-slate-700/80 pb-1">
+                <span>🌊</span>
+                <span>{centerSettlement.name}</span>
               </div>
-              <div className="text-slate-600 text-[11px]">
+              <div className="text-cyan-400 text-[11px] font-medium">
                 {centerSettlement.nepaliName}
               </div>
-              <div className="text-slate-500 text-[10px]">
-                Water Depth: <strong>{centerSettlement.waterDepthMeters}m</strong> &bull; Elevation: {centerSettlement.elevationMeters}m ASL
+              <div className="text-slate-300 text-[11px] space-y-0.5">
+                <div>Water Depth: <strong className="text-rose-400 font-bold">{centerSettlement.waterDepthMeters}m</strong></div>
+                <div>Elevation: <strong className="text-white font-bold">{centerSettlement.elevationMeters}m ASL</strong></div>
               </div>
-              <div className="font-mono text-[10px] text-rose-500 font-bold">
-                Displaced Headcount: {centerSettlement.displacedPopulation.toLocaleString()} evacuees
+              <div className="font-mono text-[11px] text-rose-200 bg-rose-500/20 border border-rose-500/30 px-2 py-1.5 rounded-lg flex items-center justify-between mt-1">
+                <span className="text-rose-300 text-[10px]">Displaced Headcount:</span>
+                <strong className="text-white font-bold">{centerSettlement.displacedPopulation.toLocaleString()} evacuees</strong>
               </div>
             </div>
           </Popup>
@@ -325,41 +328,64 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
                 }}
               >
                 <Popup>
-                  <div className="p-2 font-sans text-xs space-y-1.5 max-w-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800 truncate">
-                        {haven.name}
-                      </span>
-                      <span className="rounded bg-emerald-100 text-emerald-800 px-1.5 py-0.5 text-[9px] font-black shrink-0">
+                  <div className="p-2 font-sans text-xs space-y-2 max-w-[280px] text-white">
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-700/80 pb-1.5">
+                      <div className="space-y-0.5 min-w-0">
+                        <h4 className="font-bold text-sm text-white leading-tight">
+                          {haven.name}
+                        </h4>
+                        <div className="text-cyan-400 text-[11px] font-medium">
+                          {haven.nepaliName}
+                        </div>
+                      </div>
+                      <span className="rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-2 py-0.5 text-[10px] font-black shrink-0">
                         GRADE {haven.suitabilityGrade}
                       </span>
                     </div>
 
-                    <div className="text-slate-500 text-[10px] italic">
-                      {haven.nepaliName}
-                    </div>
-
-                    <p className="text-slate-600 text-[11px] leading-snug">
+                    <p className="text-slate-300 text-[11px] leading-relaxed">
                       {haven.notes}
                     </p>
 
-                    <div className="grid grid-cols-2 gap-1 text-[10px] bg-slate-50 p-2 rounded border border-slate-200 font-mono">
-                      <div>Dist: <strong>{match.distanceKm} km</strong> ({match.compassDirection})</div>
-                      <div>Elev: <strong>{haven.elevationMeters}m</strong> (+{match.elevationGainMeters}m)</div>
-                      <div>Capacity: <strong>{haven.totalCapacity.toLocaleString()}</strong></div>
-                      <div>Vacancy: <strong className="text-emerald-600">{match.remainingCapacity.toLocaleString()}</strong></div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-900/90 p-2.5 rounded-lg border border-slate-700/80 font-mono">
+                      <div>
+                        <span className="text-slate-400 text-[10px] block">Distance:</span>
+                        <strong className="text-white font-bold">{match.distanceKm} km</strong>{' '}
+                        <span className="text-slate-400 text-[10px]">({match.compassDirection})</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block">Elevation:</span>
+                        <strong className="text-cyan-400 font-bold">{haven.elevationMeters}m</strong>{' '}
+                        <span className="text-emerald-400 font-bold text-[10px]">(+{match.elevationGainMeters}m)</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block">Capacity:</span>
+                        <strong className="text-white font-bold">{haven.totalCapacity.toLocaleString()}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block">Vacancy:</span>
+                        <strong className="text-emerald-400 font-bold">{match.remainingCapacity.toLocaleString()}</strong>
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px]">
-                      <span>Helipad: {haven.hasHelipad ? '✅ Active HLZ' : '❌ None'}</span>
-                      <span>Warden: {haven.wardenPhone}</span>
+                    <div className="flex items-center justify-between pt-1.5 border-t border-slate-700/80 text-[11px] text-slate-300">
+                      <span>
+                        Helipad:{' '}
+                        <strong className={haven.hasHelipad ? 'text-emerald-400' : 'text-slate-400'}>
+                          {haven.hasHelipad ? '🚁 Active HLZ' : '❌ None'}
+                        </strong>
+                      </span>
+                      <span>
+                        Warden: <strong className="text-cyan-300">{haven.wardenPhone}</strong>
+                      </span>
                     </div>
 
                     <button
                       onClick={() => onSelectHaven(haven)}
-                      className="w-full mt-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold py-1 text-[11px] shadow-sm transition-all"
+                      className="w-full mt-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-bold py-2 text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      Select for Camp Deployment
+                      <Shield className="h-3.5 w-3.5" />
+                      <span>Select for Camp Deployment</span>
                     </button>
                   </div>
                 </Popup>

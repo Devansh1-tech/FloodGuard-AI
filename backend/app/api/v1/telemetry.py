@@ -498,15 +498,101 @@ def _matches_status(gauge: dict, status_query: str) -> bool:
     return gs == sq
 
 
+def _adjust_gauge_for_scenario_or_date(gauge: dict, scenario: Optional[str], date_str: Optional[str]) -> dict:
+    """Adjusts gauge water level, status, trend, and discharge for flood scenario or custom date."""
+    g = dict(gauge)
+    dt_str = date_str or "2026-10-18"
+    g["last_updated_nst"] = f"{dt_str} 12:00 NST"
+
+    # Determine scenario or seasonal month
+    month = 10
+    if date_str:
+        try:
+            parts = date_str.split("-")
+            if len(parts) >= 2:
+                month = int(parts[1])
+        except Exception:
+            month = 10
+
+    if scenario == "dry_baseline" or (scenario == "custom" and (month >= 11 or month <= 4)):
+        adj_level = round(g["warning_level_meters"] * 0.52, 2)
+        scale = adj_level / max(g["current_level_meters"], 0.1)
+        g["current_level_meters"] = adj_level
+        g["status"] = "normal"
+        g["trend"] = "steady"
+        g["rate_of_rise_cm_per_hour"] = 0
+        g["discharge_cusecs"] = max(1000, round(g["discharge_cusecs"] * 0.18))
+        if g.get("is_barrage_controlled"):
+            g["sluice_gates_open"] = 4
+        if "hourly_history" in g:
+            g["hourly_history"] = [
+                {
+                    "time": h["time"],
+                    "level_meters": round(h["level_meters"] * scale, 2),
+                    "discharge_cusecs": round(h.get("discharge_cusecs", 0) * 0.18),
+                }
+                for h in g["hourly_history"]
+            ]
+        return g
+
+    if scenario == "warning_phase" or (scenario == "custom" and (month in (5, 6, 7))):
+        span = g["danger_level_meters"] - g["warning_level_meters"]
+        adj_level = round(g["warning_level_meters"] + span * 0.45, 2)
+        scale = adj_level / max(g["current_level_meters"], 0.1)
+        g["current_level_meters"] = adj_level
+        g["status"] = "warning"
+        g["trend"] = "rising"
+        g["rate_of_rise_cm_per_hour"] = 8
+        g["discharge_cusecs"] = max(5000, round(g["discharge_cusecs"] * 0.55))
+        if g.get("is_barrage_controlled") and g.get("total_sluice_gates"):
+            g["sluice_gates_open"] = max(4, round(g["total_sluice_gates"] * 0.5))
+        if "hourly_history" in g:
+            g["hourly_history"] = [
+                {
+                    "time": h["time"],
+                    "level_meters": round(h["level_meters"] * scale, 2),
+                    "discharge_cusecs": round(h.get("discharge_cusecs", 0) * 0.55),
+                }
+                for h in g["hourly_history"]
+            ]
+        return g
+
+    if scenario == "2024_historic_peak":
+        adj_level = max(g["current_level_meters"], round(g["highest_historical_level_meters"] * 0.98, 2))
+        scale = adj_level / max(g["current_level_meters"], 0.1)
+        g["current_level_meters"] = adj_level
+        g["status"] = "extreme_flood"
+        g["trend"] = "rising_rapidly"
+        g["rate_of_rise_cm_per_hour"] = 24
+        g["discharge_cusecs"] = round(g["discharge_cusecs"] * 1.08)
+        if g.get("is_barrage_controlled") and g.get("total_sluice_gates"):
+            g["sluice_gates_open"] = g["total_sluice_gates"]
+        if "hourly_history" in g:
+            g["hourly_history"] = [
+                {
+                    "time": h["time"],
+                    "level_meters": round(h["level_meters"] * scale, 2),
+                    "discharge_cusecs": round(h.get("discharge_cusecs", 0) * 1.08),
+                }
+                for h in g["hourly_history"]
+            ]
+        return g
+
+    # Default / live_monsoon_deluge
+    return g
+
+
 @router.get("/river-gauges", response_model=ApiResponse[List[RiverGaugeStationSchema]])
 async def get_river_gauges(
     request: Request,
     basin: Optional[str] = Query(None, description="Filter by river basin substring"),
     district: Optional[str] = Query(None, description="Filter by district name"),
     status: Optional[str] = Query(None, description="Filter by status: normal, warning, danger, extreme_flood"),
+    scenario: Optional[str] = Query(None, description="Flood scenario preset id"),
+    date: Optional[str] = Query(None, description="Observation date (YYYY-MM-DD)"),
 ):
     """Returns real-time DHM hydrological monitoring stations across the 21 Terai districts."""
-    results = DHM_GAUGE_DATA
+    results = [_adjust_gauge_for_scenario_or_date(g, scenario, date) for g in DHM_GAUGE_DATA]
 
     if basin and basin.lower() != "all":
         results = [g for g in results if _matches_basin(g, basin)]
