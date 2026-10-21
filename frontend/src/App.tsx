@@ -154,9 +154,10 @@ export const App: React.FC = () => {
           isActive: activeTab === 'command_map',
         },
         {
-          label: 'Split Deluge Comparison',
-          sublabel: 'Dual-Pane Slider Alignment',
+          label: 'Optical Flood Pipeline (PS-01)',
+          sublabel: 'Spectral Indices & Settlements',
           href: '#satellite',
+          isActive: activeTab === 'satellite',
         },
         {
           label: 'Terai Settlement Picker',
@@ -286,10 +287,10 @@ export const App: React.FC = () => {
       badgeColor: 'border-rose-500/30 bg-rose-500/20 text-rose-400',
     },
     satellite: {
-      label: 'Satellite Flood Detection',
-      tagline: 'Google Earth Engine & SAR',
+      label: 'Optical Satellite Flood Detection',
+      tagline: 'PS-01: Spectral Indices & 4-Tier Settlement Impact',
       icon: Satellite,
-      badge: 'Stage 5.1 Sentinel-1',
+      badge: 'PS-01 Compliant',
       badgeColor: 'border-cyan-500/30 bg-cyan-500/20 text-cyan-400',
     },
     command_map: {

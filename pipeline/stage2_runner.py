@@ -62,6 +62,9 @@ class Stage2Runner:
 
         # Configure Stage 2 Engine
         is_preset = isinstance(self.context.aoi, str)
+        sensor_type = getattr(self.context, "sensor_type", "optical")
+        spectral_index = getattr(self.context, "spectral_index", "mndwi")
+
         s2_config = EngineConfig(
             aoi_name=self.context.aoi if is_preset else "custom",
             aoi_coords=None if is_preset else self.context.aoi,
@@ -69,6 +72,8 @@ class Stage2Runner:
             before_end=self.context.before_date[1],
             after_start=self.context.after_date[0],
             after_end=self.context.after_date[1],
+            sensor_type=sensor_type,
+            spectral_index=spectral_index,
             output_dir=flood_dir,
             gee_project=os.getenv("EE_PROJECT_ID", "home-credit-505106"),
             log_file=str(self.context.log_file),
@@ -87,11 +92,14 @@ class Stage2Runner:
             self.context.add_generated_file("flood", "flood_polygon_shapefile", result.shapefile_path)
             self.context.add_generated_file("flood", "statistics_json", result.statistics_path)
 
+            if getattr(result, "accuracy_report_path", None) and os.path.exists(result.accuracy_report_path):
+                self.context.add_generated_file("flood", "accuracy_validation_json", result.accuracy_report_path)
+
             # Copy preview image to maps directory
             if result.preview_path and os.path.exists(result.preview_path):
                 dest_map = self.context.maps_dir / Path(result.preview_path).name
                 shutil.copy2(result.preview_path, dest_map)
-                self.context.add_generated_file("maps", "sar_flood_preview", dest_map)
+                self.context.add_generated_file("maps", "flood_preview", dest_map)
 
             self.context.flood_statistics = result.statistics
 

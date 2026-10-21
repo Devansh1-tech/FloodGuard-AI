@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from SettlementImpactEngine.config.config import ImpactConfig
 from SettlementImpactEngine.utils.logger import get_logger
@@ -34,6 +34,7 @@ class ReportExporter:
         dashboard_data: Dict[str, Any],
         impact_report: Dict[str, Any],
         population_report: Dict[str, Any],
+        settlement_report: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, str]:
         """
         Export all designated JSON telemetry artifacts.
@@ -43,6 +44,8 @@ class ReportExporter:
         paths["dashboard_data"] = self.export_json(dashboard_data, "DashboardData.json")
         paths["impact_report"] = self.export_json(impact_report, "ImpactReport.json")
         paths["population_report"] = self.export_json(population_report, "AffectedPopulation.json")
+        if settlement_report is not None:
+            paths["settlement_report"] = self.export_json(settlement_report, "AffectedSettlements_Report.json")
         return paths
 
     def export_json(self, data: Dict[str, Any], filename: str) -> str:

@@ -110,6 +110,7 @@ class TestPipelineMockRun:
     ):
         output_dir = str(tmp_path / "mock_outputs")
         cfg = EngineConfig(
+            sensor_type="sar",
             aoi_name="nepal_terai_koshi",
             output_dir=output_dir,
             gee_export_to_drive=False,
@@ -189,3 +190,29 @@ class TestPipelineMockRun:
         mock_mask_gen.generate.assert_called_once()
         mock_vec.vectorize_local.assert_called_once()
         mock_vis.render_flood_preview.assert_called_once()
+
+    def test_pipeline_run_optical_offline(self, tmp_path):
+        """End-to-end test of the optical pipeline running on local test scene."""
+        output_dir = str(tmp_path / "optical_outputs")
+        cfg = EngineConfig(
+            sensor_type="optical",
+            spectral_index="mndwi",
+            aoi_name="nepal_terai_koshi",
+            output_dir=output_dir,
+            gee_export_to_drive=False,
+        )
+        pipeline = FloodDetectionPipeline(cfg)
+        result = pipeline.run()
+
+        assert isinstance(result, PipelineResult)
+        assert result.sensor_type == "optical"
+        assert result.spectral_index == "mndwi"
+        assert result.total_flooded_area_km2 > 0
+        assert result.num_polygons > 0
+        assert result.geojson_path.endswith("FloodPolygon.geojson")
+        assert result.shapefile_path.endswith("FloodPolygon.shp")
+        assert result.flood_mask_path.endswith("FloodMask.tif")
+        assert result.accuracy_report_path.endswith("AccuracyValidation.json")
+        assert result.accuracy_metrics is not None
+        assert "iou_jaccard" in result.accuracy_metrics
+        assert result.accuracy_metrics["iou_jaccard"] > 0.8

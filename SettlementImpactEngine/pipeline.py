@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 import geopandas as gpd
+import pandas as pd
 
 from SettlementImpactEngine.config.config import ImpactConfig
 from SettlementImpactEngine.datasets.loader import DatasetLoader, ImpactDatasetBundle
@@ -221,6 +222,13 @@ class SettlementImpactPipeline:
             result.table_paths["municipality_csv"] = self.tabular_exporter.export_dataframe(
                 muni_table, "MunicipalityImpactSummary.csv"
             )
+            # Export AffectedSettlements_Report.csv (Problem Statement 01 requirement)
+            settlement_records = settlement_summary.get("affected_settlements", [])
+            if settlement_records:
+                settle_df = pd.DataFrame(settlement_records)
+                result.table_paths["settlement_report_csv"] = self.tabular_exporter.export_dataframe(
+                    settle_df, "AffectedSettlements_Report.csv"
+                )
 
         # ── 13. Export JSON Reports ─────────────────────────────────────────
         with LogTimer("Exporting JSON Reports", logger):
@@ -229,6 +237,7 @@ class SettlementImpactPipeline:
                 dashboard_data=dashboard_data,
                 impact_report=impact_report,
                 population_report=population_summary,
+                settlement_report=settlement_summary,
             )
 
         # ── 14. Render Cartographic Visualization Maps ──────────────────────

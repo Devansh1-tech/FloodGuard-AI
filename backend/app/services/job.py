@@ -193,6 +193,8 @@ class JobService(BaseService):
                 after_date=(request.after_start, request.after_end),
                 project_name=request.project_name,
                 tracker=self.job_manager.tracker,
+                sensor_type=getattr(request, "sensor_type", "optical"),
+                spectral_index=getattr(request, "spectral_index", "mndwi"),
             )
         except Exception as exc:
             self.logger.exception("Background execution failed for Job [%s]: %s", job_id, exc)

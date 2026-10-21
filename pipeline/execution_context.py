@@ -40,6 +40,8 @@ class PipelineContext:
     aoi: Union[str, List[List[float]]] = "nepal_terai_koshi"
     before_date: Tuple[str, str] = ("2024-06-01", "2024-06-30")
     after_date: Tuple[str, str] = ("2024-09-15", "2024-10-15")
+    sensor_type: str = "optical"
+    spectral_index: str = "mndwi"
     base_output_dir: Path = field(default_factory=lambda: Path("outputs"))
     execution_id: str = ""
 

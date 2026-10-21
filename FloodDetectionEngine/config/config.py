@@ -97,6 +97,17 @@ class EngineConfig:
     after_start: str = "2024-09-15"
     after_end: str = "2024-10-15"
 
+    # -- Operational Sensor Mode ----------------------------------------------
+    sensor_type: str = "optical"               # "optical" | "sar" | "fusion"
+    optical_collection: str = "COPERNICUS/S2_SR_HARMONIZED" # or "LANDSAT/LC08/C02/T1_L2"
+    optical_cloud_threshold: float = 40.0      # max cloud percentage in metadata filter
+    spectral_index: str = "mndwi"              # "mndwi" | "ndwi" | "aweinsh" | "ensemble"
+    mndwi_threshold: float = 0.0               # default zero-crossing threshold
+    ndwi_threshold: float = 0.0                # auxiliary water confirmation threshold
+    enable_slope_mask: bool = True             # Copernicus GLO-30 DEM slope mask
+    slope_max_degrees: float = 5.0             # max terrain slope for water accumulation
+    reference_ground_truth_path: Optional[str] = None
+
     # -- Sentinel-1 filters ---------------------------------------------------
     instrument_mode: str = "IW"
     orbit_pass: str = "DESCENDING"

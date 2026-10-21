@@ -16,6 +16,12 @@ from FloodDetectionEngine.detection.otsu import otsu_threshold
 from FloodDetectionEngine.detection.morphology import MorphologyCleaner
 from FloodDetectionEngine.detection.flood_mask import FloodMaskGenerator
 from FloodDetectionEngine.detection.vectorization import Vectorizer
+from FloodDetectionEngine.detection.spectral_indices import (
+    compute_mndwi,
+    compute_ndwi,
+    compute_aweinsh,
+    SpectralIndexEngine,
+)
 
 __all__ = [
     "ChangeDetector",
@@ -23,4 +29,9 @@ __all__ = [
     "MorphologyCleaner",
     "FloodMaskGenerator",
     "Vectorizer",
+    "compute_mndwi",
+    "compute_ndwi",
+    "compute_aweinsh",
+    "SpectralIndexEngine",
 ]
+

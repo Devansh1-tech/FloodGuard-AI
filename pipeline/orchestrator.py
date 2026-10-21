@@ -64,11 +64,16 @@ class PipelineOrchestrator:
         b_dates = self._normalize_date_range(before_date)
         a_dates = self._normalize_date_range(after_date)
 
+        sensor_type = kwargs.pop("sensor_type", kwargs.pop("sensor", "optical"))
+        spectral_index = kwargs.pop("spectral_index", kwargs.pop("index", "mndwi"))
+
         self.context = PipelineContext(
             project_name=project_name,
             aoi=aoi,
             before_date=b_dates,
             after_date=a_dates,
+            sensor_type=sensor_type,
+            spectral_index=spectral_index,
             base_output_dir=Path(output_dir),
             execution_id=execution_id or "",
             custom_params=kwargs,

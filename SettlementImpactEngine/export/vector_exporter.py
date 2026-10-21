@@ -92,12 +92,20 @@ class VectorExporter:
         """
         out_path = str(self.output_dir / filename)
         if gdf is None or gdf.empty:
-            empty_gdf = gpd.GeoDataFrame({"geometry": []}, crs=DEFAULT_GEOGRAPHIC_CRS)
-            empty_gdf.to_file(out_path, driver="GeoJSON")
+            try:
+                empty_gdf = gpd.GeoDataFrame({"geometry": []}, crs=DEFAULT_GEOGRAPHIC_CRS)
+                empty_gdf.to_file(out_path, driver="GeoJSON")
+            except Exception:
+                with open(out_path, "w", encoding="utf-8") as f:
+                    f.write('{"type": "FeatureCollection", "features": []}')
             return out_path
 
         geo_gdf = to_geographic(fix_invalid_geometries(gdf))
-        geo_gdf.to_file(out_path, driver="GeoJSON")
+        try:
+            geo_gdf.to_file(out_path, driver="GeoJSON")
+        except Exception:
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(geo_gdf.to_json())
         logger.info("Exported GeoJSON [%d features]: %s", len(geo_gdf), out_path)
         return out_path
 

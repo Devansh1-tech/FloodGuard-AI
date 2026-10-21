@@ -197,7 +197,12 @@ class Vectorizer:
                 self.config.export_flood_polygon_geojson
             )
         ensure_directory(os.path.dirname(output_path) if os.path.dirname(output_path) else ".")
-        gdf.to_file(output_path, driver="GeoJSON")
+        try:
+            gdf.to_file(output_path, driver="GeoJSON")
+        except Exception:
+            # Fallback to direct GeoJSON serialization without GDAL/pyogrio dependency
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(gdf.to_json())
         logger.info("GeoJSON saved: %s", output_path)
         return output_path
 
@@ -231,7 +236,37 @@ class Vectorizer:
         rename_map = {col: col[:10] for col in shp_gdf.columns if len(col) > 10 and col != "geometry"}
         if rename_map:
             shp_gdf = shp_gdf.rename(columns=rename_map)
-        shp_gdf.to_file(output_path, driver="ESRI Shapefile")
+        try:
+            shp_gdf.to_file(output_path, driver="ESRI Shapefile")
+        except Exception:
+            # Fallback to pure-python pyshp without GDAL/pyogrio native DLL dependency
+            import shapefile
+            stem = os.path.splitext(output_path)[0]
+            with shapefile.Writer(stem) as w:
+                fields = [c for c in shp_gdf.columns if c != "geometry"]
+                for fld in fields:
+                    w.field(fld, "C", size=50)
+                for _, row in shp_gdf.iterrows():
+                    geom = row.get("geometry")
+                    if geom is None or geom.is_empty:
+                        continue
+                    if geom.geom_type == "Polygon":
+                        parts = [list(geom.exterior.coords)]
+                        for interior in geom.interiors:
+                            parts.append(list(interior.coords))
+                        w.poly(parts)
+                    elif geom.geom_type == "MultiPolygon":
+                        parts = []
+                        for poly in geom.geoms:
+                            parts.append(list(poly.exterior.coords))
+                            for interior in poly.interiors:
+                                parts.append(list(interior.coords))
+                        w.poly(parts)
+                    record_vals = [str(row[fld])[:50] for fld in fields]
+                    w.record(*record_vals)
+            # Write .prj
+            with open(f"{stem}.prj", "w", encoding="utf-8") as prj:
+                prj.write('GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]')
         logger.info("Shapefile saved: %s", output_path)
         return output_path
 

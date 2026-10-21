@@ -30,6 +30,8 @@ class AnalysisTriggerRequest(BaseModel):
     after_end: str = Field(default="2024-10-15", description="Post-flood crisis end (YYYY-MM-DD)")
     project_name: str = Field(default="FloodGuard AI", description="Human-readable project title")
     priority: JobPriority = Field(default=JobPriority.HIGH, description="Scheduling priority level")
+    sensor_type: str = Field(default="optical", description="Satellite sensor: 'optical' (Sentinel-2/Landsat) or 'sar' (Sentinel-1)")
+    spectral_index: str = Field(default="mndwi", description="Spectral index for optical mode: 'mndwi', 'ndwi', 'aweinsh', 'ensemble'")
 
     @field_validator("aoi")
     @classmethod
