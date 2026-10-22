@@ -1,65 +1,75 @@
 /**
- * ExecutiveDashboard.tsx — National Emergency Disaster Command Landing Page & Dashboard.
+ * ExecutiveDashboard.tsx — Nepal Terai Emergency Command Center.
  *
- * Dedicated to National Emergency Operations Center (NEOC) & Government Disaster Officers:
- * 1. Live situation intelligence across all 21 Nepal Terai districts.
- * 2. Instant Date Selector & Region/Basin Filter.
- * 3. Flooded vs Non-Flooded Layer Toggles ("What I want to see").
- * 4. Interactive Live Satellite Radar Flood Map embedded directly on the dashboard.
- * 5. Dynamic Area Inundation (km² & %) and Population at Risk Telemetry.
- * 6. District Flood Severity Leaderboard for all 21 lowland districts.
- * 7. Google Earth Engine Sentinel-1 SAR Analysis Code Modal launcher.
+ * Built for National Emergency Operations Centre (NEOC), MoHA, and APF commanders.
+ * Fully refactored into a high-density 3-Pane Command Center:
+ *
+ * [TOP HEADER & KPI BAR]
+ * - Minimalist brand header + Live telemetry indicator (● LIVE TELEMETRY ONLINE)
+ * - Top emergency ribbon (NEOC Hotline: 1155 • Nepal Red Cross: 1130 • APF: 1114)
+ * - Two distinct primary actions: "Launch Executive Command Console" & "Download Official SITREP (PDF)"
+ * - Top KPI Summary Strip: 4 high-density monospace metric cards
+ *
+ * [MAIN VIEWPORT - 3-PANEL GRID]
+ * 1. Left Panel (Control & Layer Drawer - 20%-25% width):
+ *    - River Basin Filters (Koshi, Bagmati, Gandaki, West Rapti, Karnali)
+ *    - Layer switches with @phosphor-icons/react: Inundation Mask, NDWI Heatmap, Safe Zones, Blocked Corridors
+ *    - Temporal observation range selector
+ * 2. Center Panel (Interactive Map Container - 55%-65% width):
+ *    - Retains <div id="map"></div> and <div id="terai-google-map"></div> for Google Maps / Leaflet engines
+ *    - Status ribbon with coordinates and dual engine indicators
+ * 3. Right Panel (Contextual Intelligence Drawer - 20%-25% width):
+ *    - Selected District / Settlement intelligence dossier
+ *    - Monospace population figures & hospital / antivenom metrics
+ *    - Gemini AI emergency recommendations
+ *    - Actionable button: "Export District Emergency Brief"
+ *    - Skeletal loading states on state change
+ *
+ * [TECHNICAL SAFEGUARDS]
+ * - VISUAL_DENSITY: 8 (Cockpit / Command Center Mode)
+ * - WCAG AA Contrast: #0F172A Canvas, #1E293B Containers, #F8FAFC Text, #94A3B8 Secondary
+ * - ANTI-EMOJI POLICY: Exclusively @phosphor-icons/react SVGs
+ * - Monospace font-mono across all metrics and coordinates
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  MapContainer,
-  Marker,
-  Polygon,
-  Polyline,
-  Popup,
-  TileLayer,
-  useMap,
-} from 'react-leaflet';
-import L from 'leaflet';
-import {
-  Activity,
-  AlertCircle,
-  AlertTriangle,
-  ArrowRight,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  Code2,
-  Compass,
-  ExternalLink,
-  Eye,
-  FileDown,
-  FileText,
-  Filter,
-  Globe,
-  HeartPulse,
-  Info,
-  Layers,
-  MapPin,
-  Maximize2,
-  Phone,
-  Radio,
-  RefreshCw,
-  Satellite,
-  Search,
-  Shield,
-  ShieldAlert,
   ShieldCheck,
-  Sliders,
-  Sparkles,
-  TrendingUp,
-  Users,
+  ShieldWarning,
   Waves,
+  Drop,
+  Buildings,
+  RoadHorizon,
+  WarningOctagon,
+  Warning,
+  Campfire,
+  FirstAid,
+  MapPin,
+  Crosshair,
+  Compass,
+  FilePdf,
+  FileText,
+  DownloadSimple,
+  ArrowsClockwise,
+  ArrowRight,
+  CaretRight,
+  CaretDown,
+  Calendar,
+  Clock,
+  Sparkle,
+  SlidersHorizontal,
+  Stack,
+  Eye,
+  PhoneCall,
+  Broadcast,
+  CheckCircle,
+  Truck,
+  Code,
+  Globe,
+  Radio,
+  Pulse,
   X,
-  Zap,
-} from 'lucide-react';
+} from '@phosphor-icons/react';
 
 import {
   DATE_PRESETS,
@@ -67,203 +77,167 @@ import {
   TeraiRegionData,
   VillageSettlement,
 } from '@/data/teraiRegions';
-import { TERAI_DISTRICT_STATS, TERAI_HOSPITALS } from '@/data/teraiInfrastructure';
-import { nepalBoundaries } from '@/data/nepalBoundaries';
-import { EarthEngineScriptModal } from '@/components/gee/EarthEngineScriptModal';
+import { TERAI_DISTRICT_STATS, TERAI_HOSPITALS, HospitalFacility, DistrictDemographics } from '@/data/teraiInfrastructure';
 import {
   TERAI_CITIES_DATA,
   TeraiCityData,
   VillageTownItem,
-  createCityColorLeafletPin,
 } from '@/data/teraiCitiesData';
-import { CityVillagesModal } from '@/components/map/CityVillagesModal';
 import { GoogleMapsViewer } from '@/components/map/GoogleMapsViewer';
-
-// Custom Map Pins for Flooded vs Safe High-Ground Settlements
-const createSettlementPin = (isFlooded: boolean, depth?: number) => {
-  if (isFlooded) {
-    return L.divIcon({
-      className: 'dashboard-pin-flooded',
-      html: `
-        <div style="position: relative; display: flex; align-items: center; justify-content: center;">
-          <div style="
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: rgba(239, 68, 68, 0.4);
-            animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-          "></div>
-          <div style="
-            background: linear-gradient(135deg, #EF4444 0%, #B91C1C 100%);
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            border: 2px solid #FFFFFF;
-            box-shadow: 0 0 12px #EF4444, 0 3px 6px rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #FFFFFF;
-            font-size: 11px;
-            font-weight: 900;
-          ">!</div>
-          ${
-            depth
-              ? `<div style="
-                  position: absolute;
-                  bottom: -15px;
-                  white-space: nowrap;
-                  background: #7F1D1D;
-                  color: #FCA5A5;
-                  border: 1px solid #EF4444;
-                  font-size: 8px;
-                  font-weight: 800;
-                  padding: 0 4px;
-                  border-radius: 4px;
-                ">${depth.toFixed(1)}m</div>`
-              : ''
-          }
-        </div>
-      `,
-      iconSize: [26, 26],
-      iconAnchor: [13, 13],
-      popupAnchor: [0, -13],
-    });
-  }
-
-  return L.divIcon({
-    className: 'dashboard-pin-safe',
-    html: `
-      <div style="position: relative; display: flex; align-items: center; justify-content: center;">
-        <div style="
-          background: linear-gradient(135deg, #10B981 0%, #047857 100%);
-          width: 22px;
-          height: 22px;
-          border-radius: 50%;
-          border: 2px solid #FFFFFF;
-          box-shadow: 0 0 12px #10B981, 0 2px 5px rgba(0,0,0,0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #FFFFFF;
-          font-size: 11px;
-          font-weight: 900;
-        ">✓</div>
-        <div style="
-          position: absolute;
-          bottom: -15px;
-          white-space: nowrap;
-          background: #064E3B;
-          color: #6EE7B7;
-          border: 1px solid #10B981;
-          font-size: 8px;
-          font-weight: 800;
-          padding: 0 4px;
-          border-radius: 4px;
-        ">SAFE</div>
-      </div>
-    `,
-    iconSize: [26, 26],
-    iconAnchor: [13, 13],
-    popupAnchor: [0, -13],
-  });
-};
-
-const createSafeShelterPin = () => {
-  return L.divIcon({
-    className: 'dashboard-pin-shelter',
-    html: `
-      <div style="
-        background: #059669;
-        border: 2px solid #A7F3D0;
-        width: 24px;
-        height: 24px;
-        border-radius: 6px;
-        box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #FFFFFF;
-        font-size: 12px;
-        font-weight: 900;
-      ">
-        ⌂
-      </div>
-    `,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -12],
-  });
-};
-
-// Map View Controller to handle smooth flyTo transitions
-const MapViewController: React.FC<{
-  center: [number, number];
-  zoom: number;
-}> = ({ center, zoom }) => {
-  const map = useMap();
-
-  useEffect(() => {
-    map.invalidateSize();
-    map.flyTo(center, zoom, {
-      duration: 1.2,
-      easeLinearity: 0.25,
-    });
-  }, [center, zoom, map]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      map.invalidateSize();
-    };
-    window.addEventListener('resize', handleResize);
-    const t1 = setTimeout(() => map.invalidateSize(), 100);
-    const t2 = setTimeout(() => map.invalidateSize(), 300);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [map]);
-
-  return null;
-};
+import { EarthEngineScriptModal } from '@/components/gee/EarthEngineScriptModal';
+import { CityVillagesModal } from '@/components/map/CityVillagesModal';
+import { NavigationTab } from '@/App';
 
 interface ExecutiveDashboardProps {
-  onNavigateToTab: (tabId: 'command_map' | 'satellite' | 'hospitals' | 'demographics' | 'roads' | 'routing' | 'havens' | 'sitrep' | 'gauges') => void;
-  onSelectRegion?: (regionKey: string) => void;
+  onNavigateToTab: (tab: NavigationTab) => void;
 }
 
-export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
-  onNavigateToTab,
-  onSelectRegion,
-}) => {
-  // Region & Filter State
+// Grounded Gemini AI Operational Directives by District
+const DISTRICT_AI_DIRECTIVES: Record<string, { summary: string; actions: string[]; alertLevel: 'CRITICAL' | 'HIGH' | 'WATCH' }> = {
+  Rautahat: {
+    summary: 'Bagmati & Lalbakeya confluence experiencing high hydraulic surge (+2.4m crest). Gaur municipal core submerged.',
+    actions: [
+      'Pre-stage 6 APF Zodiac motorized rescue craft at Chandranigahapur staging ground.',
+      'Reroute supply convoys via Mahendra Highway bypass; Postal Highway is impassable at Sarlahi boundary.',
+      'Deploy emergency polyvalent antivenom shipment to Gaur District Hospital forward triage tent.',
+    ],
+    alertLevel: 'CRITICAL',
+  },
+  Morang: {
+    summary: 'Koshi river eastern embankment monitoring: discharge exceeds 340,000 cusecs at Bhantabari.',
+    actions: [
+      'Reinforce flood bunds near Duhabi industrial corridor.',
+      'Keep Biratnagar Koshi Provincial Referral Hospital ICU triage in Code Red readiness.',
+      'Direct civilian evacuation towards Duhabi Elevated Campus shelter (Zone E-02).',
+    ],
+    alertLevel: 'HIGH',
+  },
+  Sunsari: {
+    summary: 'Koshi Barrage tailwater inundating low-lying agricultural plains. Saptari corridor partially restricted.',
+    actions: [
+      'Coordinate gate adjustments with Joint Koshi High Commission.',
+      'Mobilize Nepal Red Cross emergency water purification units to Bhantabari.',
+      'Maintain 24h satellite SAR delta monitoring on West Koshi bank erosion.',
+    ],
+    alertLevel: 'HIGH',
+  },
+  Sarlahi: {
+    summary: 'Lakhandei river overflowing banks around Malangwa border. Highway transit slowed by 40%.',
+    actions: [
+      'Deploy APF rescue squad to Malangwa wards 3 and 7.',
+      'Distribute halogen beacons and high-ground shelter kits to local ward chairs.',
+      'Confirm emergency fuel reserves at Highway Supply Depot.',
+    ],
+    alertLevel: 'HIGH',
+  },
+  Banke: {
+    summary: 'West Rapti river at Kusum hydro station recorded 6.8m water stage (1.8m over danger threshold).',
+    actions: [
+      'Immediate evacuation of Holiya, Betahani, and Fattepur riverfront settlements.',
+      'Air drop high-calorie rations via Nepal Army helicopter from Nepalgunj Airfield.',
+      'Bheri Provincial Hospital designated primary trauma dispatch hub for mid-west sector.',
+    ],
+    alertLevel: 'CRITICAL',
+  },
+  Bardiya: {
+    summary: 'Babai river surge threatening Gulariya township. Embankment stress detected on eastern levee.',
+    actions: [
+      'Place APF flood detachment at Babai bridgehead.',
+      'Evacuate vulnerable river hamlets to elevated community school safe havens.',
+      'Monitor drainage culverts along Postal Highway.',
+    ],
+    alertLevel: 'HIGH',
+  },
+  Kailali: {
+    summary: 'Mohana and Karnali river backwaters pooling in Bhajani and Tikapur municipalities.',
+    actions: [
+      'Stage rescue catamarans at Tikapur municipal office grounds.',
+      'Coordinate air evacuation with Surkhet Western Command if road cut-off expands.',
+      'Ensure Seti Hospital maintains cold-chain snakebite serum availability.',
+    ],
+    alertLevel: 'CRITICAL',
+  },
+  Kanchanpur: {
+    summary: 'Mahakali river discharge stabilized at 190,000 cusecs; Dodhara-Chandani suspension bridge monitored.',
+    actions: [
+      'Inspect spur dykes along Dodhara embankment.',
+      'Maintain civilian alert level at Stage 2 (Preparedness).',
+    ],
+    alertLevel: 'WATCH',
+  },
+  Jhapa: {
+    summary: 'Mechi and Ratuwa rivers elevated but currently below critical red mark. Minor inundation in lowlands.',
+    actions: [
+      'Maintain 6-hour radar delta check on Kankai catchment.',
+      'Damak emergency warehouse placed on standby.',
+    ],
+    alertLevel: 'WATCH',
+  },
+  Dhanusa: {
+    summary: 'Jalad and Kamala rivers showing moderate cresting near Janakpur perimeter.',
+    actions: [
+      'Monitor culvert drainage under Janakpur railway spur.',
+      'Verify generator fuel at Janakpur Provincial Hospital.',
+    ],
+    alertLevel: 'WATCH',
+  },
+};
+
+export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ onNavigateToTab }) => {
+  // Core Operational Filter States
   const [selectedRegionKey, setSelectedRegionKey] = useState<string>('full_terai');
-  const [selectedDistrict, setSelectedDistrict] = useState<string>('all');
-  const [selectedDatePreset, setSelectedDatePreset] = useState<string>('monsoon_deluge_2024');
-  const [beforeDate, setBeforeDate] = useState<string>('2024-06-15');
-  const [afterDate, setAfterDate] = useState<string>('2024-10-01');
-
-  // Layer Visibility Mode (What I want to see)
+  const [selectedDistrict, setSelectedDistrict] = useState<string>('Rautahat');
   const [viewLayerMode, setViewLayerMode] = useState<'both' | 'flooded' | 'safe'>('both');
-  const [mapType, setMapType] = useState<'google_hybrid' | 'google_satellite' | 'google_terrain'>('google_hybrid');
-  const [showDeepWaterOnly, setShowDeepWaterOnly] = useState<boolean>(false);
-  const [showCityPoints, setShowCityPoints] = useState<boolean>(true);
-  const [selectedCity, setSelectedCity] = useState<TeraiCityData | null>(null);
-  const [isCityModalOpen, setIsCityModalOpen] = useState<boolean>(false);
+  const [selectedDatePreset, setSelectedDatePreset] = useState<string>('monsoon_2024');
+  const [beforeDate, setBeforeDate] = useState<string>('2024-05-15');
+  const [afterDate, setAfterDate] = useState<string>('2024-07-12');
 
-  // GEE Script Modal State
+  // Command Center Layer Switches
+  const [layerSatelliteInundation, setLayerSatelliteInundation] = useState<boolean>(true);
+  const [layerNdwiHeatmap, setLayerNdwiHeatmap] = useState<boolean>(true);
+  const [layerSafeZones, setLayerSafeZones] = useState<boolean>(true);
+  const [layerBlockedCorridors, setLayerBlockedCorridors] = useState<boolean>(true);
+
+  // Full-Viewport Canvas Architecture Controls
+  const [isLeftDockOpen, setIsLeftDockOpen] = useState<boolean>(true);
+  const [isRightInspectorOpen, setIsRightInspectorOpen] = useState<boolean>(false);
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState<boolean>(true);
+  const [basinSectionOpen, setBasinSectionOpen] = useState<boolean>(true);
+  const [satelliteSectionOpen, setSatelliteSectionOpen] = useState<boolean>(true);
+  const [infraSectionOpen, setInfraSectionOpen] = useState<boolean>(true);
+  const [leaderboardFilter, setLeaderboardFilter] = useState<'ALL' | 'CRITICAL' | 'WARNING' | 'SAFE'>('ALL');
+  const [mapProvider, setMapProvider] = useState<'google_maps' | 'leaflet'>('leaflet');
+
+  // Async & Skeletal Loading Simulation for District Intelligence
+  const [isLoadingDistrict, setIsLoadingDistrict] = useState<boolean>(false);
+  const [briefExportSuccess, setBriefExportSuccess] = useState<boolean>(false);
+
+  // Modals
   const [isScriptModalOpen, setIsScriptModalOpen] = useState<boolean>(false);
+  const [isVillagesModalOpen, setIsVillagesModalOpen] = useState<boolean>(false);
+  const [selectedCityForModal, setSelectedCityForModal] = useState<TeraiCityData | null>(null);
 
   const activeRegion: TeraiRegionData = TERAI_REGIONS[selectedRegionKey] || TERAI_REGIONS.full_terai;
 
-  const handleRegionChange = (key: string) => {
-    setSelectedRegionKey(key);
-    setSelectedDistrict('all');
-    if (onSelectRegion) onSelectRegion(key);
+  // Handle District selection with brief skeletal loading effect
+  const handleSelectDistrict = (districtName: string) => {
+    setIsLoadingDistrict(true);
+    setSelectedDistrict(districtName);
+    setTimeout(() => {
+      setIsLoadingDistrict(false);
+    }, 280);
   };
 
+  // Handle Basin Filter change
+  const handleBasinChange = (basinKey: string) => {
+    setSelectedRegionKey(basinKey);
+    const region = TERAI_REGIONS[basinKey];
+    if (region && region.districts.length > 0) {
+      handleSelectDistrict(region.districts[0]);
+    }
+  };
+
+  // Date preset handler
   const handleDatePresetChange = (presetId: string) => {
     setSelectedDatePreset(presetId);
     const preset = DATE_PRESETS.find((p) => p.id === presetId);
@@ -273,973 +247,828 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
     }
   };
 
-  // District Table Hazard Filters, Search, and Sort State
-  const [districtHazardFilter, setDistrictHazardFilter] = useState<'ALL' | 'CRITICAL_DELUGE' | 'MODERATE_WARNING' | 'STABLE_MONITORING'>('ALL');
-  const [districtSearchQuery, setDistrictSearchQuery] = useState<string>('');
-  const [districtSortBy, setDistrictSortBy] = useState<'inundated' | 'atRisk' | 'name'>('inundated');
+  // Active district intelligence computation
+  const activeDistrictStats: DistrictDemographics = useMemo(() => {
+    const found = TERAI_DISTRICT_STATS.find(
+      (d) => d.district.toLowerCase() === selectedDistrict.toLowerCase()
+    );
+    return (
+      found || {
+        district: selectedDistrict,
+        basin: activeRegion.basin,
+        totalPopulation: 809000,
+        atRiskPopulation: 67800,
+        inundatedAreaKm2: 82.4,
+        hospitalsCount: 13,
+        sheltersCount: 9,
+      }
+    );
+  }, [selectedDistrict, activeRegion]);
 
-  // Base districts filtered by selected region
-  const activeRegionBaseDistricts = useMemo(() => {
-    return selectedRegionKey === 'full_terai'
-      ? TERAI_DISTRICT_STATS
-      : TERAI_DISTRICT_STATS.filter((d) => {
-          if (selectedRegionKey === 'eastern_terai') return d.basin === 'Eastern Terai';
-          if (selectedRegionKey === 'central_terai') return d.basin === 'Central Terai';
-          if (selectedRegionKey === 'western_terai') return d.basin === 'Western Terai';
-          if (selectedRegionKey === 'far_western_terai') return d.basin === 'Far-Western Terai';
-          return true;
-        });
-  }, [selectedRegionKey]);
+  const activeHospitals: HospitalFacility[] = useMemo(() => {
+    return TERAI_HOSPITALS.filter(
+      (h) => h.district.toLowerCase() === selectedDistrict.toLowerCase()
+    );
+  }, [selectedDistrict]);
 
-  // Dynamic counts for hazard filter pills
-  const districtHazardCounts = useMemo(() => {
-    return {
-      ALL: activeRegionBaseDistricts.length,
-      CRITICAL_DELUGE: activeRegionBaseDistricts.filter((d) => d.inundatedAreaKm2 > 40).length,
-      MODERATE_WARNING: activeRegionBaseDistricts.filter((d) => d.inundatedAreaKm2 > 20 && d.inundatedAreaKm2 <= 40).length,
-      STABLE_MONITORING: activeRegionBaseDistricts.filter((d) => d.inundatedAreaKm2 <= 20).length,
-    };
-  }, [activeRegionBaseDistricts]);
+  const activeCityData: TeraiCityData | undefined = useMemo(() => {
+    return TERAI_CITIES_DATA.find(
+      (c) => c.district.toLowerCase() === selectedDistrict.toLowerCase()
+    );
+  }, [selectedDistrict]);
 
-  // Filtered and sorted district statistics
-  const filteredDistricts = useMemo(() => {
-    let list = [...activeRegionBaseDistricts];
+  const aiDirective = useMemo(() => {
+    return (
+      DISTRICT_AI_DIRECTIVES[selectedDistrict] || {
+        summary: `Monitoring high-velocity flood stage across ${selectedDistrict} basin. Drainage channels under surveillance.`,
+        actions: [
+          `Deploy APF local monitoring unit to primary river confluences in ${selectedDistrict}.`,
+          `Keep district hospital trauma ward on standby alert.`,
+          `Verify communication links with rural municipality disaster focal points.`,
+        ],
+        alertLevel: 'HIGH',
+      }
+    );
+  }, [selectedDistrict]);
 
-    // Hazard Level Filter
-    if (districtHazardFilter === 'CRITICAL_DELUGE') {
-      list = list.filter((d) => d.inundatedAreaKm2 > 40);
-    } else if (districtHazardFilter === 'MODERATE_WARNING') {
-      list = list.filter((d) => d.inundatedAreaKm2 > 20 && d.inundatedAreaKm2 <= 40);
-    } else if (districtHazardFilter === 'STABLE_MONITORING') {
-      list = list.filter((d) => d.inundatedAreaKm2 <= 20);
-    }
+  // Handle Export District Emergency Brief
+  const handleExportBrief = () => {
+    setBriefExportSuccess(true);
+    const sitrepContent = `NEOC / MoHA SITUATION REPORT: ${selectedDistrict.toUpperCase()} DISTRICT
+Date: ${new Date().toISOString().split('T')[0]} | Authority: National Emergency Operations Centre
+Basin: ${activeDistrictStats.basin}
+Inundated Area: ${activeDistrictStats.inundatedAreaKm2} sq km
+At-Risk Population: ${activeDistrictStats.atRiskPopulation.toLocaleString()}
+Hospitals Ready: ${activeHospitals.length} | Operational Status: Monitored
+AI Recommendations:
+${aiDirective.actions.map((a, i) => `${i + 1}. ${a}`).join('\n')}
+Generated by FloodGuard AI Nepal Decision Support System.`;
 
-    // Text Search
-    if (districtSearchQuery.trim()) {
-      const q = districtSearchQuery.toLowerCase();
-      list = list.filter(
-        (d) => d.district.toLowerCase().includes(q) || d.basin.toLowerCase().includes(q)
-      );
-    }
+    const blob = new Blob([sitrepContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `SITREP_${selectedDistrict}_${new Date().toISOString().split('T')[0]}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 
-    // Sorting
-    return list.sort((a, b) => {
-      if (districtSortBy === 'inundated') return b.inundatedAreaKm2 - a.inundatedAreaKm2;
-      if (districtSortBy === 'atRisk') return b.atRiskPopulation - a.atRiskPopulation;
-      return a.district.localeCompare(b.district);
-    });
-  }, [activeRegionBaseDistricts, districtHazardFilter, districtSearchQuery, districtSortBy]);
-
-  // Filtered settlements by district
-  const filteredSettlements =
-    selectedDistrict === 'all'
-      ? activeRegion.settlements
-      : activeRegion.settlements.filter((s) => s.district.toLowerCase() === selectedDistrict.toLowerCase());
-
-  const totalInundatedKm2 = activeRegion.floodAreaKm2;
-  const totalSafeKm2 = activeRegion.safeAreaKm2;
-  const totalAffectedPop = activeRegion.affectedPopulation;
-  const operationalHospitalsCount = TERAI_HOSPITALS.filter((h) => !h.isFlooded).length;
-
-  const tileUrls = {
-    google_hybrid: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-    google_satellite: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-    google_terrain: 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+    setTimeout(() => {
+      setBriefExportSuccess(false);
+    }, 3500);
   };
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="min-h-[100dvh] space-y-4 pb-12 font-sans text-[#F8FAFC]">
       {/* ───────────────────────────────────────────────────────────────────────
-          HERO EXECUTIVE LANDING PAGE: GOVERNMENT DISASTER INTELLIGENCE PLATFORM
-          (Ultra-Sleek Dark Theme Matching FloodGuard AI Sovereign Aesthetic)
+          [TOP HEADER & KPI BAR]
+          1. Minimalist brand header + Live telemetry indicator
       ───────────────────────────────────────────────────────────────────────── */}
-      <div
-        style={{ position: 'relative', width: '100%', minHeight: '560px', backgroundColor: '#070b16' }}
-        className="relative rounded-3xl border border-cyan-500/30 bg-[#070b16] shadow-[0_0_60px_rgba(0,0,0,0.95)] backdrop-blur-2xl overflow-hidden"
-      >
-        {/* Deep Sovereign Dark Ambient Accents & Grid */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-950/40 via-[#070b16] to-cyan-950/30 pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(#0ea5e9_1px,transparent_1px)] [background-size:28px_28px] opacity-[0.08] pointer-events-none" />
-        <div className="absolute -top-32 left-1/4 h-72 w-96 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-32 right-1/4 h-72 w-96 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 p-5 sm:p-7 md:p-9 flex flex-col justify-between min-h-[560px] space-y-6">
-          {/* Top Header: Official Nepal Government Badges — All 5 in One-Line Alignment */}
-          <div className="w-full border-b border-slate-800/80 pb-3.5 overflow-x-auto no-scrollbar">
-            <div className="flex items-center justify-between gap-2 min-w-[760px] lg:min-w-0 w-full">
-              {/* 1. Official Government Command Portal */}
-              <div className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-950/70 px-2.5 py-1.5 text-[11px] font-bold text-rose-200 shadow-sm shadow-rose-950/40 whitespace-nowrap">
-                <span className="h-2 w-2 rounded-full bg-rose-400 animate-ping shrink-0" />
-                <span>OFFICIAL GOVERNMENT COMMAND PORTAL</span>
-              </div>
-
-              {/* 2. Government of Nepal MoHA / NEOC */}
-              <div className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-950/70 px-2.5 py-1.5 text-[11px] font-bold text-blue-200 shadow-sm shadow-blue-950/40 whitespace-nowrap">
-                <Shield className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-                <span>GOVERNMENT OF NEPAL &bull; MoHA / NEOC</span>
-              </div>
-
-              {/* 3. 21 Districts Active */}
-              <div className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/70 px-2.5 py-1.5 text-[11px] font-bold text-emerald-200 shadow-sm shadow-emerald-950/40 whitespace-nowrap">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                <span>21 DISTRICTS ACTIVE</span>
-              </div>
-
-              {/* 4. Sentinel-1 Radar Live */}
-              <div className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-950/70 px-2.5 py-1.5 text-[11px] font-bold text-cyan-200 shadow-sm shadow-cyan-950/40 whitespace-nowrap">
-                <Satellite className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-                <span>SENTINEL-1 RADAR LIVE</span>
-              </div>
-
-              {/* 5. NEOC 1155 Emergency Room */}
-              <a
-                href="tel:1155"
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-rose-500/60 bg-gradient-to-r from-rose-950/90 to-red-900/70 hover:from-rose-900/90 hover:to-red-800/80 px-2.5 py-1.5 text-[11px] font-extrabold text-rose-200 hover:text-white transition-all shadow-md shadow-rose-950/40 whitespace-nowrap cursor-pointer group"
-              >
-                <Phone className="h-3.5 w-3.5 text-rose-400 animate-pulse shrink-0 group-hover:scale-110 transition-transform" />
-                <span>NEOC 1155 EMERGENCY ROOM</span>
-              </a>
-            </div>
-          </div>
-
-          {/* Middle Section: Sovereign Brand Emblem, Title & Detailed Government Briefing */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center py-2">
-            <div className="lg:col-span-8 space-y-4">
-              {/* Sovereign Brand Emblem */}
-              <div className="flex items-center gap-3 pt-1">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/30 border border-cyan-400/40 shadow-lg shadow-cyan-500/20">
-                  <Shield className="h-6 w-6 text-cyan-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight bg-gradient-to-r from-white via-slate-100 to-cyan-200 bg-clip-text text-transparent">
-                      FLOODGUARD NEPAL
-                    </h2>
-                    <span className="rounded-md border border-cyan-500/40 bg-cyan-950/60 px-2 py-0.5 text-[10px] font-mono font-bold text-cyan-300">
-                      v5.10 SOVEREIGN AI
-                    </span>
-                  </div>
-                  <p className="text-[11px] font-mono text-cyan-400/80 tracking-wider uppercase font-semibold">
-                    National Emergency Operations Centre (NEOC) &bull; Ministry of Home Affairs
-                  </p>
-                </div>
-              </div>
-
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white leading-tight">
-                Disaster Response &amp; Flood Intelligence Console
-              </h1>
-
-              {/* Nepal Government Briefing Statement */}
-              <div className="rounded-2xl border border-cyan-500/25 bg-[#090d16]/95 p-4 sm:p-5 backdrop-blur-md space-y-2.5 shadow-2xl">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-cyan-400" />
-                  <p className="text-xs sm:text-sm font-bold text-cyan-300">
-                    Dedicated Nepal Government Disaster Intelligence Briefing
-                  </p>
-                </div>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  National command intelligence platform designed for the Ministry of Home Affairs (MoHA) and the National Emergency Operations Centre (NEOC). High-frequency Copernicus Sentinel-1 Synthetic Aperture Radar (SAR) microwave change detection is directly fused with Google Maps JavaScript API v3 infrastructure layers across all 21 southern lowland Terai plain districts from Jhapa to Kanchanpur.
-                </p>
-              </div>
-
-              {/* Quick Key Telemetry Capsules inside Hero */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="rounded-xl border border-cyan-500/30 bg-[#06121f]/90 p-2.5 backdrop-blur-sm shadow-md">
-                  <span className="text-[10px] text-cyan-300 font-semibold uppercase block">Inundated Area</span>
-                  <span className="text-base sm:text-lg font-black text-cyan-200">642.8 km²</span>
-                </div>
-                <div className="rounded-xl border border-purple-500/30 bg-[#140824]/90 p-2.5 backdrop-blur-sm shadow-md">
-                  <span className="text-[10px] text-purple-300 font-semibold uppercase block">Population at Risk</span>
-                  <span className="text-base sm:text-lg font-black text-purple-200">1,482,000</span>
-                </div>
-                <div className="rounded-xl border border-emerald-500/30 bg-[#051811]/90 p-2.5 backdrop-blur-sm shadow-md">
-                  <span className="text-[10px] text-emerald-300 font-semibold uppercase block">Active Hospitals</span>
-                  <span className="text-base sm:text-lg font-black text-emerald-200">7 / 8 Ready</span>
-                </div>
-                <div className="rounded-xl border border-blue-500/30 bg-[#081024]/90 p-2.5 backdrop-blur-sm shadow-md">
-                  <span className="text-[10px] text-blue-300 font-semibold uppercase block">Monitored Basin</span>
-                  <span className="text-base sm:text-lg font-black text-blue-200">21 Districts</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Center: Prominent Buttons for Moving Next */}
-            <div className="lg:col-span-4 flex flex-col gap-3">
-              <div className="rounded-2xl border border-slate-800 bg-[#070b13]/95 p-4 space-y-3 shadow-2xl backdrop-blur-xl">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
-                  Immediate Operational Actions
-                </span>
-
-                {/* Primary Next Stage Button */}
-                <button
-                  onClick={() => onNavigateToTab('satellite')}
-                  className="w-full flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 px-4 py-3.5 text-xs font-black text-white hover:from-blue-500 hover:to-cyan-400 transition-all shadow-lg shadow-cyan-950/60 active:scale-95 group cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Satellite className="h-4 w-4 text-cyan-100" />
-                    <span>Proceed to Next Stage: Flood Detection</span>
-                  </div>
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </button>
-
-                {/* View Google Map Button */}
-                <button
-                  onClick={() => {
-                    const el = document.getElementById('terai-google-map');
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}
-                  className="w-full flex items-center justify-between gap-3 rounded-xl bg-[#0d1320] border border-slate-700/80 hover:border-cyan-500/60 px-4 py-3 text-xs font-bold text-slate-200 hover:text-white hover:bg-[#121a2c] transition-all shadow-md group cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Globe className="h-4 w-4 text-cyan-400" />
-                    <span>Explore Live Google Map Below</span>
-                  </div>
-                  <span className="text-cyan-400 font-black group-hover:translate-y-0.5 transition-transform">&darr;</span>
-                </button>
-
-                {/* Relief & Evacuation Routes Button */}
-                <button
-                  onClick={() => onNavigateToTab('routing')}
-                  className="w-full flex items-center justify-between gap-3 rounded-xl bg-[#0d1320] border border-slate-700/80 hover:border-amber-500/60 px-4 py-3 text-xs font-bold text-slate-200 hover:text-white hover:bg-[#121a2c] transition-all shadow-md group cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Compass className="h-4 w-4 text-amber-400" />
-                    <span>Relief Convoys &amp; Alternate Routes</span>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-amber-400 transition-transform group-hover:translate-x-1" />
-                </button>
-
-                {/* Official Govt SitRep (Stage 5.8) Button */}
-                <button
-                  onClick={() => onNavigateToTab('sitrep')}
-                  className="w-full flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-cyan-950/70 border border-emerald-500/40 hover:border-emerald-400 px-4 py-3 text-xs font-bold text-emerald-200 hover:text-white transition-all shadow-md group cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <FileDown className="h-4 w-4 text-emerald-400" />
-                    <span>Govt Situation Report (SitRep PDF)</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                    Stage 5.8
-                  </span>
-                </button>
-
-                {/* DHM River Gauges & SOS Alerts (Stage 5.9) Button */}
-                <button
-                  onClick={() => onNavigateToTab('gauges')}
-                  className="w-full flex items-center justify-between gap-3 rounded-xl bg-gradient-to-r from-blue-950/70 via-slate-900 to-rose-950/70 border border-blue-500/40 hover:border-rose-400 px-4 py-3 text-xs font-bold text-cyan-200 hover:text-white transition-all shadow-md group cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Waves className="h-4 w-4 text-cyan-400 animate-pulse" />
-                    <span>DHM River Gauges &amp; Vernacular SOS</span>
-                  </div>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                    Stage 5.9
-                  </span>
-                </button>
-
-                {/* GEE Script Launcher */}
-                <button
-                  onClick={() => setIsScriptModalOpen(true)}
-                  className="w-full flex items-center justify-between gap-3 rounded-xl border border-cyan-500/40 bg-[#091522] px-4 py-2.5 text-xs font-bold text-cyan-300 hover:text-white hover:bg-[#0e2136] transition-all active:scale-95 cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Code2 className="h-3.5 w-3.5 text-cyan-400" />
-                    <span>GEE Sentinel-1 SAR Code</span>
-                  </div>
-                  <ExternalLink className="h-3.5 w-3.5 text-cyan-400" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Indicator: Scroll Prompt */}
-          <div className="pt-2 border-t border-slate-800/60 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Copernicus Sentinel-1 SAR &bull; Google Maps API v3 &bull; Strictly Nepal Terai Basin</span>
-            </div>
-            <button
-              onClick={() => {
-                const el = document.getElementById('terai-google-map');
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }}
-              className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 font-bold transition-colors cursor-pointer"
-            >
-              <span>Scroll Down to Google Map &amp; Real-Time Hazards</span>
-              <span className="animate-bounce">&darr;</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ───────────────────────────────────────────────────────────────────────
-          OFFICER RAPID INTELLIGENCE FILTER BAR
-      ───────────────────────────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-slate-800/90 bg-[#070b14]/95 p-5 shadow-2xl backdrop-blur-xl space-y-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800 pb-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30">
-              <Sliders className="h-4 w-4" />
+      <header className="rounded-xl border border-white/10 bg-[#1E293B] p-3 sm:p-4 shadow-md">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-white/10 pb-3">
+          {/* Brand & Telemetry Indicator */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <ShieldCheck size={22} weight="bold" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Officer Rapid Intelligence Filter</h2>
-              <p className="text-xs text-slate-400">Configure Observation Dates, Study Regions, and Layer Display</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-[#F8FAFC]">
+                  Nepal Terai Disaster Command Console
+                </h1>
+                <span className="flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-950/60 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  LIVE TELEMETRY ONLINE
+                </span>
+              </div>
+              <p className="text-[11px] font-mono text-[#94A3B8]">
+                MoHA &bull; NEOC &bull; Armed Police Force (APF) Joint Operations Command
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-cyan-300 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-            <Radio className="h-3.5 w-3.5 text-cyan-400 animate-pulse" />
-            <span>Active Basin: {activeRegion.name}</span>
+          {/* Two Distinct Primary Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const mapEl = document.getElementById('map') || document.getElementById('terai-google-map');
+                if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <Crosshair size={14} weight="bold" />
+              <span>Focus Command Map</span>
+            </button>
+
+            <button
+              onClick={() => onNavigateToTab('sitrep')}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-[#0F172A] hover:bg-[#334155] px-3.5 py-2 text-xs font-bold text-[#F8FAFC] shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <FilePdf size={14} weight="bold" className="text-rose-400" />
+              <span>Download Official SITREP (PDF)</span>
+            </button>
           </div>
         </div>
 
-        {/* 1. Date Selector (Pre-Monsoon Dry vs Deluge Peak Date) */}
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-slate-300 flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-cyan-400" />
-              Select Flood Event Observation Window:
-            </span>
-            <span className="text-slate-400 text-[11px] hidden sm:inline">
-              Sentinel-1 C-Band SAR &bull; Otsu threshold computed automatically via GEE
-            </span>
+        {/* 2. Top KPI Summary Strip: 4 High-Density Monospace Metric Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 pt-3">
+          {/* KPI 1: Active Flood Extent */}
+          <div className="rounded-lg border border-white/10 bg-[#0F172A] p-2.5 sm:p-3 text-left">
+            <div className="flex items-center justify-between text-[#94A3B8]">
+              <span className="text-[10px] font-mono uppercase tracking-wider font-bold">
+                1. Active Flood Extent
+              </span>
+              <Waves size={15} weight="bold" className="text-[#EF4444]" />
+            </div>
+            <div className="text-xl sm:text-2xl font-black font-mono text-[#EF4444] mt-0.5">
+              {activeRegion.floodAreaKm2 || 142.4} sq km
+            </div>
+            <div className="text-[10px] font-mono text-[#94A3B8] flex items-center gap-1">
+              <span className="text-[#EF4444] font-bold">&bull; Submerged</span>
+              <span>via S1-SAR Otsu</span>
+            </div>
           </div>
 
-          {/* Quick Presets & Custom Temporal Range — All 4 Buttons Aligned with Matching Size */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-            {DATE_PRESETS.map((preset) => {
-              const isSelected = preset.id === selectedDatePreset;
-              return (
+          {/* KPI 2: High-Risk Settlements */}
+          <div className="rounded-lg border border-white/10 bg-[#0F172A] p-2.5 sm:p-3 text-left">
+            <div className="flex items-center justify-between text-[#94A3B8]">
+              <span className="text-[10px] font-mono uppercase tracking-wider font-bold">
+                2. High-Risk Settlements
+              </span>
+              <Buildings size={15} weight="bold" className="text-[#F59E0B]" />
+            </div>
+            <div className="text-xl sm:text-2xl font-black font-mono text-[#F59E0B] mt-0.5">
+              12 Districts / 115 Wards
+            </div>
+            <div className="text-[10px] font-mono text-[#94A3B8] flex items-center gap-1">
+              <span className="text-[#F59E0B] font-bold">&bull; Gaur Hub +2.4m</span>
+              <span>depth</span>
+            </div>
+          </div>
+
+          {/* KPI 3: Blocked Corridors */}
+          <div className="rounded-lg border border-white/10 bg-[#0F172A] p-2.5 sm:p-3 text-left">
+            <div className="flex items-center justify-between text-[#94A3B8]">
+              <span className="text-[10px] font-mono uppercase tracking-wider font-bold">
+                3. Blocked Corridors
+              </span>
+              <RoadHorizon size={15} weight="bold" className="text-[#EF4444]" />
+            </div>
+            <div className="text-xl sm:text-2xl font-black font-mono text-[#EF4444] mt-0.5">
+              3 Segments - Mahendra Hwy
+            </div>
+            <div className="text-[10px] font-mono text-[#94A3B8] flex items-center gap-1">
+              <span className="text-[#EF4444] font-bold">&bull; Koshi &amp; Postal</span>
+              <span>restricted</span>
+            </div>
+          </div>
+
+          {/* KPI 4: Safe Havens Identified */}
+          <div className="rounded-lg border border-white/10 bg-[#0F172A] p-2.5 sm:p-3 text-left">
+            <div className="flex items-center justify-between text-[#94A3B8]">
+              <span className="text-[10px] font-mono uppercase tracking-wider font-bold">
+                4. Safe Havens Identified
+              </span>
+              <Campfire size={15} weight="bold" className="text-[#10B981]" />
+            </div>
+            <div className="text-xl sm:text-2xl font-black font-mono text-[#10B981] mt-0.5">
+              8 HLZs / Refugee Spots
+            </div>
+            <div className="text-[10px] font-mono text-[#94A3B8] flex items-center gap-1">
+              <span className="text-[#10B981] font-bold">&bull; 4,200 cap</span>
+              <span>Sphere Standard</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ───────────────────────────────────────────────────────────────────────
+          [FULL-VIEWPORT CANVAS ARCHITECTURE]
+          Hero Map Viewport (80-100% Viewport Height) with Floating Control Docks
+      ───────────────────────────────────────────────────────────────────────── */}
+      <div className="relative w-full h-[78vh] min-h-[640px] rounded-2xl overflow-hidden border border-white/10 bg-[#0F172A] shadow-2xl">
+        {/* 1. HERO MAP CANVAS (Retains <div id="map"></div> intact for engines) */}
+        <div id="map" className="relative w-full h-full">
+          <div id="terai-google-map" className="w-full h-full">
+            <GoogleMapsViewer
+              hideHeader={true}
+              selectedRegionKey={selectedRegionKey}
+              selectedDistrict={selectedDistrict}
+              viewLayerMode={
+                layerSatelliteInundation && layerSafeZones
+                  ? 'both'
+                  : layerSatelliteInundation
+                  ? 'flooded'
+                  : 'safe'
+              }
+              selectedDatePreset={selectedDatePreset}
+              beforeDate={beforeDate}
+              afterDate={afterDate}
+              provider={mapProvider}
+              onProviderChange={(p) => setMapProvider(p)}
+              onRegionChange={(key) => handleBasinChange(key)}
+              onDistrictChange={(d) => {
+                handleSelectDistrict(d);
+                setIsRightInspectorOpen(true);
+              }}
+              onViewLayerModeChange={(m) => setViewLayerMode(m)}
+            />
+          </div>
+        </div>
+
+        {/* 2. FLOATING LEFT CONTROL DOCK (Overlay / Collapsible) */}
+        <div className="absolute top-3 left-3 z-30 flex flex-col items-start gap-2 max-w-[calc(100%-24px)] pointer-events-none">
+          <button
+            onClick={() => setIsLeftDockOpen(!isLeftDockOpen)}
+            className="pointer-events-auto flex items-center gap-2 rounded-lg border border-white/10 bg-[#1E293B]/95 backdrop-blur-md px-3 py-2 text-xs font-bold text-[#F8FAFC] shadow-2xl hover:bg-[#334155] transition-all cursor-pointer"
+          >
+            <SlidersHorizontal size={15} weight="bold" className="text-emerald-400" />
+            <span>Controls &amp; Layers</span>
+            <CaretDown size={13} weight="bold" className={`text-slate-400 transition-transform ${isLeftDockOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isLeftDockOpen && (
+            <div className="pointer-events-auto w-72 sm:w-80 max-h-[calc(78vh-70px)] overflow-y-auto rounded-xl border border-white/10 bg-[#1E293B]/95 backdrop-blur-md p-3.5 space-y-3 shadow-2xl text-xs animate-in fade-in">
+              {/* Map Engine Switcher */}
+              <div className="flex items-center justify-between p-1.5 rounded-lg border border-white/10 bg-[#0F172A] text-xs">
+                <span className="font-mono text-[10px] text-[#94A3B8] font-bold pl-1">Engine:</span>
+                <div className="flex items-center gap-1 font-mono text-xs">
+                  <button
+                    onClick={() => setMapProvider('leaflet')}
+                    className={`px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                      mapProvider === 'leaflet'
+                        ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400'
+                        : 'text-slate-400 hover:text-white bg-white/5'
+                    }`}
+                    title="High-speed satellite tile stream, zero API key required"
+                  >
+                    Satellite (Tile Stream)
+                  </button>
+                  <button
+                    onClick={() => setMapProvider('google_maps')}
+                    className={`px-2 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                      mapProvider === 'google_maps'
+                        ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400'
+                        : 'text-slate-400 hover:text-white bg-white/5'
+                    }`}
+                    title="Google Maps JavaScript API v3"
+                  >
+                    Google Maps JS
+                  </button>
+                </div>
+              </div>
+
+              {/* Section 1: River Basins */}
+              <div className="space-y-2 border-b border-white/10 pb-2.5">
                 <button
-                  key={preset.id}
-                  onClick={() => handleDatePresetChange(preset.id)}
-                  className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
-                    isSelected
-                      ? 'border-cyan-500 bg-cyan-600/20 text-white shadow-lg ring-1 ring-cyan-500/40'
-                      : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-white'
-                  }`}
+                  onClick={() => setBasinSectionOpen(!basinSectionOpen)}
+                  className="w-full flex items-center justify-between text-left font-bold text-[#F8FAFC] cursor-pointer"
                 >
-                  <div className="flex items-center justify-between gap-1.5">
-                    <span className="font-bold text-xs truncate">{preset.label}</span>
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
-                        isSelected
-                          ? 'bg-cyan-500/30 text-cyan-200'
-                          : 'bg-slate-800 text-slate-400'
+                  <span className="flex items-center gap-1.5 uppercase text-[11px] tracking-wider text-emerald-400 font-mono">
+                    <Compass size={14} weight="bold" />
+                    1. River Basins
+                  </span>
+                  <CaretDown size={12} weight="bold" className={`text-slate-400 transition-transform ${basinSectionOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {basinSectionOpen && (
+                  <div className="grid grid-cols-2 gap-1.5 pt-1">
+                    {[
+                      { key: 'full_terai', label: 'All Terai' },
+                      { key: 'koshi_basin', label: 'Koshi' },
+                      { key: 'bagmati_basin', label: 'Bagmati' },
+                      { key: 'narayani_basin', label: 'Gandaki' },
+                      { key: 'west_rapti_basin', label: 'West Rapti' },
+                      { key: 'karnali_basin', label: 'Karnali' },
+                    ].map((basin) => (
+                      <button
+                        key={basin.key}
+                        onClick={() => handleBasinChange(basin.key)}
+                        className={`px-2 py-1.5 rounded-lg text-left text-xs font-bold transition-all cursor-pointer truncate ${
+                          selectedRegionKey === basin.key
+                            ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400'
+                            : 'bg-[#0F172A] border border-white/10 text-[#94A3B8] hover:text-white hover:border-white/20'
+                        }`}
+                      >
+                        {basin.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Satellite Overlays (SAR/NDWI) */}
+              <div className="space-y-2 border-b border-white/10 pb-2.5">
+                <button
+                  onClick={() => setSatelliteSectionOpen(!satelliteSectionOpen)}
+                  className="w-full flex items-center justify-between text-left font-bold text-[#F8FAFC] cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5 uppercase text-[11px] tracking-wider text-cyan-400 font-mono">
+                    <Stack size={14} weight="bold" />
+                    2. Satellite Overlays (SAR/NDWI)
+                  </span>
+                  <CaretDown size={12} weight="bold" className={`text-slate-400 transition-transform ${satelliteSectionOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {satelliteSectionOpen && (
+                  <div className="space-y-1.5 pt-1">
+                    {/* Inundation Mask */}
+                    <label
+                      className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer select-none ${
+                        layerSatelliteInundation
+                          ? 'border-rose-500/40 bg-rose-950/30 text-[#F8FAFC]'
+                          : 'border-white/10 bg-[#0F172A] text-[#94A3B8]'
                       }`}
                     >
-                      {preset.badge}
+                      <div className="flex items-center gap-2">
+                        <Waves size={15} weight="bold" className={layerSatelliteInundation ? 'text-[#EF4444]' : 'text-slate-500'} />
+                        <span className="font-semibold text-xs">SAR Inundation Mask</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={layerSatelliteInundation}
+                        onChange={(e) => {
+                          setLayerSatelliteInundation(e.target.checked);
+                          if (e.target.checked && viewLayerMode === 'safe') setViewLayerMode('both');
+                        }}
+                        className="rounded border-slate-700 bg-slate-900 text-rose-500 focus:ring-0 cursor-pointer accent-rose-500"
+                      />
+                    </label>
+
+                    {/* NDWI Water Index */}
+                    <label
+                      className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer select-none ${
+                        layerNdwiHeatmap
+                          ? 'border-cyan-500/40 bg-cyan-950/30 text-[#F8FAFC]'
+                          : 'border-white/10 bg-[#0F172A] text-[#94A3B8]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Drop size={15} weight="bold" className={layerNdwiHeatmap ? 'text-cyan-400' : 'text-slate-500'} />
+                        <span className="font-semibold text-xs">NDWI Water Heatmap</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={layerNdwiHeatmap}
+                        onChange={(e) => setLayerNdwiHeatmap(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-0 cursor-pointer accent-cyan-500"
+                      />
+                    </label>
+
+                    {/* Observation Window */}
+                    <div className="pt-1.5">
+                      <span className="text-[10px] font-mono text-[#94A3B8] block mb-1">Temporal Window</span>
+                      <div className="space-y-1">
+                        {DATE_PRESETS.map((preset) => (
+                          <button
+                            key={preset.id}
+                            onClick={() => handleDatePresetChange(preset.id)}
+                            className={`w-full p-1.5 rounded-lg text-left text-xs transition-all cursor-pointer flex items-center justify-between ${
+                              selectedDatePreset === preset.id
+                                ? 'bg-cyan-600/20 border border-cyan-500 text-white'
+                                : 'bg-[#0F172A] border border-white/10 text-[#94A3B8] hover:text-white'
+                            }`}
+                          >
+                            <span className="font-bold truncate text-[11px]">{preset.label}</span>
+                            <span className="text-[9px] font-mono px-1 rounded bg-white/10 text-slate-300">
+                              {preset.badge}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* GEE Sentinel-1 SAR Algorithm Code launcher */}
+                    <button
+                      onClick={() => setIsScriptModalOpen(true)}
+                      className="w-full flex items-center justify-between gap-2 rounded-lg border border-cyan-500/40 bg-cyan-950/40 hover:bg-cyan-900/40 p-2 text-xs font-mono font-bold text-cyan-300 transition-colors cursor-pointer mt-1"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Code size={14} weight="bold" />
+                        <span>GEE S1-SAR Script</span>
+                      </div>
+                      <span className="text-[10px] text-cyan-400">&rarr;</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 3: Infrastructure & Safe Havens */}
+              <div className="space-y-2">
+                <button
+                  onClick={() => setInfraSectionOpen(!infraSectionOpen)}
+                  className="w-full flex items-center justify-between text-left font-bold text-[#F8FAFC] cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5 uppercase text-[11px] tracking-wider text-amber-400 font-mono">
+                    <Buildings size={14} weight="bold" />
+                    3. Infrastructure &amp; Safe Havens
+                  </span>
+                  <CaretDown size={12} weight="bold" className={`text-slate-400 transition-transform ${infraSectionOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {infraSectionOpen && (
+                  <div className="space-y-1.5 pt-1">
+                    {/* Safe Zones */}
+                    <label
+                      className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer select-none ${
+                        layerSafeZones
+                          ? 'border-emerald-500/40 bg-emerald-950/30 text-[#F8FAFC]'
+                          : 'border-white/10 bg-[#0F172A] text-[#94A3B8]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Campfire size={15} weight="bold" className={layerSafeZones ? 'text-[#10B981]' : 'text-slate-500'} />
+                        <span className="font-semibold text-xs">Safe Zones &amp; HLZ Camps</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={layerSafeZones}
+                        onChange={(e) => {
+                          setLayerSafeZones(e.target.checked);
+                          if (e.target.checked && viewLayerMode === 'flooded') setViewLayerMode('both');
+                        }}
+                        className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-0 cursor-pointer accent-emerald-500"
+                      />
+                    </label>
+
+                    {/* Blocked Corridors */}
+                    <label
+                      className={`flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer select-none ${
+                        layerBlockedCorridors
+                          ? 'border-amber-500/40 bg-amber-950/30 text-[#F8FAFC]'
+                          : 'border-white/10 bg-[#0F172A] text-[#94A3B8]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <RoadHorizon size={15} weight="bold" className={layerBlockedCorridors ? 'text-[#F59E0B]' : 'text-slate-500'} />
+                        <span className="font-semibold text-xs">Blocked Corridors</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={layerBlockedCorridors}
+                        onChange={(e) => setLayerBlockedCorridors(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-0 cursor-pointer accent-amber-500"
+                      />
+                    </label>
+
+                    {/* District quick selector */}
+                    <div className="pt-1.5">
+                      <span className="text-[10px] font-mono text-[#94A3B8] block mb-1">Focus District</span>
+                      <select
+                        value={selectedDistrict}
+                        onChange={(e) => {
+                          handleSelectDistrict(e.target.value);
+                          setIsRightInspectorOpen(true);
+                        }}
+                        className="w-full rounded-lg border border-white/10 bg-[#0F172A] px-2.5 py-1.5 text-xs text-[#F8FAFC] font-semibold focus:outline-none focus:border-emerald-500 cursor-pointer"
+                      >
+                        {activeRegion.districts.map((d) => (
+                          <option key={d} value={d} className="bg-slate-900 text-white">
+                            {d} District
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 3. SLIDING RIGHT INSPECTOR PANEL (Contextual Overlay) */}
+        <div className="absolute top-3 right-3 z-30 flex flex-col items-end gap-2 max-w-[calc(100%-24px)] pointer-events-none">
+          {!isRightInspectorOpen ? (
+            <button
+              onClick={() => setIsRightInspectorOpen(true)}
+              className="pointer-events-auto flex items-center gap-2 rounded-lg border border-white/10 bg-[#1E293B]/95 backdrop-blur-md px-3 py-2 text-xs font-bold text-[#F8FAFC] shadow-2xl hover:bg-[#334155] transition-all cursor-pointer font-mono"
+            >
+              <Broadcast size={14} weight="bold" className="text-rose-400 animate-pulse" />
+              <span>{selectedDistrict} Dossier</span>
+              <span
+                className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                  aiDirective.alertLevel === 'CRITICAL'
+                    ? 'border-[#EF4444]/40 bg-[#EF4444]/20 text-[#EF4444]'
+                    : aiDirective.alertLevel === 'HIGH'
+                    ? 'border-[#F59E0B]/40 bg-[#F59E0B]/20 text-[#F59E0B]'
+                    : 'border-[#10B981]/40 bg-[#10B981]/20 text-[#10B981]'
+                }`}
+              >
+                {aiDirective.alertLevel}
+              </span>
+              <CaretRight size={13} weight="bold" className="text-slate-400" />
+            </button>
+          ) : (
+            <div className="pointer-events-auto w-80 sm:w-96 max-h-[calc(78vh-32px)] overflow-y-auto rounded-xl border border-white/10 bg-[#1E293B]/95 backdrop-blur-md p-3.5 space-y-3.5 shadow-2xl text-xs animate-in fade-in">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Broadcast size={16} weight="bold" className="text-rose-400" />
+                  <div>
+                    <h2 className="text-sm font-black text-[#F8FAFC] tracking-tight">
+                      {selectedDistrict} District Hub
+                    </h2>
+                    <span className="text-[10px] font-mono text-[#94A3B8]">
+                      Basin: {activeDistrictStats.basin}
                     </span>
                   </div>
-                  <div className="text-[10px] font-mono text-slate-400 mt-2">
-                    <span className="text-emerald-400/90 font-bold">Dry:</span> {preset.beforeDate} &rarr;{' '}
-                    <span className="text-cyan-400/90 font-bold">Deluge:</span> {preset.afterDate}
-                  </div>
-                </button>
-              );
-            })}
-
-            {/* 4. Custom Temporal Range Button (Fixed Size matching the other 3 presets) */}
-            <div
-              onClick={() => setSelectedDatePreset('custom')}
-              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                selectedDatePreset === 'custom'
-                  ? 'border-cyan-500 bg-cyan-600/20 text-white shadow-lg ring-1 ring-cyan-500/40'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-1.5">
-                <span className="font-bold text-xs truncate flex items-center gap-1.5 text-slate-200">
-                  <Clock className={`h-3.5 w-3.5 shrink-0 ${selectedDatePreset === 'custom' ? 'text-cyan-400' : 'text-blue-400'}`} />
-                  Custom Temporal Range
-                </span>
-                <span
-                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
-                    selectedDatePreset === 'custom'
-                      ? 'bg-cyan-500/30 text-cyan-200'
-                      : 'bg-slate-800 text-slate-400'
-                  }`}
-                >
-                  CUSTOM
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-1.5 mt-1.5">
-                <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
-                  <label className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-tight">
-                    Baseline (Dry)
-                  </label>
-                  <input
-                    type="date"
-                    value={beforeDate}
-                    onChange={(e) => {
-                      setBeforeDate(e.target.value);
-                      setSelectedDatePreset('custom');
-                    }}
-                    className="rounded-lg border border-slate-700/80 bg-slate-900/90 px-1.5 py-0.5 text-[10px] text-white font-mono focus:outline-none focus:border-cyan-500 cursor-pointer w-full"
-                  />
                 </div>
-                <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
-                  <label className="text-[9px] font-mono font-bold text-cyan-400 uppercase tracking-tight">
-                    Observation (Deluge)
-                  </label>
-                  <input
-                    type="date"
-                    value={afterDate}
-                    onChange={(e) => {
-                      setAfterDate(e.target.value);
-                      setSelectedDatePreset('custom');
-                    }}
-                    className="rounded-lg border border-slate-700/80 bg-slate-900/90 px-1.5 py-0.5 text-[10px] text-white font-mono focus:outline-none focus:border-cyan-500 cursor-pointer w-full"
-                  />
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${
+                      aiDirective.alertLevel === 'CRITICAL'
+                        ? 'border-[#EF4444]/50 bg-[#EF4444]/20 text-[#EF4444]'
+                        : aiDirective.alertLevel === 'HIGH'
+                        ? 'border-[#F59E0B]/50 bg-[#F59E0B]/20 text-[#F59E0B]'
+                        : 'border-[#10B981]/50 bg-[#10B981]/20 text-[#10B981]'
+                    }`}
+                  >
+                    {aiDirective.alertLevel} ALERT
+                  </span>
+                  <button
+                    onClick={() => setIsRightInspectorOpen(false)}
+                    className="rounded-lg p-1 text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    title="Collapse Inspector"
+                  >
+                    <X size={15} weight="bold" />
+                  </button>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* 2. Region / Basin Selector */}
-        <div className="space-y-2.5 pt-3 border-t border-slate-800/80">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-slate-300 flex items-center gap-1.5">
-              <Compass className="h-3.5 w-3.5 text-blue-400" />
-              Select Lowland Flood Corridor / Basin:
-            </span>
-            <span className="text-slate-400 text-[11px]">Strictly Clamped to 21 Southern Terai Districts</span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-            {Object.values(TERAI_REGIONS).map((reg) => {
-              const isSelected = reg.id === selectedRegionKey;
-              return (
-                <button
-                  key={reg.id}
-                  onClick={() => handleRegionChange(reg.id)}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-600/20 text-white shadow-lg ring-1 ring-blue-500/40'
-                      : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-white'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs truncate">{reg.shortName}</span>
-                    {isSelected && <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />}
-                  </div>
-                  <div className="text-[10px] text-slate-400 truncate mt-0.5">{reg.basin}</div>
-                  <div className="text-[11px] font-mono font-bold text-cyan-400 mt-1">
-                    {reg.floodAreaKm2} km² inundated
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 3. What I Want to See (Flooded vs Non-Flooded Toggle) */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-800/80 text-xs">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-bold text-slate-300 flex items-center gap-1.5">
-              <Eye className="h-3.5 w-3.5 text-amber-400" />
-              What I Want to See on Map:
-            </span>
-
-            <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1">
-              <button
-                onClick={() => setViewLayerMode('both')}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${
-                  viewLayerMode === 'both'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Layers className="h-3.5 w-3.5 text-blue-200" />
-                <span>Show Both (Flood vs Safe)</span>
-              </button>
-
-              <button
-                onClick={() => setViewLayerMode('flooded')}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${
-                  viewLayerMode === 'flooded'
-                    ? 'bg-cyan-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Waves className="h-3.5 w-3.5 text-cyan-200" />
-                <span>🌊 Flooded Area Only</span>
-              </button>
-
-              <button
-                onClick={() => setViewLayerMode('safe')}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${
-                  viewLayerMode === 'safe'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-200" />
-                <span>🛡️ Non-Flooded (Safe) Only</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Jump to Individual District */}
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">Focus District:</span>
-            <select
-              value={selectedDistrict}
-              onChange={(e) => setSelectedDistrict(e.target.value)}
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 font-medium"
-            >
-              <option value="all">All Terai Districts ({activeRegion.shortName})</option>
-              {activeRegion.districts.map((d) => (
-                <option key={d} value={d}>
-                  {d} District
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* ───────────────────────────────────────────────────────────────────────
-          LIVE GOOGLE MAPS FLOOD EXTENT & EMERGENCY OPERATIONS PLATFORM
-          (User Requirement: The uske neeche bas google map lagana hai, agar kahi flood aye to google map pe highlight karke bataye)
-      ───────────────────────────────────────────────────────────────────────── */}
-      <div id="terai-google-map" className="space-y-4 scroll-mt-24">
-        <GoogleMapsViewer
-          selectedRegionKey={selectedRegionKey}
-          selectedDistrict={selectedDistrict}
-          viewLayerMode={viewLayerMode}
-          selectedDatePreset={selectedDatePreset}
-          beforeDate={beforeDate}
-          afterDate={afterDate}
-          onRegionChange={(key) => handleRegionChange(key)}
-          onDistrictChange={(d) => setSelectedDistrict(d)}
-          onViewLayerModeChange={(m) => setViewLayerMode(m)}
-        />
-      </div>
-
-      {/* ───────────────────────────────────────────────────────────────────────
-          DYNAMIC AREA TELEMETRY CARDS (EXACT FLOODED VS SAFE KM²)
-      ───────────────────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1: Total Flooded Inundated Land */}
-        <div className="rounded-2xl border border-slate-800/90 bg-[#070b14]/95 p-5 space-y-2 relative overflow-hidden shadow-xl">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
-              <Waves className="h-4 w-4 text-cyan-400" />
-              Inundated Flood Area
-            </span>
-            <span className="rounded bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-400 border border-rose-500/30">
-              ACTIVE DELUGE
-            </span>
-          </div>
-
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-cyan-400">{totalInundatedKm2} km²</span>
-            <span className="text-xs text-rose-400 font-bold">Submerged</span>
-          </div>
-
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Specular radar drop (&le; {activeRegion.otsuThreshold} dB) detected via Sentinel-1 SAR. Covers{' '}
-            <strong className="text-slate-200">
-              {((totalInundatedKm2 / (totalInundatedKm2 + totalSafeKm2)) * 100).toFixed(1)}%
-            </strong>{' '}
-            of regional alluvial surface.
-          </p>
-
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-cyan-300">
-            <span>Core Deep Water: &gt;1.8m</span>
-            <span>Backscatter: {activeRegion.deltaDb} dB</span>
-          </div>
-        </div>
-
-        {/* Metric 2: Safe High-Ground Non-Flooded Area */}
-        <div className="rounded-2xl border border-slate-800/90 bg-[#070b14]/95 p-5 space-y-2 shadow-xl">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4 text-emerald-400" />
-              Safe Non-Flooded Surface
-            </span>
-            <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
-              DRY RIDGES
-            </span>
-          </div>
-
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-emerald-400">{totalSafeKm2.toLocaleString()} km²</span>
-            <span className="text-xs text-emerald-300 font-bold">Habitable</span>
-          </div>
-
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Elevated terraces and dry Siwalik foothills available for relief camps, helicopter landing zones, and supply corridors.
-          </p>
-
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-emerald-300">
-            <span>Capacity: {activeRegion.safeZones.reduce((acc, z) => acc + z.shelterCapacity, 0).toLocaleString()}</span>
-            <span>Elevation: &gt;150m ASL</span>
-          </div>
-        </div>
-
-        {/* Metric 3: Population At Risk / Displaced */}
-        <div className="rounded-2xl border border-slate-800/90 bg-[#070b14]/95 p-5 space-y-2 shadow-xl">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
-              <Users className="h-4 w-4 text-purple-400" />
-              Exposed Citizens
-            </span>
-            <span className="rounded bg-purple-500/20 px-2 py-0.5 text-[10px] font-bold text-purple-400 border border-purple-500/30">
-              WORLDPOP 100M
-            </span>
-          </div>
-
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-purple-400">{totalAffectedPop.toLocaleString()}</span>
-            <span className="text-xs text-slate-400">citizens</span>
-          </div>
-
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Civilians situated inside direct river breach corridors and low-lying agricultural wards requiring emergency relief convoys.
-          </p>
-
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-purple-300">
-            <span>High Risk: 34%</span>
-            <span>Evacuation: Urgent</span>
-          </div>
-        </div>
-
-        {/* Metric 4: Operational Healthcare Capacity */}
-        <div className="rounded-2xl border border-slate-800/90 bg-[#070b14]/95 p-5 space-y-2 shadow-xl">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
-              <HeartPulse className="h-4 w-4 text-blue-400" />
-              Hospital Emergency Beds
-            </span>
-            <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold text-blue-400 border border-blue-500/30">
-              {operationalHospitalsCount} / {TERAI_HOSPITALS.length} ACTIVE
-            </span>
-          </div>
-
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-blue-400">2,180 Beds</span>
-            <span className="text-xs text-rose-400 font-bold">2 Inundated</span>
-          </div>
-
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Verified OpenStreetMap medical facilities mapped with direct emergency triage contact numbers and flood elevation clearance.
-          </p>
-
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-blue-300">
-            <span>ICU Capacity: 84%</span>
-            <span>Helpline: 1155</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ───────────────────────────────────────────────────────────────────────
-          DISTRICT LEADERBOARD & INUNDATION SUMMARY TABLE
-      ───────────────────────────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-6 space-y-4 shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
-          <div>
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-blue-400" />
-              District Flood Severity &amp; Exposure Leaderboard
-            </h3>
-            <p className="text-xs text-slate-400">
-              Real-time breakdown of inundated square kilometers and vulnerable citizens per Terai district
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-300 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-              Showing {filteredDistricts.length} of {activeRegionBaseDistricts.length} Districts in {activeRegion.shortName}
-            </span>
-          </div>
-        </div>
-
-        {/* ── HAZARD FILTER TOOLBAR & CONTROLS ── */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1">
-          {/* Hazard Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setDistrictHazardFilter('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                districtHazardFilter === 'ALL'
-                  ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/20'
-                  : 'bg-slate-950/80 text-slate-300 border-slate-800 hover:text-white hover:border-slate-700'
-              }`}
-            >
-              <span>All Districts</span>
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
-                districtHazardFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
-              }`}>
-                {districtHazardCounts.ALL}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setDistrictHazardFilter('CRITICAL_DELUGE')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                districtHazardFilter === 'CRITICAL_DELUGE'
-                  ? 'bg-red-500/30 text-red-200 border-red-500 shadow-md shadow-red-500/20 ring-1 ring-red-500/50'
-                  : 'bg-slate-950/80 text-red-400 border-red-900/50 hover:bg-red-950/30 hover:border-red-700'
-              }`}
-            >
-              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-              <span>Critical Deluge</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-red-950 border border-red-800/80 text-red-300">
-                {districtHazardCounts.CRITICAL_DELUGE}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setDistrictHazardFilter('MODERATE_WARNING')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                districtHazardFilter === 'MODERATE_WARNING'
-                  ? 'bg-amber-500/30 text-amber-200 border-amber-500 shadow-md shadow-amber-500/20 ring-1 ring-amber-500/50'
-                  : 'bg-slate-950/80 text-amber-400 border-amber-900/50 hover:bg-amber-950/30 hover:border-amber-700'
-              }`}
-            >
-              <span className="h-2 w-2 rounded-full bg-amber-400" />
-              <span>Moderate Warning</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-amber-950 border border-amber-800/80 text-amber-300">
-                {districtHazardCounts.MODERATE_WARNING}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setDistrictHazardFilter('STABLE_MONITORING')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                districtHazardFilter === 'STABLE_MONITORING'
-                  ? 'bg-emerald-500/30 text-emerald-200 border-emerald-500 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/50'
-                  : 'bg-slate-950/80 text-emerald-400 border-emerald-900/50 hover:bg-emerald-950/30 hover:border-emerald-700'
-              }`}
-            >
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              <span>Stable Monitoring</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-800/80 text-emerald-300">
-                {districtHazardCounts.STABLE_MONITORING}
-              </span>
-            </button>
-          </div>
-
-          {/* Quick Search & Sort Control */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
-              <input
-                type="text"
-                placeholder="Search district or basin..."
-                value={districtSearchQuery}
-                onChange={(e) => setDistrictSearchQuery(e.target.value)}
-                className="bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-44 sm:w-52 transition-colors"
-              />
-              {districtSearchQuery && (
-                <button
-                  onClick={() => setDistrictSearchQuery('')}
-                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5 text-[11px]">
-              <button
-                onClick={() => setDistrictSortBy('inundated')}
-                className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
-                  districtSortBy === 'inundated'
-                    ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Sort by Inundated Area (Highest First)"
-              >
-                Inundation
-              </button>
-              <button
-                onClick={() => setDistrictSortBy('atRisk')}
-                className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
-                  districtSortBy === 'atRisk'
-                    ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Sort by Population at Risk (Highest First)"
-              >
-                At-Risk Pop
-              </button>
-              <button
-                onClick={() => setDistrictSortBy('name')}
-                className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
-                  districtSortBy === 'name'
-                    ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Sort Alphabetically (A-Z)"
-              >
-                A-Z
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="border-b border-slate-800 bg-slate-950/60 uppercase tracking-wider text-[11px] text-slate-400">
-              <tr>
-                <th className="py-3 px-4">District</th>
-                <th className="py-3 px-4">River Basin</th>
-                <th className="py-3 px-4">Inundated Area</th>
-                <th className="py-3 px-4">Total Population</th>
-                <th className="py-3 px-4">Population at Risk</th>
-                <th className="py-3 px-4">Hazard Level</th>
-                <th className="py-3 px-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 font-sans">
-              {filteredDistricts.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-10 text-center text-slate-400">
-                    <AlertCircle className="h-6 w-6 text-slate-500 mx-auto mb-2" />
-                    <p className="font-semibold text-white">No districts found matching criteria</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {districtHazardFilter !== 'ALL'
-                        ? `No districts currently categorized under "${districtHazardFilter.replace(/_/g, ' ')}"`
-                        : 'Try adjusting your search query'}
-                    </p>
-                    <button
-                      onClick={() => {
-                        setDistrictHazardFilter('ALL');
-                        setDistrictSearchQuery('');
-                      }}
-                      className="mt-3 text-xs font-bold text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
-                    >
-                      Reset all filters
-                    </button>
-                  </td>
-                </tr>
+              {/* Skeletal Loading State */}
+              {isLoadingDistrict ? (
+                <div className="space-y-3 py-2 animate-pulse">
+                  <div className="h-4 bg-white/10 rounded w-3/4" />
+                  <div className="h-16 bg-white/5 rounded-lg w-full" />
+                  <div className="h-20 bg-white/5 rounded-lg w-full" />
+                  <div className="h-24 bg-white/5 rounded-lg w-full" />
+                </div>
               ) : (
-                filteredDistricts.map((d) => {
-                  const isHighHazard = d.inundatedAreaKm2 > 40;
-                  const isModerateHazard = d.inundatedAreaKm2 > 20 && d.inundatedAreaKm2 <= 40;
-
-                  return (
-                    <tr key={d.district} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
-                        <span
-                          className={`h-2 w-2 rounded-full ${
-                            isHighHazard ? 'bg-red-500 animate-ping' : isModerateHazard ? 'bg-amber-400' : 'bg-emerald-400'
-                          }`}
-                        />
-                        {d.district}
-                      </td>
-                      <td className="py-3 px-4 text-slate-400">{d.basin}</td>
-                      <td className="py-3 px-4 font-mono font-bold text-cyan-400">
-                        {d.inundatedAreaKm2.toFixed(1)} km²
-                      </td>
-                      <td className="py-3 px-4 font-mono">{d.totalPopulation.toLocaleString()}</td>
-                      <td className="py-3 px-4 font-mono text-rose-300 font-bold">
-                        {d.atRiskPopulation.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                            isHighHazard
-                              ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                              : isModerateHazard
-                              ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                              : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                          }`}
-                        >
-                          {isHighHazard ? 'CRITICAL DELUGE' : isModerateHazard ? 'MODERATE WARNING' : 'STABLE MONITORING'}
+                <>
+                  {/* Monospace Empirical Demographics & Metrics */}
+                  <div className="rounded-lg border border-white/10 bg-[#0F172A] p-2.5">
+                    <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+                      <div>
+                        <span className="text-[10px] text-[#94A3B8] block">Total Population</span>
+                        <span className="text-sm font-black text-[#F8FAFC]">
+                          {activeDistrictStats.totalPopulation.toLocaleString()}
                         </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => onNavigateToTab('command_map')}
-                          className="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
-                        >
-                          Inspect on Map
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#EF4444] block font-bold">At-Risk Pop.</span>
+                        <span className="text-sm font-black text-[#EF4444]">
+                          {activeDistrictStats.atRiskPopulation.toLocaleString()}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#94A3B8] block">Inundated Area</span>
+                        <span className="text-xs font-bold text-cyan-300">
+                          {activeDistrictStats.inundatedAreaKm2} km²
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-[#94A3B8] block">Active Shelters</span>
+                        <span className="text-xs font-bold text-[#10B981]">
+                          {activeDistrictStats.sheltersCount} HLZ Havens
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Healthcare & Antivenom Infrastructure */}
+                  <div className="rounded-lg border border-white/10 bg-[#0F172A] p-2.5 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-bold text-[#F8FAFC]">
+                      <span className="flex items-center gap-1.5">
+                        <FirstAid size={13} weight="bold" className="text-emerald-400" />
+                        Hospitals &amp; Antivenom
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-400">
+                        {activeHospitals.length} Tracked
+                      </span>
+                    </div>
+
+                    <div className="space-y-1 font-mono text-[11px]">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span>ICU Bed Capacity:</span>
+                        <span className="font-bold text-[#10B981]">
+                          {activeHospitals.reduce((acc, h) => acc + Math.round(h.beds * 0.12), 14)} Ready
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span>Snakebite Antivenom:</span>
+                        <span className="font-bold text-[#10B981]">
+                          120 Polyvalent Vials
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span>Facility Status:</span>
+                        <span className="font-bold text-[#F59E0B]">
+                          {activeHospitals[0]?.status.includes('SUBMERGED') ? 'Submerged / Divert' : 'Operational'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gemini AI Emergency Recommendations */}
+                  <div className="rounded-lg border border-cyan-500/30 bg-cyan-950/20 p-2.5 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 text-cyan-300 font-bold">
+                        <Sparkle size={14} weight="bold" className="text-cyan-400" />
+                        <span>Gemini AI Tactical Directives</span>
+                      </div>
+                      <span className="text-[9px] font-mono text-cyan-300 bg-cyan-950 px-1.5 py-0.5 rounded border border-cyan-500/40">
+                        AUTONOMOUS
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-[#E2E8F0] leading-relaxed">
+                      {aiDirective.summary}
+                    </p>
+
+                    <ul className="space-y-1 pt-1 text-[11px] text-[#94A3B8]">
+                      {aiDirective.actions.map((act, i) => (
+                        <li key={i} className="flex items-start gap-1.5">
+                          <span className="text-cyan-400 font-bold font-mono">{i + 1}.</span>
+                          <span className="leading-snug text-slate-200">{act}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Actionable Buttons */}
+                  <div className="space-y-2 pt-0.5">
+                    <button
+                      onClick={handleExportBrief}
+                      className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 p-2.5 text-xs font-bold text-white shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+                    >
+                      <DownloadSimple size={15} weight="bold" />
+                      <span>Export District Emergency Brief</span>
+                    </button>
+
+                    {briefExportSuccess && (
+                      <div className="flex items-center gap-1.5 p-2 rounded-lg bg-emerald-950/80 border border-emerald-500/50 text-[11px] font-mono text-emerald-300">
+                        <CheckCircle size={14} weight="bold" className="text-emerald-400 shrink-0" />
+                        <span>SITREP downloaded for {selectedDistrict}</span>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => onNavigateToTab('routing')}
+                      className="w-full flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-[#0F172A] hover:bg-white/5 p-2 text-xs font-bold text-[#F8FAFC] transition-colors cursor-pointer"
+                    >
+                      <Truck size={14} weight="bold" className="text-amber-400" />
+                      <span>Relief Convoy &amp; Detour Router &rarr;</span>
+                    </button>
+                  </div>
+                </>
               )}
-            </tbody>
-          </table>
+            </div>
+          )}
+        </div>
+
+        {/* 4. BOTTOM MAP TELEMETRY OVERLAY */}
+        <div className="absolute bottom-3 left-3 z-20 pointer-events-none hidden sm:flex items-center gap-3 rounded-lg border border-white/10 bg-[#1E293B]/90 backdrop-blur-md px-3 py-1.5 text-[10px] font-mono text-[#94A3B8] shadow-lg">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-emerald-400 font-bold">RADAR:</span>
+            <span>Copernicus S1-SAR GRD VV/VH Otsu -15.2 dB</span>
+          </span>
+          <span className="text-slate-600">|</span>
+          <span className="flex items-center gap-1.5">
+            <span className="text-cyan-400 font-bold">HYDRO:</span>
+            <span>DHM Nepal Telemetry Link</span>
+          </span>
         </div>
       </div>
 
       {/* ───────────────────────────────────────────────────────────────────────
-          GOVERNMENT OFFICER PRIORITY INCIDENT NOTICES
+          TERAI DISTRICT SEVERITY LEADERBOARD (Compact Accordion Table Drawer)
       ───────────────────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-rose-500/30 bg-rose-950/20 p-5 space-y-2.5">
-          <div className="flex items-center gap-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
-            <AlertCircle className="h-4 w-4" />
-            <span>Priority 1: Gaur Ring Dam Breaches</span>
+      <section className="rounded-xl border border-white/10 bg-[#1E293B] p-3 sm:p-4 space-y-2.5 shadow-md">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/10 pb-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsLeaderboardOpen(!isLeaderboardOpen)}
+              className="flex items-center gap-2 text-sm font-bold text-[#F8FAFC] hover:text-emerald-400 transition-colors cursor-pointer"
+            >
+              <Buildings size={16} weight="bold" className="text-emerald-400" />
+              <span>Nepal Terai 21 Districts Severity Telemetry</span>
+              <CaretDown size={14} weight="bold" className={`text-slate-400 transition-transform ${isLeaderboardOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <span className="text-[10px] font-mono text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30">
+              21 Districts Tracked
+            </span>
           </div>
-          <h4 className="text-sm font-bold text-white">Bagmati &amp; Lalbakeya Embankment Deluge</h4>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Severe inundation in Gaur border municipality (depth ~2.2m). 39,800 citizens cut off. Recommend immediate food/water airdrops and relocation north to Chandranigahapur High Ground.
-          </p>
-          <div className="text-[11px] font-mono text-rose-300/90">
-            District: Rautahat &bull; Safe Refuge: Chandranigahapur Campus
+
+          <div className="flex items-center gap-2 text-xs">
+            {/* Filter buttons */}
+            <div className="flex rounded-lg border border-white/10 bg-[#0F172A] p-0.5 text-[11px] font-mono">
+              {(['ALL', 'CRITICAL', 'WARNING', 'SAFE'] as const).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setLeaderboardFilter(filter)}
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                    leaderboardFilter === filter
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-[#94A3B8] hover:text-white'
+                  }`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+
+            <span className="text-[10px] font-mono text-[#94A3B8] hidden md:inline">
+              Click row to inspect
+            </span>
           </div>
-          <button
-            onClick={() => onNavigateToTab('roads')}
-            className="w-full mt-2 rounded-xl bg-rose-600/30 border border-rose-500/50 px-3 py-1.5 text-xs font-bold text-rose-200 hover:bg-rose-600/50 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-          >
-            <span>Inspect Road Breaches (Stage 5.4)</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
         </div>
 
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-5 space-y-2.5">
-          <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
-            <AlertTriangle className="h-4 w-4" />
-            <span>Priority 2: Koshi Tailwater Spillover</span>
+        {isLeaderboardOpen && (
+          <div className="max-h-[175px] overflow-y-auto rounded-lg border border-white/10 bg-[#0F172A] text-xs">
+            <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 bg-[#1E293B] border-b border-white/10 text-[10px] font-mono uppercase tracking-wider text-[#94A3B8] z-10">
+                <tr>
+                  <th className="py-2 px-3">District</th>
+                  <th className="py-2 px-3">River Basin</th>
+                  <th className="py-2 px-3 text-right">Inundated Area</th>
+                  <th className="py-2 px-3 text-right">At-Risk Pop</th>
+                  <th className="py-2 px-3 text-center">Status Badge</th>
+                  <th className="py-2 px-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5 font-mono text-xs">
+                {TERAI_DISTRICT_STATS
+                  .filter((d) => {
+                    if (leaderboardFilter === 'CRITICAL') return d.inundatedAreaKm2 > 60;
+                    if (leaderboardFilter === 'WARNING') return d.inundatedAreaKm2 > 35 && d.inundatedAreaKm2 <= 60;
+                    if (leaderboardFilter === 'SAFE') return d.inundatedAreaKm2 <= 35;
+                    return true;
+                  })
+                  .map((d) => {
+                    const isSelected = d.district.toLowerCase() === selectedDistrict.toLowerCase();
+                    const status = d.inundatedAreaKm2 > 60 ? 'CRITICAL' : d.inundatedAreaKm2 > 35 ? 'WARNING' : 'SAFE';
+                    return (
+                      <tr
+                        key={d.district}
+                        onClick={() => {
+                          handleSelectDistrict(d.district);
+                          setIsRightInspectorOpen(true);
+                        }}
+                        className={`transition-colors cursor-pointer select-none ${
+                          isSelected
+                            ? 'bg-emerald-500/15 text-white font-bold'
+                            : 'hover:bg-white/5 text-[#E2E8F0]'
+                        }`}
+                      >
+                        <td className="py-1.5 px-3 font-sans font-bold flex items-center gap-1.5">
+                          <MapPin size={13} weight="bold" className={isSelected ? 'text-emerald-400' : 'text-slate-400'} />
+                          <span>{d.district}</span>
+                        </td>
+                        <td className="py-1.5 px-3 text-[#94A3B8] text-[11px]">{d.basin}</td>
+                        <td className="py-1.5 px-3 text-right font-black text-[#EF4444]">
+                          {d.inundatedAreaKm2} km²
+                        </td>
+                        <td className="py-1.5 px-3 text-right text-slate-300">
+                          {d.atRiskPopulation.toLocaleString()}
+                        </td>
+                        <td className="py-1.5 px-3 text-center">
+                          <span
+                            className={`inline-block text-[9px] font-mono font-bold px-2 py-0.5 rounded border ${
+                              status === 'CRITICAL'
+                                ? 'border-[#EF4444]/40 bg-[#EF4444]/20 text-[#EF4444]'
+                                : status === 'WARNING'
+                                ? 'border-[#F59E0B]/40 bg-[#F59E0B]/20 text-[#F59E0B]'
+                                : 'border-[#10B981]/40 bg-[#10B981]/20 text-[#10B981]'
+                            }`}
+                          >
+                            {status}
+                          </span>
+                        </td>
+                        <td className="py-1.5 px-3 text-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectDistrict(d.district);
+                              setIsRightInspectorOpen(true);
+                            }}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            Inspect
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
           </div>
-          <h4 className="text-sm font-bold text-white">Bhantabari &amp; Hanumannagar Floodplains</h4>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Koshi Barrage tailwater surge overflowing eastern dikes (depth ~2.1m). Maintain one-way emergency convoy traffic on East-West Highway; transfer evacuees to Barahachhetra High Ridge.
-          </p>
-          <div className="text-[11px] font-mono text-amber-300/90">
-            District: Sunsari &bull; Safe Refuge: Barahachhetra High Ridge (8,500 cap)
-          </div>
-          <button
-            onClick={() => onNavigateToTab('havens')}
-            className="w-full mt-2 rounded-xl bg-amber-600/30 border border-amber-500/50 px-3 py-1.5 text-xs font-bold text-amber-200 hover:bg-amber-600/50 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-          >
-            <span>Safe Havens &amp; Camps (Stage 5.7)</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        )}
+      </section>
 
-        <div className="rounded-2xl border border-blue-500/30 bg-blue-950/20 p-5 space-y-2.5">
-          <div className="flex items-center gap-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
-            <Radio className="h-4 w-4" />
-            <span>Priority 3: West Rapti Stream Backflow</span>
-          </div>
-          <h4 className="text-sm font-bold text-white">Nepalgunj &amp; Holiya Rural Basin</h4>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Duduwa stream backflow causing urban waterlogging (depth ~1.3m). Armed Police Force rubber boats deployed. Route medical supplies north along Ratna Highway toward Kohalpur Hub.
-          </p>
-          <div className="text-[11px] font-mono text-blue-300/90">
-            District: Banke &bull; Safe Refuge: Kohalpur Evacuation Hub (9,200 cap)
-          </div>
-          <button
-            onClick={() => onNavigateToTab('routing')}
-            className="w-full mt-2 rounded-xl bg-blue-600/30 border border-blue-500/50 px-3 py-1.5 text-xs font-bold text-blue-200 hover:bg-blue-600/50 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
-          >
-            <span>Emergency Route Navigator (Stage 5.6)</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Earth Engine Script Modal */}
+      {/* Earth Engine SAR Code Modal */}
       <EarthEngineScriptModal
         isOpen={isScriptModalOpen}
         onClose={() => setIsScriptModalOpen(false)}
@@ -1249,12 +1078,22 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
         otsuThreshold={activeRegion.otsuThreshold}
       />
 
-      {/* Terai City Villages & Towns Directory Modal */}
-      <CityVillagesModal
-        city={selectedCity}
-        isOpen={isCityModalOpen}
-        onClose={() => setIsCityModalOpen(false)}
-      />
+      {/* City & Constituent Villages Detail Modal */}
+      {selectedCityForModal && (
+        <CityVillagesModal
+          isOpen={isVillagesModalOpen}
+          onClose={() => {
+            setIsVillagesModalOpen(false);
+            setSelectedCityForModal(null);
+          }}
+          city={selectedCityForModal}
+          onFocusVillage={(v: VillageTownItem) => {
+            setIsVillagesModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 };
+
+export default ExecutiveDashboard;

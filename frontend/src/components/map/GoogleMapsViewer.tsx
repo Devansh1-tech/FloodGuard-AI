@@ -38,6 +38,7 @@ import {
   Building2,
   Car,
   CheckCircle2,
+  ChevronDown,
   Compass,
   Cross,
   Eye,
@@ -269,12 +270,12 @@ const createBridgeLeafletIcon = (bridge: TeraiBridge) => {
         font-size: 11px;
         font-weight: 900;
       ">
-        🌉
+        BRIDGE
       </div>
     `,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -12],
+    iconSize: [44, 20],
+    iconAnchor: [22, 10],
+    popupAnchor: [0, -10],
   });
 };
 
@@ -293,10 +294,10 @@ const createSafeHavenLeafletIcon = (haven: SafeHavenFacility) => {
         border: 2px solid #FFFFFF;
         box-shadow: 0 0 10px #10B981;
         color: #FFFFFF;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 900;
       ">
-        🛡️
+        HLZ
       </div>
     `,
     iconSize: [24, 24],
@@ -352,10 +353,24 @@ export interface GoogleMapsViewerProps {
   beforeDate?: string;
   afterDate?: string;
   initialRouteId?: string;
+  hideHeader?: boolean;
+  provider?: 'google_maps' | 'leaflet';
+  onProviderChange?: (provider: 'google_maps' | 'leaflet') => void;
   onRegionChange?: (regionKey: string) => void;
   onDistrictChange?: (district: string) => void;
   onViewLayerModeChange?: (mode: 'both' | 'flooded' | 'safe') => void;
 }
+
+const isKeyPlaceholder = (key?: string) => {
+  if (!key) return true;
+  const clean = key.trim();
+  return (
+    clean.length < 20 ||
+    clean.includes('your_') ||
+    clean.includes('placeholder') ||
+    clean === 'your_google_maps_api_key_here'
+  );
+};
 
 export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   apiKey: initialApiKey,
@@ -367,22 +382,42 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   beforeDate: propBeforeDate,
   afterDate: propAfterDate,
   initialRouteId = 'none',
+  hideHeader = false,
+  provider: propProvider,
+  onProviderChange,
   onRegionChange,
   onDistrictChange,
   onViewLayerModeChange,
 }) => {
+  const rawEnvKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const hasValidConfiguredKey = !isKeyPlaceholder(initialApiKey) || !isKeyPlaceholder(rawEnvKey);
+
   // API Key State (Fallback to Vite Env or User Key)
   const [apiKey, setApiKey] = useState<string>(
-    initialApiKey ||
-    import.meta.env.VITE_GOOGLE_MAPS_API_KEY ||
-    'AIzaSyCYKKkl1C613n508xjv25SNSDFKO9Og0rw'
+    (!isKeyPlaceholder(initialApiKey) && initialApiKey) ||
+    (!isKeyPlaceholder(rawEnvKey) && rawEnvKey) ||
+    ''
   );
   const [isEditingKey, setIsEditingKey] = useState<boolean>(false);
   const [tempApiKey, setTempApiKey] = useState<string>(apiKey);
 
-  // Provider State: Google Maps JS API vs Leaflet Fallback
-  const [provider, setProvider] = useState<'google_maps' | 'leaflet'>('google_maps');
-  const [isLoadingGoogle, setIsLoadingGoogle] = useState<boolean>(true);
+  // Provider State: Default to high-speed Leaflet if no valid Google Maps API key is configured
+  const [provider, setProvider] = useState<'google_maps' | 'leaflet'>(
+    propProvider || (hasValidConfiguredKey && apiKey ? 'google_maps' : 'leaflet')
+  );
+
+  useEffect(() => {
+    if (propProvider && propProvider !== provider) {
+      setProvider(propProvider);
+    }
+  }, [propProvider]);
+
+  const handleSetProvider = (newProvider: 'google_maps' | 'leaflet') => {
+    setProvider(newProvider);
+    if (onProviderChange) onProviderChange(newProvider);
+  };
+
+  const [isLoadingGoogle, setIsLoadingGoogle] = useState<boolean>(false);
   const [googleLoadError, setGoogleLoadError] = useState<string | null>(null);
 
   // Region & District State
@@ -427,6 +462,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   const [isRiverModalOpen, setIsRiverModalOpen] = useState<boolean>(false);
   const [selectedCity, setSelectedCity] = useState<TeraiCityData | null>(null);
   const [isCityModalOpen, setIsCityModalOpen] = useState<boolean>(false);
+  const [isLayersMenuOpen, setIsLayersMenuOpen] = useState<boolean>(false);
   const [dossierTarget, setDossierTarget] = useState<{
     name: string;
     district: string;
@@ -749,7 +785,11 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
 
   // Initialize Google Maps JavaScript API via Loader
   useEffect(() => {
-    if (provider !== 'google_maps' || !apiKey) {
+    if (provider !== 'google_maps' || !apiKey || isKeyPlaceholder(apiKey)) {
+      if (provider === 'google_maps') {
+        setGoogleLoadError('Google Maps API key is unconfigured. Defaulted to high-speed Leaflet satellite engine.');
+        handleSetProvider('leaflet');
+      }
       setIsLoadingGoogle(false);
       return;
     }
@@ -757,6 +797,15 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
     let isMounted = true;
     setIsLoadingGoogle(true);
     setGoogleLoadError(null);
+
+    // Listen for Google Maps API authentication failures (invalid key, unbilled project, etc.)
+    const prevAuthFailure = (window as unknown as { gm_authFailure?: () => void }).gm_authFailure;
+    (window as unknown as { gm_authFailure?: () => void }).gm_authFailure = () => {
+      console.warn('Google Maps API auth failure detected. Auto-failing over to Leaflet satellite engine.');
+      setGoogleLoadError('Google Maps API authentication failed with provided key. Automatically switched to Leaflet satellite engine.');
+      handleSetProvider('leaflet');
+      setIsLoadingGoogle(false);
+    };
 
     // If Google Maps is already present on window
     if (window.google?.maps?.Map) {
@@ -786,11 +835,13 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
         if (!isMounted) return;
         console.warn('Google Maps JS API load failed, switching to Leaflet fallback:', err);
         setGoogleLoadError(err.message || 'Google Maps failed to authenticate with provided API key.');
+        handleSetProvider('leaflet');
         setIsLoadingGoogle(false);
       });
 
     return () => {
       isMounted = false;
+      (window as unknown as { gm_authFailure?: () => void }).gm_authFailure = prevAuthFailure;
       overlaysRef.current.forEach((item) => {
         if ('setMap' in item) item.setMap(null);
       });
@@ -1616,7 +1667,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                 <div style="font-size: 11px; color: #334155; line-height: 1.4; border-top: 1px solid #E2E8F0; padding-top: 4px;">
                   <strong>Capacity:</strong> ${haven.currentOccupancy.toLocaleString()} / ${haven.totalCapacity.toLocaleString()} persons<br/>
                   <strong>Structure:</strong> ${haven.structure.replace(/_/g, ' ')}<br/>
-                  <strong>Helipad:</strong> ${haven.hasHelipad ? '🚁 Nepal Army Helipad Ready' : '❌ No Helipad'}<br/>
+                  <strong>Helipad:</strong> ${haven.hasHelipad ? 'Nepal Army Helipad Ready' : 'No Helipad'}<br/>
                   <strong>Warden:</strong> ${haven.wardenName} (${haven.wardenPhone})
                 </div>
               </div>
@@ -1659,79 +1710,76 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   };
 
   return (
-    <div className={`space-y-4 relative isolate z-10 ${isFullscreen ? 'fixed inset-0 z-[1000] h-screen w-screen overflow-y-auto bg-slate-950 p-4' : ''}`}>
+    <div className={`space-y-4 relative isolate z-10 ${isFullscreen ? 'fixed inset-0 z-[1000] h-screen w-screen overflow-y-auto bg-slate-950 p-4' : 'h-full flex flex-col'}`}>
       {/* ───────────────────────────────────────────────────────────────────────
           TERAI DISASTER COMMAND HUD & ROUTE DISPATCH CONTROLS
       ───────────────────────────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/95 p-5 shadow-2xl backdrop-blur-xl space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-blue-500/20 px-2.5 py-0.5 text-xs font-bold text-blue-400 border border-blue-500/30 flex items-center gap-1">
-                <Globe className="h-3.5 w-3.5" />
-                STAGE 5.3: FLOOD EXTENT &amp; SETTLEMENT OVERLAY
-              </span>
-              <span className="rounded-md bg-cyan-500/20 px-2.5 py-0.5 text-xs font-bold text-cyan-400 border border-cyan-500/30">
-                11 RIVER CORRIDORS &bull; 21 TERAI DISTRICTS
-              </span>
-              <span className="rounded-md bg-amber-500/20 px-2.5 py-0.5 text-xs font-bold text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                <Truck className="h-3.5 w-3.5" />
-                STAGE 5.4: ROAD INUNDATION
-              </span>
-            </div>
-            <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-blue-400 shrink-0" />
-              <span>{activeRegion.name}</span>
-            </h2>
-            <p className="text-xs text-slate-400">
-              Interactive Google Maps intelligence displaying real-time flood inundation, all constituent villages &amp; cities, emergency convoy routes, and safe refugee havens.
-            </p>
-          </div>
-
-          {/* Engine, Fullscreen & Provider Controls */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* Dual Provider Switcher */}
-            <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1 text-xs">
-              <button
-                onClick={() => setProvider('google_maps')}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${
-                  provider === 'google_maps'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Zap className="h-3.5 w-3.5 text-amber-300" />
-                <span>Google Maps API</span>
-              </button>
-              <button
-                onClick={() => setProvider('leaflet')}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${
-                  provider === 'leaflet'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Layers className="h-3.5 w-3.5 text-emerald-300" />
-                <span>Leaflet Fallback</span>
-              </button>
+      {!hideHeader && (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/95 p-5 shadow-2xl backdrop-blur-xl space-y-4 shrink-0">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-md bg-blue-500/20 px-2.5 py-0.5 text-xs font-bold text-blue-400 border border-blue-500/30 flex items-center gap-1">
+                  <Globe className="h-3.5 w-3.5" />
+                  FLOOD EXTENT &amp; SETTLEMENT OVERLAY
+                </span>
+                <span className="rounded-md bg-cyan-500/20 px-2.5 py-0.5 text-xs font-bold text-cyan-400 border border-cyan-500/30 font-mono">
+                  11 RIVER CORRIDORS &bull; 21 TERAI DISTRICTS
+                </span>
+              </div>
+              <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-blue-400 shrink-0" />
+                <span>{activeRegion.name}</span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Interactive geospatial intelligence displaying real-time flood inundation, settlements, emergency corridors, and safe shelters.
+              </p>
             </div>
 
-            {/* Re-center strictly to Terai button */}
-            <button
-              onClick={() => {
-                if (googleMapInstanceRef.current) {
-                  fitToActiveRegion(googleMapInstanceRef.current, selectedRegionKey);
-                }
-                if (leafletMapInstanceRef.current) {
-                  leafletMapInstanceRef.current.flyTo(activeRegion.center, activeRegion.zoom);
-                }
-              }}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700 transition-all active:scale-95"
-              title="Reset view to Terai lowlands"
-            >
-              <Compass className="h-3.5 w-3.5 text-blue-400" />
-              <span>Lock Terai View</span>
-            </button>
+            {/* Engine, Fullscreen & Provider Controls */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {/* Dual Provider Switcher */}
+              <div className="flex rounded-xl border border-slate-800 bg-slate-950 p-1 text-xs">
+                <button
+                  onClick={() => handleSetProvider('google_maps')}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${
+                    provider === 'google_maps'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Zap className="h-3.5 w-3.5 text-amber-300" />
+                  <span>Satellite</span>
+                </button>
+                <button
+                  onClick={() => handleSetProvider('leaflet')}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${
+                    provider === 'leaflet'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Layers className="h-3.5 w-3.5 text-emerald-300" />
+                  <span>Vector</span>
+                </button>
+              </div>
+
+              {/* Re-center strictly to Terai button */}
+              <button
+                onClick={() => {
+                  if (googleMapInstanceRef.current) {
+                    fitToActiveRegion(googleMapInstanceRef.current, selectedRegionKey);
+                  }
+                  if (leafletMapInstanceRef.current) {
+                    leafletMapInstanceRef.current.flyTo(activeRegion.center, activeRegion.zoom);
+                  }
+                }}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700 transition-all active:scale-95"
+                title="Reset view to Terai lowlands"
+              >
+                <Compass className="h-3.5 w-3.5 text-blue-400" />
+                <span>Reset Bounds</span>
+              </button>
 
             {/* Fullscreen Map Toggle */}
             <button
@@ -1826,7 +1874,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
             >
               <div className="flex items-center gap-1.5">
                 <Truck className="h-3.5 w-3.5 text-emerald-400" />
-                <span>🚑 Bharatpur → Gaur (88 km)</span>
+                <span>Bharatpur → Gaur (88 km)</span>
               </div>
               <div className="text-[10px] text-emerald-400/80 font-normal mt-0.5">Central Terai Relief Convoy</div>
             </button>
@@ -1841,7 +1889,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
             >
               <div className="flex items-center gap-1.5">
                 <Truck className="h-3.5 w-3.5 text-cyan-400" />
-                <span>🚑 Duhabi → Koshi (68 km)</span>
+                <span>Duhabi → Koshi (68 km)</span>
               </div>
               <div className="text-[10px] text-cyan-400/80 font-normal mt-0.5">Eastern Terai Medical Lifeline</div>
             </button>
@@ -1856,7 +1904,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
             >
               <div className="flex items-center gap-1.5">
                 <Navigation className="h-3.5 w-3.5 text-amber-400" />
-                <span>🚶 Gaur → Chandranigahapur</span>
+                <span>Gaur → Chandranigahapur</span>
               </div>
               <div className="text-[10px] text-amber-400/80 font-normal mt-0.5">Civilian Alternate Evacuation</div>
             </button>
@@ -1871,7 +1919,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                     className="font-black uppercase px-2 py-0.5 rounded text-[10px]"
                     style={{ backgroundColor: `${activeRoute.color}25`, color: activeRoute.color }}
                   >
-                    {activeRoute.type === 'relief_convoy' ? '🚑 EMERGENCY RELIEF CONVOY' : '🚶 CIVILIAN ALTERNATE EVACUATION'}
+                    {activeRoute.type === 'relief_convoy' ? 'EMERGENCY RELIEF CONVOY' : 'CIVILIAN ALTERNATE EVACUATION'}
                   </span>
                   <span className="font-bold text-white">{activeRoute.name}</span>
                 </div>
@@ -1938,7 +1986,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                             v.isFlooded ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'
                           }`}
                         >
-                          {v.isFlooded ? `🌊 Flooded (${v.floodDepthMeters}m)` : '🛡️ Safe'}
+                          {v.isFlooded ? `Flooded (${v.floodDepthMeters}m)` : 'Safe'}
                         </span>
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
@@ -1976,7 +2024,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                🌊 Flooded ({allTeraiVillages.filter((v) => v.isFlooded).length})
+                Flooded ({allTeraiVillages.filter((v) => v.isFlooded).length})
               </button>
               <button
                 onClick={() => setSettlementFilter('safe_only')}
@@ -1986,7 +2034,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                🛡️ Safe ({allTeraiVillages.filter((v) => !v.isFlooded).length})
+                Safe ({allTeraiVillages.filter((v) => !v.isFlooded).length})
               </button>
             </div>
           </div>
@@ -2080,267 +2128,195 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
           </div>
         </div>
 
-        {/* Layer Checkboxes */}
+        {/* Consolidated Layer Controls Popover */}
         <div className="pt-3 border-t border-slate-800/80 text-xs">
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Sovereign Nepal Map Highlight Toggle */}
-            <label
-              htmlFor="toggle-nepal-border"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                showNepalBorder
-                  ? 'border-amber-500/70 bg-amber-500/15 text-amber-300 shadow-sm'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-nepal-border"
-                type="checkbox"
-                checked={showNepalBorder}
-                onChange={(e) => setShowNepalBorder(e.target.checked)}
-                className="rounded border-amber-600 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer accent-amber-500"
-              />
-              <span>🇳🇵 Nepal Sovereign Map</span>
-            </label>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="relative">
+              <button
+                id="btn-feature-layers"
+                onClick={() => setIsLayersMenuOpen(!isLayersMenuOpen)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/90 hover:bg-slate-700 text-xs font-bold text-slate-200 transition-all cursor-pointer shadow-sm"
+              >
+                <Layers className="h-3.5 w-3.5 text-cyan-400" />
+                <span>Feature Layers</span>
+                <span className="rounded bg-cyan-500/20 border border-cyan-500/30 px-1.5 py-0.2 text-[10px] font-mono text-cyan-300">
+                  {[showNepalBorder, showTeraiBoundary, showTraffic, highlightFloodedDotted, showDottedBasins, showDottedRivers, showFloodPolygons, showCityPoints, showVillagePins, showHospitals, showSafeZones, showRoadNetwork, showBridges].filter(Boolean).length} Active
+                </span>
+                <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${isLayersMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-            {/* Terai Lowlands Plain Highlight Toggle */}
-            <label
-              htmlFor="toggle-terai-boundary"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                showTeraiBoundary
-                  ? 'border-emerald-500/70 bg-emerald-500/15 text-emerald-300 shadow-sm'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-terai-boundary"
-                type="checkbox"
-                checked={showTeraiBoundary}
-                onChange={(e) => setShowTeraiBoundary(e.target.checked)}
-                className="rounded border-emerald-600 bg-slate-950 text-emerald-500 focus:ring-0 cursor-pointer accent-emerald-500"
-              />
-              <span>🌾 Terai Lowland Region</span>
-            </label>
+              {isLayersMenuOpen && (
+                <div className="absolute left-0 bottom-full mb-2 w-80 rounded-xl border border-slate-700 bg-slate-900/98 p-3 shadow-2xl backdrop-blur-xl z-50 space-y-3 animate-in fade-in">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="font-bold text-slate-200 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                      <Sliders className="h-3.5 w-3.5 text-cyan-400" />
+                      Overlay Layer Toggles
+                    </span>
+                    <button
+                      onClick={() => setIsLayersMenuOpen(false)}
+                      className="text-slate-400 hover:text-white text-xs font-mono cursor-pointer"
+                    >
+                      Close &times;
+                    </button>
+                  </div>
 
-            {/* Live Traffic Toggle */}
-            <button
-              id="toggle-traffic"
-              onClick={() => setShowTraffic(!showTraffic)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
-                showTraffic
-                  ? 'border-amber-500 bg-amber-500/25 text-amber-300 ring-1 ring-amber-500/40 shadow-sm'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-white'
-              }`}
-            >
-              <Car className="h-3.5 w-3.5" />
-              <span>Live Traffic</span>
-            </button>
+                  {/* Section 1: Boundaries & Live Traffic */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Boundaries &amp; Traffic</span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showNepalBorder}
+                          onChange={(e) => setShowNepalBorder(e.target.checked)}
+                          className="rounded border-amber-600 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer accent-amber-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">Nepal Border</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showTeraiBoundary}
+                          onChange={(e) => setShowTeraiBoundary(e.target.checked)}
+                          className="rounded border-emerald-600 bg-slate-950 text-emerald-500 focus:ring-0 cursor-pointer accent-emerald-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">Terai Belt</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer col-span-2">
+                        <input
+                          type="checkbox"
+                          checked={showTraffic}
+                          onChange={(e) => setShowTraffic(e.target.checked)}
+                          className="rounded border-amber-600 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer accent-amber-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium flex items-center gap-1.5">
+                          <Car className="h-3 w-3 text-amber-400" />
+                          Live Highway Traffic
+                        </span>
+                      </label>
+                    </div>
+                  </div>
 
-            {/* Dotted Flood Lines Toggle */}
-            <label
-              htmlFor="toggle-dotted-flood"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                highlightFloodedDotted
-                  ? 'border-cyan-400/80 bg-cyan-950/80 text-cyan-300 shadow-sm ring-1 ring-cyan-500/30'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-dotted-flood"
-                type="checkbox"
-                checked={highlightFloodedDotted}
-                onChange={(e) => setHighlightFloodedDotted(e.target.checked)}
-                className="rounded border-cyan-500 bg-slate-950 text-cyan-400 focus:ring-0 cursor-pointer accent-cyan-400"
-              />
-              <span className="flex items-center gap-1.5">
-                <span className="border-b-2 border-dotted border-cyan-400 w-3.5 inline-block"></span>
-                ⚡ Dotted Flood Lines
-              </span>
-            </label>
+                  {/* Section 2: Hydrology & Inundation */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Hydrology &amp; Inundation</span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={highlightFloodedDotted}
+                          onChange={(e) => setHighlightFloodedDotted(e.target.checked)}
+                          className="rounded border-cyan-500 bg-slate-950 text-cyan-400 focus:ring-0 cursor-pointer accent-cyan-400"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">Flood Extent</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showDottedBasins}
+                          onChange={(e) => setShowDottedBasins(e.target.checked)}
+                          className="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-0 cursor-pointer accent-cyan-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">Basin Lines</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showDottedRivers}
+                          onChange={(e) => setShowDottedRivers(e.target.checked)}
+                          className="rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-0 cursor-pointer accent-blue-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">Live Rivers</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showFloodPolygons}
+                          onChange={(e) => setShowFloodPolygons(e.target.checked)}
+                          className="rounded border-slate-700 bg-slate-950 text-cyan-600 focus:ring-0 cursor-pointer accent-sky-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">11 Corridors</span>
+                      </label>
+                    </div>
+                  </div>
 
-            {/* Dotted Basins Toggle */}
-            <label
-              htmlFor="toggle-dotted-basins"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                showDottedBasins
-                  ? 'border-cyan-500/70 bg-cyan-500/15 text-cyan-300 shadow-sm'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-dotted-basins"
-                type="checkbox"
-                checked={showDottedBasins}
-                onChange={(e) => setShowDottedBasins(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-0 cursor-pointer accent-cyan-500"
-              />
-              <span className="flex items-center gap-1">
-                <span className="border-b border-dotted border-cyan-400 w-3 inline-block"></span>
-                ⚡ Dotted Basins
-              </span>
-            </label>
+                  {/* Section 3: Settlements & Lifelines */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Settlements &amp; Lifelines</span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showCityPoints}
+                          onChange={(e) => setShowCityPoints(e.target.checked)}
+                          className="rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-0 cursor-pointer accent-blue-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">21 Cities</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showVillagePins}
+                          onChange={(e) => setShowVillagePins(e.target.checked)}
+                          className="rounded border-slate-700 bg-slate-950 text-rose-600 focus:ring-0 cursor-pointer accent-rose-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">Village Pins</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showHospitals}
+                          onChange={(e) => setShowHospitals(e.target.checked)}
+                          className="rounded border-slate-700 bg-slate-950 text-red-600 focus:ring-0 cursor-pointer accent-red-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">Hospitals</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showSafeZones}
+                          onChange={(e) => setShowSafeZones(e.target.checked)}
+                          className="rounded border-slate-700 bg-slate-950 text-emerald-600 focus:ring-0 cursor-pointer accent-emerald-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">Safe Havens</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showRoadNetwork}
+                          onChange={(e) => setShowRoadNetwork(e.target.checked)}
+                          className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer accent-amber-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">Roads Network</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showBridges}
+                          onChange={(e) => setShowBridges(e.target.checked)}
+                          className="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-0 cursor-pointer accent-cyan-500"
+                        />
+                        <span className="text-[11px] text-slate-300 font-medium">Critical Bridges</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
-            {/* Dotted Rivers (Live) Toggle */}
-            <label
-              htmlFor="toggle-dotted-rivers"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                showDottedRivers
-                  ? 'border-blue-500/70 bg-blue-500/15 text-blue-300 shadow-sm'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-dotted-rivers"
-                type="checkbox"
-                checked={showDottedRivers}
-                onChange={(e) => setShowDottedRivers(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-0 cursor-pointer accent-blue-500"
-              />
-              <span className="flex items-center gap-1">
-                <span className="border-b-2 border-dotted border-blue-400 w-3 inline-block"></span>
-                🌊 Dotted Rivers (Live)
-              </span>
-            </label>
-
-            {/* 11 Flood Corridors Toggle */}
-            <label
-              htmlFor="toggle-flood-polygons"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                showFloodPolygons
-                  ? 'border-sky-500/70 bg-sky-500/15 text-sky-300 shadow-sm'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-flood-polygons"
-                type="checkbox"
-                checked={showFloodPolygons}
-                onChange={(e) => setShowFloodPolygons(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-cyan-600 focus:ring-0 cursor-pointer accent-sky-500"
-              />
-              <span>🌊 11 Flood Corridors</span>
-            </label>
-
-            {/* All 21 Terai Cities Toggle */}
-            <label
-              htmlFor="toggle-city-points"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                showCityPoints
-                  ? 'border-blue-500/70 bg-blue-500/15 text-blue-300 shadow-sm'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-city-points"
-                type="checkbox"
-                checked={showCityPoints}
-                onChange={(e) => setShowCityPoints(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-0 cursor-pointer accent-blue-500"
-              />
-              <span>🏙️ All 21 Terai Cities</span>
-            </label>
-
-            {/* Village Hazard Pins Toggle */}
-            <label
-              htmlFor="toggle-village-pins"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                showVillagePins
-                  ? 'border-rose-500/70 bg-rose-500/15 text-rose-300 shadow-sm'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-village-pins"
-                type="checkbox"
-                checked={showVillagePins}
-                onChange={(e) => setShowVillagePins(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-rose-600 focus:ring-0 cursor-pointer accent-rose-500"
-              />
-              <span>📍 Village Hazard Pins</span>
-            </label>
-
-            {/* Hospitals Toggle */}
-            <label
-              htmlFor="toggle-hospitals"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                showHospitals
-                  ? 'border-red-500/70 bg-red-500/15 text-red-300 shadow-sm ring-1 ring-red-500/20'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-hospitals"
-                type="checkbox"
-                checked={showHospitals}
-                onChange={(e) => setShowHospitals(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-red-600 focus:ring-0 cursor-pointer accent-red-500"
-              />
-              <span>🏥 Hospitals</span>
-            </label>
-
-            {/* Safe Shelters Toggle */}
-            <label
-              htmlFor="toggle-safe-zones"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                showSafeZones
-                  ? 'border-emerald-500/70 bg-emerald-500/15 text-emerald-300 shadow-sm ring-1 ring-emerald-500/20'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-safe-zones"
-                type="checkbox"
-                checked={showSafeZones}
-                onChange={(e) => setShowSafeZones(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-emerald-600 focus:ring-0 cursor-pointer accent-emerald-500"
-              />
-              <span>🛡️ Safe Shelters</span>
-            </label>
-
-            {/* Stage 5.4 Road Inundation Toggle */}
-            <label
-              htmlFor="toggle-road-network"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                showRoadNetwork
-                  ? 'border-amber-500/70 bg-amber-500/15 text-amber-300 shadow-sm'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-road-network"
-                type="checkbox"
-                checked={showRoadNetwork}
-                onChange={(e) => setShowRoadNetwork(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-0 cursor-pointer accent-amber-500"
-              />
-              <span>🛣️ Stage 5.4 Road Inundation</span>
-            </label>
-
-            {/* Critical Bridges Toggle */}
-            <label
-              htmlFor="toggle-bridges"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer select-none ${
-                showBridges
-                  ? 'border-cyan-500/70 bg-cyan-500/15 text-cyan-300 shadow-sm'
-                  : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              }`}
-            >
-              <input
-                id="toggle-bridges"
-                type="checkbox"
-                checked={showBridges}
-                onChange={(e) => setShowBridges(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-0 cursor-pointer accent-cyan-500"
-              />
-              <span>🌉 Critical Bridges</span>
-            </label>
+            <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
+              <span className="text-emerald-400">&bull;</span>
+              <span>21 Districts &bull; 11 River Basins</span>
+            </div>
           </div>
         </div>
       </div>
+      )}
 
       {/* ───────────────────────────────────────────────────────────────────────
           MAIN VIEWPORT: DUAL ENGINE (GOOGLE MAPS V3 OR CRISP LEAFLET)
       ───────────────────────────────────────────────────────────────────────── */}
-      <div className={`relative isolate z-10 w-full rounded-2xl border border-slate-700/80 bg-slate-950 shadow-2xl overflow-hidden ${isFullscreen ? 'h-[calc(100vh-280px)] min-h-[500px]' : 'h-[680px]'}`}>
+      <div className={`relative isolate z-10 w-full rounded-2xl border border-slate-700/80 bg-slate-950 shadow-2xl overflow-hidden ${isFullscreen ? 'h-[calc(100vh-280px)] min-h-[500px]' : hideHeader ? 'h-full min-h-[580px] flex-1' : 'h-[680px]'}`}>
         {provider === 'google_maps' ? (
           <>
             <div ref={mapContainerRef} className="h-full w-full" style={{ height: '100%', width: '100%' }} />
@@ -2365,8 +2341,8 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                   <p className="text-xs text-slate-300">{googleLoadError}</p>
                 </div>
                 <button
-                  onClick={() => setProvider('leaflet')}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition-all shadow-lg"
+                  onClick={() => handleSetProvider('leaflet')}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition-all shadow-lg cursor-pointer"
                 >
                   Switch to Leaflet Fallback
                 </button>
@@ -2382,7 +2358,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                     <span>Nepal Terai Plain &bull; {mapTypeId.toUpperCase()}</span>
                   </div>
                   <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                    {propViewLayerMode === 'flooded' ? '🌊 Inundation Only' : propViewLayerMode === 'safe' ? '🛡️ Safe Shelters Only' : 'Both (Flood vs Safe)'}
+                    {propViewLayerMode === 'flooded' ? 'Inundation Only' : propViewLayerMode === 'safe' ? 'Safe Shelters Only' : 'Dual View (Flood + Safe)'}
                   </span>
                 </div>
                 <div className="text-[10px] font-mono text-slate-300">
@@ -2390,15 +2366,15 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                 </div>
                 <div className="text-[9px] font-mono text-slate-400 border-t border-slate-800/80 pt-1 flex items-center gap-2">
                   <span className={showNepalBorder ? 'text-amber-400 font-bold' : 'text-slate-500 line-through'}>
-                    🇳🇵 Nepal Border: {showNepalBorder ? 'ON' : 'OFF'}
+                    Nepal Border: {showNepalBorder ? 'ON' : 'OFF'}
                   </span>
                   <span>&bull;</span>
                   <span className={showTeraiBoundary ? 'text-emerald-400 font-bold' : 'text-slate-500 line-through'}>
-                    🌾 Terai Lowlands: {showTeraiBoundary ? 'ON' : 'OFF'}
+                    Terai Lowlands: {showTeraiBoundary ? 'ON' : 'OFF'}
                   </span>
                   <span>&bull;</span>
                   <span className={showFloodPolygons ? 'text-cyan-400 font-bold' : 'text-slate-500 line-through'}>
-                    🌊 Flood Corridors: {showFloodPolygons ? 'ON' : 'OFF'}
+                    Flood Corridors: {showFloodPolygons ? 'ON' : 'OFF'}
                   </span>
                   {propAfterDate && (
                     <>
@@ -2467,7 +2443,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                           white-space: nowrap;
                           box-shadow: 0 4px 12px rgba(0,0,0,0.8);
                         ">
-                          🇳🇵 NEPAL SOVEREIGN
+                          NEPAL SOVEREIGN
                         </div>
                       `,
                       iconSize: [130, 26],
@@ -3033,7 +3009,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                     <span>Nepal Terai Plain &bull; Leaflet High-Speed Engine</span>
                   </div>
                   <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    {propViewLayerMode === 'flooded' ? '🌊 Inundation Only' : propViewLayerMode === 'safe' ? '🛡️ Safe Shelters Only' : 'Both (Flood vs Safe)'}
+                    {propViewLayerMode === 'flooded' ? 'Inundation Only' : propViewLayerMode === 'safe' ? 'Safe Shelters Only' : 'Dual View (Flood + Safe)'}
                   </span>
                 </div>
                 <div className="text-[10px] font-mono text-slate-300">
@@ -3041,15 +3017,15 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                 </div>
                 <div className="text-[9px] font-mono text-slate-400 border-t border-slate-800/80 pt-1 flex items-center gap-2">
                   <span className={showNepalBorder ? 'text-amber-400 font-bold' : 'text-slate-500 line-through'}>
-                    🇳🇵 Nepal Border: {showNepalBorder ? 'ON' : 'OFF'}
+                    Nepal Border: {showNepalBorder ? 'ON' : 'OFF'}
                   </span>
                   <span>&bull;</span>
                   <span className={showTeraiBoundary ? 'text-emerald-400 font-bold' : 'text-slate-500 line-through'}>
-                    🌾 Terai Lowlands: {showTeraiBoundary ? 'ON' : 'OFF'}
+                    Terai Lowlands: {showTeraiBoundary ? 'ON' : 'OFF'}
                   </span>
                   <span>&bull;</span>
                   <span className={showFloodPolygons ? 'text-cyan-400 font-bold' : 'text-slate-500 line-through'}>
-                    🌊 Flood Corridors: {showFloodPolygons ? 'ON' : 'OFF'}
+                    Flood Corridors: {showFloodPolygons ? 'ON' : 'OFF'}
                   </span>
                   {propAfterDate && (
                     <>

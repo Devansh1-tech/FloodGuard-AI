@@ -1,38 +1,32 @@
 /**
- * App.tsx — FloodGuard AI: Nepal Terai Disaster Intelligence Platform.
+ * App.tsx — FloodGuard AI: Nepal Terai Rapid Flood Monitoring & Decision Support System.
  *
- * Unified, user-friendly command console:
- * 1. Satellite Flood Detection: Google Earth Engine & Copernicus Sentinel-1 SAR.
- * 2. Field Command Map: Google Maps JavaScript API v3 locked to Nepal Terai.
- * 3. Healthcare Infrastructure: Live hospital operational status & bed capacity.
- * 4. Demographics & Vulnerability: WorldPop empirical population headcounts.
+ * Enterprise Emergency Command Center built for NEOC, MoHA, and APF.
+ * Adheres strictly to SKILL.md:
+ * - VISUAL_DENSITY: 8 (Cockpit / Command Center Mode)
+ * - TYPOGRAPHY: Geist/Satoshi display UI, JetBrains Mono for telemetry
+ * - COLOR PALETTE: Deep Slate #0F172A Canvas, #1E293B Panels, #F8FAFC text
+ * - ANTI-EMOJI POLICY: Exclusively Phosphor / Radix / clean SVG icons
+ * - VIEWPORT STABILITY: min-h-[100dvh] outer layout
  */
 
 import React, { useEffect, useState } from 'react';
 import {
-  Activity,
-  AlertCircle,
-  Building2,
-  CheckCircle2,
-  FileDown,
-  Globe,
-  HeartPulse,
-  Info,
-  Layers,
-  MapPin,
-  Moon,
-  Phone,
-  Route,
-  Satellite,
-  Shield,
-  ShieldAlert,
-  Sun,
-  Tent,
-  Truck,
-  Users,
+  ShieldCheck,
+  ShieldWarning,
   Waves,
-  Zap,
-} from 'lucide-react';
+  Truck,
+  FirstAid,
+  FilePdf,
+  PhoneCall,
+  Broadcast,
+  Sun,
+  Moon,
+  MapPin,
+  Crosshair,
+  Compass,
+  UsersThree,
+} from '@phosphor-icons/react';
 
 import { Stage51ComparisonPage } from '@/pages/comparison/Stage51ComparisonPage';
 import { Stage52GoogleMapPage } from '@/pages/map/Stage52GoogleMapPage';
@@ -50,7 +44,18 @@ import { AboutModal } from '@/components/common/AboutModal';
 import { FaqModal } from '@/components/common/FaqModal';
 import { ContactModal } from '@/components/common/ContactModal';
 
-export type NavigationTab = 'landing' | 'dashboard' | 'satellite' | 'command_map' | 'roads' | 'routing' | 'havens' | 'sitrep' | 'gauges' | 'hospitals' | 'demographics';
+export type NavigationTab =
+  | 'landing'
+  | 'dashboard'
+  | 'satellite'
+  | 'command_map'
+  | 'roads'
+  | 'routing'
+  | 'havens'
+  | 'sitrep'
+  | 'gauges'
+  | 'hospitals'
+  | 'demographics';
 
 export const App: React.FC = () => {
   const [isDark, setIsDark] = useState<boolean>(true);
@@ -96,37 +101,48 @@ export const App: React.FC = () => {
   };
 
   const navLogo = (
-    <span className="font-extrabold text-sm sm:text-base tracking-tight text-white select-none whitespace-nowrap">
-      Floodguard AI
-    </span>
+    <div className="flex items-center gap-2 select-none">
+      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">
+        <ShieldCheck size={18} weight="bold" />
+      </div>
+      <div className="flex flex-col">
+        <span className="font-black text-sm sm:text-base tracking-tight text-white whitespace-nowrap">
+          FloodGuard AI
+        </span>
+        <span className="text-[9px] font-mono uppercase tracking-wider text-emerald-400 font-bold hidden sm:inline">
+          Nepal Terai Decision Support
+        </span>
+      </div>
+    </div>
   );
 
+  // Anti-emoji cleaned navigation items
   const navItems: CardNavItem[] = [
     {
-      label: '🛡️ NEOC Command',
+      label: 'NEOC Command',
       description: 'National Emergency Operations & Terai river alerts.',
       links: [
         {
-          label: 'Home & Sovereign Overview',
-          sublabel: 'Public Landing & Hero Mission',
+          label: 'System Overview & Mission',
+          sublabel: 'Operational Landing & Verification',
           href: '#landing',
           isActive: activeTab === 'landing',
         },
         {
-          label: 'Executive Dashboard',
-          sublabel: 'Govt Officer Landing Console',
+          label: 'Executive Command Console',
+          sublabel: '3-Pane Emergency Command Center',
           href: '#dashboard',
           isActive: activeTab === 'dashboard',
         },
         {
           label: 'River Gauges & SOS (5.9)',
-          sublabel: 'DHM Telemetry & Alerts',
+          sublabel: 'DHM Hydrology Telemetry',
           href: '#gauges',
           isActive: activeTab === 'gauges',
         },
         {
-          label: 'Govt SitRep (5.8)',
-          sublabel: 'Official PDF Export',
+          label: 'Official SitRep PDF (5.8)',
+          sublabel: 'UN-SPIDER Compliant Export',
           href: '#sitrep',
           isActive: activeTab === 'sitrep',
         },
@@ -138,12 +154,12 @@ export const App: React.FC = () => {
       ],
     },
     {
-      label: '🛰️ Flood Detection & Maps',
+      label: 'Flood Detection & Maps',
       description: 'Copernicus Sentinel-1 SAR & Google Maps Engine.',
       links: [
         {
           label: 'Satellite Flood Detection',
-          sublabel: 'Google Earth Engine & SAR',
+          sublabel: 'Sentinel-1 SAR Change Detection',
           href: '#satellite',
           isActive: activeTab === 'satellite',
         },
@@ -167,30 +183,30 @@ export const App: React.FC = () => {
       ],
     },
     {
-      label: '🚛 Relief & Alternate Routes',
-      description: 'Emergency convoys & evacuation detours.',
+      label: 'Relief & Alternate Routes',
+      description: 'Emergency convoys & civilian evacuation detours.',
       links: [
         {
           label: 'Road Inundation (5.4)',
-          sublabel: 'Highways & Cut-Off Zones',
+          sublabel: 'Highways & Cut-Off Corridors',
           href: '#roads',
           isActive: activeTab === 'roads',
         },
         {
           label: 'Emergency Routes (5.6)',
-          sublabel: 'Convoys & Evacuation',
+          sublabel: 'Tactical Convoys & Evacuation',
           href: '#routing',
           isActive: activeTab === 'routing',
         },
         {
           label: 'Safe Havens (5.7)',
-          sublabel: 'Refugee Camps & HLZ',
+          sublabel: 'Sphere Shelters & HLZs',
           href: '#havens',
           isActive: activeTab === 'havens',
         },
         {
           label: 'Point 7: Convoy Router',
-          sublabel: 'Tactical Relief Dispatch',
+          sublabel: 'Relief Staging & Dispatch',
           href: '#routing',
         },
         {
@@ -201,18 +217,18 @@ export const App: React.FC = () => {
       ],
     },
     {
-      label: '👥 Demographics & Hospitals (5.5)',
+      label: 'Demographics & Hospitals (5.5)',
       description: 'Grounded public data (Google, CBS & MoHP).',
       links: [
         {
           label: 'Public Hospitals (5.5)',
-          sublabel: 'Beds, ICU & Antivenom',
+          sublabel: 'Beds, ICU & Antivenom Stock',
           href: '#hospitals',
           isActive: activeTab === 'hospitals',
         },
         {
           label: 'Public Demographics (5.5)',
-          sublabel: 'Census 2021 & Gemini AI',
+          sublabel: 'Census 2021 & WorldPop Model',
           href: '#demographics',
           isActive: activeTab === 'demographics',
         },
@@ -223,7 +239,7 @@ export const App: React.FC = () => {
         },
         {
           label: 'Emergency Antivenom Supply',
-          sublabel: 'MoHP Snakebite Treatment Depots',
+          sublabel: 'MoHP Snakebite Treatment Stock',
           href: '#hospitals',
         },
       ],
@@ -232,71 +248,42 @@ export const App: React.FC = () => {
 
   const handleLinkClick = (link: CardNavLink) => {
     if (!link.href) return;
-    if (link.href.includes('#landing')) {
-      setActiveTab('landing');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (link.href.includes('#dashboard')) {
-      setActiveTab('dashboard');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (link.href.includes('#satellite')) {
-      setActiveTab('satellite');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (link.href.includes('#command_map')) {
-      setActiveTab('command_map');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (link.href.includes('#roads')) {
-      setActiveTab('roads');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (link.href.includes('#routing')) {
-      setActiveTab('routing');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (link.href.includes('#havens')) {
-      setActiveTab('havens');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (link.href.includes('#sitrep')) {
-      setActiveTab('sitrep');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (link.href.includes('#gauges')) {
-      setActiveTab('gauges');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (link.href.includes('#hospitals')) {
-      setActiveTab('hospitals');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else if (link.href.includes('#demographics')) {
-      setActiveTab('demographics');
+    const tab = link.href.replace('#', '') as NavigationTab;
+    if (tab) {
+      setActiveTab(tab);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const tabInfoMap: Record<
     NavigationTab,
-    { label: string; tagline: string; icon: React.ComponentType<{ className?: string }>; badge: string; badgeColor: string }
+    { label: string; tagline: string; icon: React.ElementType; badge: string; badgeColor: string }
   > = {
     landing: {
-      label: 'Home & Sovereign Overview',
-      tagline: 'Nepal Terai Early Defense & Satellite Radar',
-      icon: Shield,
+      label: 'Mission Overview & Verification',
+      tagline: 'Nepal Terai Rapid Flood Monitoring & Decision Support',
+      icon: ShieldCheck,
       badge: 'Public Portal',
-      badgeColor: 'border-cyan-500/30 bg-cyan-500/20 text-cyan-400',
+      badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400',
     },
     dashboard: {
-      label: 'Executive Dashboard',
-      tagline: 'Govt Officer Landing Console',
-      icon: ShieldAlert,
+      label: 'Emergency Command Center',
+      tagline: '3-Pane Operational Intelligence Console',
+      icon: Crosshair,
       badge: 'NEOC Command',
       badgeColor: 'border-rose-500/30 bg-rose-500/20 text-rose-400',
     },
     satellite: {
       label: 'Optical Satellite Flood Detection',
       tagline: 'PS-01: Spectral Indices & 4-Tier Settlement Impact',
-      icon: Satellite,
+      icon: Waves,
       badge: 'PS-01 Compliant',
       badgeColor: 'border-cyan-500/30 bg-cyan-500/20 text-cyan-400',
     },
     command_map: {
       label: 'Field Command Map',
-      tagline: 'Google Maps API Engine',
-      icon: Globe,
+      tagline: 'Google Maps API Engine & Inundated Settlements',
+      icon: MapPin,
       badge: 'Stage 5.2/5.3 Operations',
       badgeColor: 'border-blue-500/30 bg-blue-500/20 text-blue-400',
     },
@@ -310,27 +297,27 @@ export const App: React.FC = () => {
     routing: {
       label: 'Emergency Routes & Convoys',
       tagline: 'Convoys & Evacuation Detours',
-      icon: Route,
+      icon: Compass,
       badge: 'Stage 5.6 Points 7 & 9',
       badgeColor: 'border-cyan-500/30 bg-cyan-500/20 text-cyan-400',
     },
     havens: {
       label: 'Safe Havens & Refugee Camps',
-      tagline: 'Sphere Standards & HLZ',
-      icon: Tent,
+      tagline: 'Sphere Standards & Helicopter Landing Zones',
+      icon: ShieldCheck,
       badge: 'Stage 5.7 Point 8',
       badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400',
     },
     sitrep: {
       label: 'Govt SitRep PDF Export',
       tagline: 'Official UN-SPIDER SitRep',
-      icon: FileDown,
+      icon: FilePdf,
       badge: 'Stage 5.8 Point 10',
       badgeColor: 'border-rose-500/30 bg-rose-500/20 text-rose-400',
     },
     gauges: {
       label: 'DHM River Gauges & SOS',
-      tagline: 'Real-Time Telemetry & Alerts',
+      tagline: 'Real-Time Telemetry & Bilingual Broadcasts',
       icon: Waves,
       badge: 'Stage 5.9 Point 11',
       badgeColor: 'border-blue-500/30 bg-blue-500/20 text-blue-400',
@@ -338,16 +325,16 @@ export const App: React.FC = () => {
     hospitals: {
       label: 'Public Hospitals & Antivenom',
       tagline: 'Beds, ICU & Antivenom Stock',
-      icon: HeartPulse,
+      icon: FirstAid,
       badge: 'Stage 5.5 MoHP Data',
       badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400',
     },
     demographics: {
       label: 'Public Demographics & AI',
-      tagline: 'Census 2021 & Gemini AI',
-      icon: Users,
+      tagline: 'Census 2021 & WorldPop Model',
+      icon: UsersThree,
       badge: 'Stage 5.5 Points 5 & 6',
-      badgeColor: 'border-purple-500/30 bg-purple-500/20 text-purple-400',
+      badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400',
     },
   };
 
@@ -355,7 +342,7 @@ export const App: React.FC = () => {
   const CurrentIcon = currentTab.icon;
 
   const navLeftSlot = (
-    <div className="hidden md:flex items-center gap-1 ml-1.5">
+    <div className="hidden md:flex items-center gap-1 ml-1.5 font-sans">
       <button
         onClick={() => {
           setActiveTab('landing');
@@ -363,10 +350,9 @@ export const App: React.FC = () => {
         }}
         className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
           activeTab === 'landing'
-            ? 'text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 shadow-sm shadow-cyan-500/10'
+            ? 'text-emerald-300 bg-emerald-500/15 border border-emerald-500/30'
             : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent'
         }`}
-        title="Go to Public Landing & Hero Overview"
       >
         Home
       </button>
@@ -377,39 +363,35 @@ export const App: React.FC = () => {
         }}
         className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
           activeTab === 'dashboard'
-            ? 'text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 shadow-sm shadow-cyan-500/10'
+            ? 'text-emerald-300 bg-emerald-500/15 border border-emerald-500/30'
             : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent'
         }`}
-        title="Go to Executive Overview Dashboard"
       >
-        Dashboard
+        Command Center
       </button>
       <button
         onClick={() => setIsAboutOpen(true)}
         className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent transition-all cursor-pointer"
-        title="About FloodGuard AI Platform"
       >
         About
       </button>
       <button
         onClick={() => setIsFaqOpen(true)}
         className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent transition-all cursor-pointer"
-        title="Frequently Asked Questions & Radar Guide"
       >
         FAQ
       </button>
       <button
         onClick={() => setIsContactOpen(true)}
         className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent transition-all cursor-pointer"
-        title="Emergency Operations Hotlines & Signal Dispatch"
       >
-        Contact
+        Hotlines
       </button>
     </div>
   );
 
   const dropdownHeader = (
-    <div className="flex flex-wrap items-center justify-between gap-2 w-full text-xs">
+    <div className="flex flex-wrap items-center justify-between gap-2 w-full text-xs font-sans">
       <div className="flex items-center gap-1.5">
         <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold">Quick Links:</span>
         <button
@@ -418,7 +400,7 @@ export const App: React.FC = () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-            activeTab === 'landing' ? 'text-cyan-300 bg-cyan-500/20' : 'text-slate-300 hover:text-white'
+            activeTab === 'landing' ? 'text-emerald-300 bg-emerald-500/20' : 'text-slate-300 hover:text-white'
           }`}
         >
           Home
@@ -429,10 +411,10 @@ export const App: React.FC = () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors cursor-pointer ${
-            activeTab === 'dashboard' ? 'text-cyan-300 bg-cyan-500/20' : 'text-slate-300 hover:text-white'
+            activeTab === 'dashboard' ? 'text-emerald-300 bg-emerald-500/20' : 'text-slate-300 hover:text-white'
           }`}
         >
-          Dashboard
+          Command Center
         </button>
         <button
           onClick={() => setIsAboutOpen(true)}
@@ -446,37 +428,88 @@ export const App: React.FC = () => {
         >
           FAQ
         </button>
-        <button
-          onClick={() => setIsContactOpen(true)}
-          className="px-2 py-0.5 rounded text-[11px] font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
-        >
-          Contact
-        </button>
       </div>
-      <div className="hidden sm:flex items-center gap-1 text-[10px] font-mono text-cyan-400">
-        <span>Nepal Terai Sovereign AI Ops</span>
+      <div className="hidden sm:flex items-center gap-1 text-[10px] font-mono text-emerald-400">
+        <span>Nepal Terai Decision Support Ops</span>
       </div>
     </div>
   );
 
   const navRightSlot = (
-    <button
-      onClick={toggleTheme}
-      className="rounded-xl border border-slate-700/80 bg-slate-800/80 p-2 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
-      title="Toggle Light / Dark Theme"
-      aria-label="Toggle Theme"
-    >
-      {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-slate-300" />}
-    </button>
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => {
+          setActiveTab('dashboard');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+      >
+        <Crosshair size={14} weight="bold" />
+        <span>Command Console</span>
+      </button>
+
+      <button
+        onClick={() => {
+          setActiveTab('sitrep');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        className="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-[#1E293B] hover:bg-[#334155] px-3 py-1.5 text-xs font-bold text-[#F8FAFC] shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+      >
+        <FilePdf size={14} weight="bold" className="text-rose-400" />
+        <span>SITREP</span>
+      </button>
+
+      <button
+        onClick={toggleTheme}
+        className="rounded-xl border border-slate-700/80 bg-slate-800/80 p-2 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+        title="Toggle Theme"
+        aria-label="Toggle Theme"
+      >
+        {isDark ? <Sun size={15} weight="bold" className="text-amber-400" /> : <Moon size={15} weight="bold" className="text-slate-300" />}
+      </button>
+    </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+    <div className="min-h-[100dvh] bg-[#0F172A] text-[#F8FAFC] flex flex-col font-sans selection:bg-emerald-600 selection:text-white">
       {/* ───────────────────────────────────────────────────────────────────────
-          MAIN NAVIGATION BAR (Full Width Edge-to-Edge)
+          1. TOP EMERGENCY RIBBON BAR (Prominently displayed)
       ───────────────────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-[100] w-full border-b border-slate-800/80 bg-[#07090e]/95 backdrop-blur-md px-2 sm:px-4 py-2">
-        <div className="w-full">
+      <div className="bg-[#1E293B] border-b border-white/10 px-4 py-1.5 text-xs font-mono">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-[#94A3B8]">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-bold text-white">● LIVE TELEMETRY ONLINE</span>
+            <span className="text-slate-600">|</span>
+            <span className="text-[11px] text-[#94A3B8]">
+              Nepal Terai Rapid Flood Monitoring &amp; Decision Support System
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4 text-[11px]">
+            <a href="tel:1155" className="text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1">
+              <PhoneCall size={12} weight="bold" />
+              <span>NEOC Hotline: 1155</span>
+            </a>
+            <span className="text-slate-600">&bull;</span>
+            <a href="tel:1130" className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1">
+              <FirstAid size={12} weight="bold" />
+              <span>Nepal Red Cross: 1130</span>
+            </a>
+            <span className="text-slate-600">&bull;</span>
+            <a href="tel:1114" className="text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1">
+              <ShieldWarning size={12} weight="bold" />
+              <span>APF: 1114</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* ───────────────────────────────────────────────────────────────────────
+          2. MAIN NAVIGATION BAR
+      ───────────────────────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-[100] w-full border-b border-white/10 bg-[#0F172A]/95 backdrop-blur-md px-2 sm:px-4 py-2">
+        <div className="w-full max-w-7xl mx-auto">
           <CardNav
             logo={navLogo}
             logoAlt="FloodGuard AI Nepal"
@@ -488,7 +521,7 @@ export const App: React.FC = () => {
             openOn="click"
             cardHeight={175}
             maxWidth="100%"
-            accentColor="#06b6d4"
+            accentColor="#10B981"
             onLinkClick={handleLinkClick}
             leftSlot={navLeftSlot}
             rightSlot={navRightSlot}
@@ -498,14 +531,14 @@ export const App: React.FC = () => {
       </header>
 
       {/* ───────────────────────────────────────────────────────────────────────
-          SLIM STATUS & CONTEXT BREADCRUMB STRIP (Replaces bulky secondary nav)
+          3. SLIM STATUS & CONTEXT BREADCRUMB STRIP
       ───────────────────────────────────────────────────────────────────────── */}
-      <div className="bg-slate-900/50 border-b border-slate-800/80 px-4 md:px-8 py-2 text-xs">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-slate-400">
+      <div className="bg-[#1E293B]/70 border-b border-white/10 px-4 md:px-8 py-2 text-xs">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-[#94A3B8]">
           <div className="flex items-center gap-2">
-            <span className="text-slate-500 font-mono">NEOC Command &bull;</span>
-            <span className="flex items-center gap-1.5 font-bold text-slate-200">
-              <CurrentIcon className="h-3.5 w-3.5 text-cyan-400" />
+            <span className="font-mono text-slate-400">NEOC Command &bull;</span>
+            <span className="flex items-center gap-1.5 font-bold text-white">
+              <CurrentIcon size={14} weight="bold" className="text-emerald-400" />
               <span>{currentTab.label}</span>
             </span>
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-mono font-bold border ${currentTab.badgeColor}`}>
@@ -513,24 +546,24 @@ export const App: React.FC = () => {
             </span>
           </div>
 
-          <div className="flex items-center gap-3 text-[11px] text-slate-400 flex-wrap">
+          <div className="flex items-center gap-3 text-[11px] font-mono text-[#94A3B8] flex-wrap">
             <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="text-emerald-300 font-medium">Telemetry Online</span>
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-emerald-300 font-medium">Copernicus S1 SAR Linked</span>
             </div>
             <span className="text-slate-600">|</span>
             <div className="flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 text-cyan-400" />
-              <span>21 Southern Nepal Terai Districts (26.20°N &ndash; 28.35°N)</span>
+              <MapPin size={13} weight="bold" className="text-cyan-400" />
+              <span>21 Terai Districts (26.20°N &ndash; 28.35°N)</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* ───────────────────────────────────────────────────────────────────────
-          MAIN CONTENT VIEWPORT
+          4. MAIN CONTENT VIEWPORT
       ───────────────────────────────────────────────────────────────────────── */}
-      <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+      <main className="flex-1 p-3 sm:p-5 md:p-6 max-w-7xl mx-auto w-full">
         {activeTab === 'landing' && (
           <LandingHeroPage
             onMoveToDashboard={() => {
@@ -558,33 +591,33 @@ export const App: React.FC = () => {
       </main>
 
       {/* ───────────────────────────────────────────────────────────────────────
-          USER-FRIENDLY FOOTER & EMERGENCY HOTLINES
+          5. OFFICIAL GOVERNMENT FOOTER & EMERGENCY HOTLINES
       ───────────────────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-slate-800 bg-slate-900/90 px-6 py-6 text-xs text-slate-400 mt-auto">
+      <footer className="border-t border-white/10 bg-[#1E293B] px-6 py-5 text-xs text-[#94A3B8] mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="space-y-1 text-center md:text-left">
             <div className="flex items-center justify-center md:justify-start gap-2">
               <span className="font-bold text-white">FloodGuard AI</span>
-              <span className="text-slate-500">&bull;</span>
-              <span className="text-slate-300">Nepal Terai Disaster Intelligence &amp; Early Response</span>
+              <span className="text-slate-600">&bull;</span>
+              <span className="text-[#F8FAFC]">Nepal Terai Rapid Flood Monitoring &amp; Decision Support System</span>
             </div>
-            <p className="text-[11px] text-slate-500">
-              Powered by Copernicus Sentinel-1 Radar SAR + Google Maps JavaScript API v3. Strictly localized to Nepal Terai.
+            <p className="text-[11px] text-[#94A3B8]">
+              Powered by Copernicus Sentinel-1 Radar SAR + Google Maps JavaScript API v3. Strictly localized to Nepal Terai Lowlands.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-4 text-[11px]">
+          <div className="flex flex-wrap items-center justify-center gap-4 text-[11px] font-mono">
             <div className="flex items-center gap-1.5 text-slate-300">
-              <Phone className="h-3.5 w-3.5 text-rose-400" />
+              <PhoneCall size={13} weight="bold" className="text-rose-400" />
               <span>NEOC Hotline: <strong>1155</strong></span>
             </div>
             <div className="flex items-center gap-1.5 text-slate-300">
-              <HeartPulse className="h-3.5 w-3.5 text-emerald-400" />
+              <FirstAid size={13} weight="bold" className="text-emerald-400" />
               <span>Nepal Red Cross: <strong>1130</strong></span>
             </div>
             <div className="flex items-center gap-1.5 text-slate-300">
-              <Shield className="h-3.5 w-3.5 text-blue-400" />
-              <span>Armed Police Force Rescue: <strong>1114</strong></span>
+              <ShieldCheck size={13} weight="bold" className="text-blue-400" />
+              <span>APF Rescue: <strong>1114</strong></span>
             </div>
           </div>
         </div>
