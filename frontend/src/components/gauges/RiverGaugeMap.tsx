@@ -192,45 +192,45 @@ export const RiverGaugeMap: React.FC<RiverGaugeMapProps> = ({
   };
 
   return (
-    <div className="relative isolate z-10 w-full h-[520px] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl">
+    <div id="map" className="relative isolate z-10 w-full h-[520px] rounded-2xl overflow-hidden border border-white/10 bg-[#1E293B] shadow-2xl">
       {/* ─────────────────────────────────────────────────────────────────────
           TOP INTERACTIVE CONTROLS BAR (DOTTED BASINS & DOTTED RIVERS)
       ─────────────────────────────────────────────────────────────────────── */}
       <div className="absolute top-3 left-3 right-3 z-[400] flex flex-wrap items-center justify-between gap-2 pointer-events-none">
         {/* Toggle Buttons */}
-        <div className="flex items-center gap-2 pointer-events-auto bg-slate-950/85 backdrop-blur-md p-1.5 rounded-xl border border-slate-800/80 shadow-xl">
+        <div className="flex items-center gap-2 pointer-events-auto bg-[#0F172A]/90 backdrop-blur-md p-1.5 rounded-xl border border-white/10 shadow-xl">
           <button
             onClick={() => setShowBasins((prev) => !prev)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               showBasins
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-950/50'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
                 : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
-            <Zap className="h-3.5 w-3.5" />
-            <span>{language === 'ne' ? '⚡ बेसिनहरू (Dotted)' : '⚡ Basins (Dotted)'}</span>
+            <Zap className="h-3.5 w-3.5 text-cyan-400" />
+            <span>{language === 'ne' ? 'बेसिनहरू (Dotted)' : 'Basins (Dotted)'}</span>
           </button>
 
           <button
             onClick={() => setShowRivers((prev) => !prev)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               showRivers
-                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm shadow-blue-950/50'
+                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm'
                 : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
-            <Waves className="h-3.5 w-3.5" />
-            <span>{language === 'ne' ? '🌊 नदीहरू (Dotted)' : '🌊 Rivers (Dotted)'}</span>
+            <Waves className="h-3.5 w-3.5 text-blue-400" />
+            <span>{language === 'ne' ? 'नदीहरू (Dotted)' : 'Rivers (Dotted)'}</span>
           </button>
         </div>
 
         {/* Informative Tap Indicator */}
-        <div className="pointer-events-auto hidden md:flex items-center gap-2 bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-cyan-500/30 text-xs font-mono text-cyan-300 shadow-xl animate-fade-in">
+        <div className="pointer-events-auto hidden md:flex items-center gap-2 bg-[#0F172A]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-xs font-mono text-cyan-300 shadow-xl">
           <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping"></span>
           <span>
             {language === 'ne'
-              ? '💡 कुनै पनि नदी रेखामा ट्याप गरी प्रत्यक्ष विवरण हेर्नुहोस्'
-              : '💡 Tap any dotted river line to inspect live telemetry updates'}
+              ? 'नदी रेखा वा पिनमा ट्याप गरी प्रत्यक्ष विवरण हेर्नुहोस्'
+              : 'Tap any dotted river line or station pin for live telemetry updates'}
           </span>
         </div>
       </div>
@@ -339,7 +339,7 @@ export const RiverGaugeMap: React.FC<RiverGaugeMapProps> = ({
                     <div className="p-1 font-sans text-slate-900 min-w-[200px]">
                       <div className="flex items-center justify-between gap-1.5 border-b border-slate-200 pb-1">
                         <span className="font-bold text-xs text-slate-950 flex items-center gap-1">
-                          <span>🌊</span>
+                          <Waves className="h-3.5 w-3.5 text-cyan-600 inline" />
                           <span>{language === 'ne' ? river.nepaliName : river.name}</span>
                         </span>
                         <span
@@ -476,8 +476,7 @@ export const RiverGaugeMap: React.FC<RiverGaugeMapProps> = ({
           MAP LEGEND OVERLAY (HIGH-CONTRAST SOLID BACKDROP • CRISP VISIBILITY)
       ─────────────────────────────────────────────────────────────────────── */}
       <div
-        style={{ backgroundColor: '#090e1a' }}
-        className="absolute bottom-4 left-4 z-[400] p-3.5 rounded-2xl border-2 border-slate-700/90 shadow-[0_12px_40px_rgba(0,0,0,0.9)] space-y-2 max-w-[290px] sm:max-w-xs select-none backdrop-blur-none"
+        className="absolute bottom-4 left-4 z-[400] p-3 rounded-xl border border-white/10 bg-[#1E293B]/80 shadow-2xl space-y-2 max-w-[270px] select-none backdrop-blur-md"
       >
         <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
           <div className="flex items-center gap-1.5 text-white font-extrabold text-[11px] uppercase tracking-wider">

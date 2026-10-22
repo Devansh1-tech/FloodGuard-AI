@@ -1,46 +1,40 @@
 /**
- * Stage59RiverGaugesPage.tsx — Stage 5.9 DHM River Gauge Telemetry & Vernacular SOS Alerts.
+ * Stage59RiverGaugesPage.tsx — Real-Time River Gauge Telemetry & Vernacular SOS.
  *
- * Implements Point 11 of the Master Plan:
- * 1. Nepal DHM Real-Time River Gauge Telemetry across 21 Terai districts.
- * 2. Visual liquid water gauge bars (Normal, Warning, Danger thresholds).
- * 3. 12-Hour hydrographs and discharge telemetry.
- * 4. Multi-channel Vernacular Nepali SOS Alert Generator (SMS, WhatsApp, Radio FM).
- * 5. Full Bilingual Switcher (नेपाली / English).
+ * Overhauled to High-Density Cockpit Telemetry (VISUAL_DENSITY: 8, SKILL.md):
+ * 1. Zero vertical page scroll: Abolished 7 heavy static station cards.
+ * 2. On-Demand Inspection Drawer: Inspect station hydrographs, gate status, and downstream zones via dropdown or map pin click.
+ * 3. 4 High-Density Monospace Telemetry KPI Cards.
+ * 4. Consolidated Toolbar: Language switcher (नेपाली / EN), Telemetry Sync, and DHM Info.
+ * 5. Clean Basin & Station Dropdowns directly above the interactive River Map canvas.
+ * 6. Preserved <div id="map"></div> mounting container and Leaflet/Google Maps compatibility.
+ * 7. Anti-Emoji Policy: Exclusively @phosphor-icons/react SVGs.
+ * 8. WCAG AA Palette: #0F172A Canvas, #1E293B Containers, #F8FAFC Text, #94A3B8 Secondary.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Activity,
-  AlertOctagon,
-  AlertTriangle,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  Compass,
-  Filter,
-  Globe,
-  HeartPulse,
-  Layers,
-  MapPin,
-  Maximize2,
-  Phone,
-  Radio,
-  RefreshCw,
-  Search,
-  Shield,
-  ShieldAlert,
-  Sparkles,
-  Users,
-  Volume2,
+  Broadcast,
   Waves,
-  Zap,
-  Info,
-  ExternalLink,
-  ChevronDown,
-  ChevronUp,
+  Drop,
+  WarningOctagon,
+  WarningCircle,
+  Warning,
+  Gauge,
+  Users,
+  ArrowsClockwise,
+  MagnifyingGlass,
+  SlidersHorizontal,
   X,
-} from 'lucide-react';
+  CaretDown,
+  CaretUp,
+  MapPin,
+  CalendarBlank,
+  Info,
+  Radio,
+  CheckCircle,
+} from '@phosphor-icons/react';
+
 import {
   TERAI_RIVER_GAUGES,
   RiverGaugeStation,
@@ -63,6 +57,9 @@ import { LiveRiverTelemetryModal } from '@/components/gauges/LiveRiverTelemetryM
 export const Stage59RiverGaugesPage: React.FC = () => {
   const [gauges, setGauges] = useState<RiverGaugeStation[]>(TERAI_RIVER_GAUGES);
   const [selectedStation, setSelectedStation] = useState<RiverGaugeStation | null>(TERAI_RIVER_GAUGES[0]);
+  const [inspectedStation, setInspectedStation] = useState<RiverGaugeStation | null>(null);
+  const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(false);
+
   const [selectedBasin, setSelectedBasin] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedScenario, setSelectedScenario] = useState<string>('live_monsoon_deluge');
@@ -70,6 +67,7 @@ export const Stage59RiverGaugesPage: React.FC = () => {
   const [isCustomDate, setIsCustomDate] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [language, setLanguage] = useState<'en' | 'ne'>('ne'); // Default to Nepali vernacular
+
   const [isSosModalOpen, setIsSosModalOpen] = useState<boolean>(false);
   const [modalStation, setModalStation] = useState<RiverGaugeStation | null>(null);
   const [selectedRiverForModal, setSelectedRiverForModal] = useState<LiveRiverData | null>(null);
@@ -97,46 +95,46 @@ export const Stage59RiverGaugesPage: React.FC = () => {
   }, [selectedBasin, selectedStatus, selectedDate, selectedScenario]);
 
   // Synchronize Nepal rivers with active DHM gauges and selected scenario
-  const activeRivers = React.useMemo(() => {
+  const activeRivers = useMemo(() => {
     return syncNepalRiversWithGauges(NEPAL_RIVERS, gauges);
   }, [gauges]);
 
-  const filteredGauges = gauges.filter((g) => {
-    // 1. Text search filter: Match names, rivers, districts, basins, DHM station numbers, officer, settlements
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      const qDigits = q.replace(/[^0-9]/g, '');
-      const matchText = (
-        g.name.toLowerCase().includes(q) ||
-        g.nepaliName.toLowerCase().includes(q) ||
-        g.river.toLowerCase().includes(q) ||
-        g.nepaliRiver.toLowerCase().includes(q) ||
-        g.district.toLowerCase().includes(q) ||
-        g.basin.toLowerCase().includes(q) ||
-        g.dhmStationNumber.toLowerCase().includes(q) ||
-        (qDigits.length > 0 && g.dhmStationNumber.replace(/[^0-9]/g, '').includes(qDigits)) ||
-        g.stationOfficer.toLowerCase().includes(q) ||
-        (g.downstreamSettlements && g.downstreamSettlements.some(
-          (s) => s.settlementName.toLowerCase().includes(q) || s.nepaliName.toLowerCase().includes(q)
-        ))
-      );
-      if (!matchText) return false;
-    }
-    // 2. Client-side basin & status double-check for instantaneous responsiveness
-    if (!matchesBasin(g, selectedBasin)) return false;
-    if (!matchesStatus(g, selectedStatus)) return false;
+  const filteredGauges = useMemo(() => {
+    return gauges.filter((g) => {
+      // 1. Text search filter: Match names, rivers, districts, basins, DHM station numbers, officer, settlements
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const qDigits = q.replace(/[^0-9]/g, '');
+        const matchText = (
+          g.name.toLowerCase().includes(q) ||
+          g.nepaliName.toLowerCase().includes(q) ||
+          g.river.toLowerCase().includes(q) ||
+          g.nepaliRiver.toLowerCase().includes(q) ||
+          g.district.toLowerCase().includes(q) ||
+          g.basin.toLowerCase().includes(q) ||
+          g.dhmStationNumber.toLowerCase().includes(q) ||
+          (qDigits.length > 0 && g.dhmStationNumber.replace(/[^0-9]/g, '').includes(qDigits)) ||
+          g.stationOfficer.toLowerCase().includes(q) ||
+          (g.downstreamSettlements && g.downstreamSettlements.some(
+            (s) => s.settlementName.toLowerCase().includes(q) || s.nepaliName.toLowerCase().includes(q)
+          ))
+        );
+        if (!matchText) return false;
+      }
+      // 2. Client-side basin & status double-check for instantaneous responsiveness
+      if (!matchesBasin(g, selectedBasin)) return false;
+      if (!matchesStatus(g, selectedStatus)) return false;
 
-    return true;
-  });
+      return true;
+    });
+  }, [gauges, searchQuery, selectedBasin, selectedStatus]);
 
-  // Ensure selected station remains valid when filters or scenarios change
+  // Ensure selected station remains valid when filters change
   useEffect(() => {
     if (filteredGauges.length > 0) {
       if (!selectedStation || !filteredGauges.some((g) => g.id === selectedStation.id)) {
         setSelectedStation(filteredGauges[0]);
       }
-    } else {
-      setSelectedStation(null);
     }
   }, [filteredGauges]);
 
@@ -162,9 +160,9 @@ export const Stage59RiverGaugesPage: React.FC = () => {
     isCustomDate;
 
   // Compute telemetry summary reflecting active filtered subset (or full gauges)
-  const summary: TelemetrySummary = computeTelemetrySummary(
-    filteredGauges.length > 0 ? filteredGauges : gauges
-  );
+  const summary: TelemetrySummary = useMemo(() => {
+    return computeTelemetrySummary(filteredGauges.length > 0 ? filteredGauges : gauges);
+  }, [filteredGauges, gauges]);
 
   const handleOpenSosModal = (station: RiverGaugeStation) => {
     setModalStation(station);
@@ -180,64 +178,55 @@ export const Stage59RiverGaugesPage: React.FC = () => {
     setSearchQuery('');
   };
 
-  return (
-    <div className="space-y-6 pb-16 text-slate-100">
-      {/* ─────────────────────────────────────────────────────────────────────
-          PAGE HEADER & BILINGUAL LANGUAGE SWITCHER
-      ─────────────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="rounded-md bg-blue-500/20 px-2.5 py-1 text-xs font-bold text-blue-400 border border-blue-500/30 flex items-center gap-1.5">
-              <Waves className="h-3.5 w-3.5" />
-              STAGE 5.9: DHM RIVER GAUGES &amp; VERNACULAR SOS ALERTS
-            </span>
-            <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-300 border border-emerald-500/30">
-              Point 11: Real-Time Early Warning
-            </span>
-            <span className="rounded-md bg-rose-500/20 px-2 py-0.5 text-[11px] font-bold text-rose-300 border border-rose-500/30">
-              Nepal DHM Grounded
-            </span>
-          </div>
+  const handleStationSelect = (station: RiverGaugeStation) => {
+    setSelectedStation(station);
+    setInspectedStation(station);
+    setIsInspectorOpen(true);
+  };
 
-          <h1 className="text-2xl md:text-3xl font-black text-white mt-1.5 flex items-center gap-2.5">
-            <Radio className="h-7 w-7 text-rose-400 animate-pulse" />
+  return (
+    <div className="min-h-[100dvh] bg-[#0F172A] text-[#F8FAFC] pb-12 space-y-4 px-2 sm:px-4 max-w-7xl mx-auto w-full">
+      {/* ─────────────────────────────────────────────────────────────────────
+          1. CONSOLIDATED TOP BAR: CRISP TITLE + UNIFIED TOOLBAR
+      ─────────────────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3 pt-1">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-black text-[#F8FAFC] tracking-tight flex items-center gap-2">
+            <Broadcast size={24} weight="bold" className="text-[#EF4444] animate-pulse" />
             <span>
               {language === 'ne'
                 ? 'नदी जलसतह टेलिमेट्री तथा नेपाली आपतकालीन चेतावनी'
-                : 'Real-Time River Gauge Telemetry & Vernacular Alerts'}
+                : 'Real-Time River Gauge Telemetry & Vernacular SOS'}
             </span>
           </h1>
-          <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-4xl">
-            {language === 'ne'
-              ? 'नेपाल जल तथा मौसम विज्ञान विभाग (DHM) को प्रत्यक्ष जलसतह सेन्सरहरूको आधारमा तराईका २१ जिल्लाका प्रमुख नदीहरूको खतरा विन्दु अनुगमन। एक क्लिकमा नेपाली भाषामा एसएमएस, व्हाट्सएप र रेडियो एफएम प्रसारण सूचना उत्पादन।'
-              : 'Direct integration with Nepal Department of Hydrology & Meteorology (DHM) telemetry sensors across the 21 Terai districts. Automated generation of vernacular Nepali and English SOS alerts for cellular SMS, WhatsApp, and community FM radio.'}
+          <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
+            DHM Automated Sensor Transducers &bull; 21 Lowland Terai Districts &bull; 10-Min Telemetry
           </p>
         </div>
 
-        {/* Right Controls: Bilingual Switcher & Telemetry Sync */}
-        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-          {/* Bilingual Toggle Button */}
-          <div className="flex items-center rounded-xl bg-slate-850 border border-slate-700 p-1 bg-slate-900 shadow-md">
+        {/* Compact Right Toolbar: Language Switcher + Telemetry Sync + Provenance Info */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Compact Bilingual Switcher */}
+          <div className="flex items-center rounded-lg bg-[#1E293B] border border-white/10 p-0.5 shadow-sm text-xs">
             <button
               onClick={() => setLanguage('ne')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
                 language === 'ne'
-                  ? 'bg-rose-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-rose-600 text-white shadow-sm'
+                  : 'text-[#94A3B8] hover:text-white'
               }`}
             >
-              नेपाली (Vernacular)
+              नेपाली
             </button>
             <button
               onClick={() => setLanguage('en')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
                 language === 'en'
-                  ? 'bg-cyan-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-cyan-600 text-white shadow-sm'
+                  : 'text-[#94A3B8] hover:text-white'
               }`}
             >
-              English
+              EN
             </button>
           </div>
 
@@ -245,75 +234,62 @@ export const Stage59RiverGaugesPage: React.FC = () => {
           <button
             onClick={loadData}
             disabled={isLoading}
-            className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 px-3.5 py-2.5 text-xs font-bold text-slate-200 hover:text-white transition-all shadow-md cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#1E293B] hover:bg-[#334155] px-3 py-1.5 text-xs font-bold text-[#F8FAFC] shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+            title="Refresh Live Telemetry"
           >
-            <RefreshCw className={`h-3.5 w-3.5 text-blue-400 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>{language === 'ne' ? 'ताजा गर्नुहोस्' : 'Sync Telemetry'}</span>
+            <ArrowsClockwise size={14} weight="bold" className={`text-cyan-400 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>{language === 'ne' ? 'ताजा गर्नुहोस्' : 'Sync'}</span>
           </button>
 
           {/* Data Provenance Info Button */}
           <button
             onClick={() => setShowProvenanceInfo(!showProvenanceInfo)}
-            className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-cyan-950/40 hover:bg-cyan-900/40 px-3 py-2 text-xs font-bold text-cyan-300 transition-all shadow-md cursor-pointer"
-            title="View DHM Data Sources & Architecture"
+            className="flex items-center gap-1 rounded-lg border border-cyan-500/30 bg-cyan-950/40 hover:bg-cyan-900/40 px-2.5 py-1.5 text-xs font-semibold text-cyan-300 transition-all cursor-pointer"
+            title="DHM Data Architecture"
           >
-            <Info className="h-3.5 w-3.5 text-cyan-400" />
-            <span>{language === 'ne' ? 'तथ्यांक स्रोत (DHM Info)' : 'DHM Data Info'}</span>
-            {showProvenanceInfo ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            <Info size={14} weight="bold" className="text-cyan-400" />
+            <span className="hidden sm:inline">DHM Info</span>
+            {showProvenanceInfo ? <CaretUp size={12} weight="bold" /> : <CaretDown size={12} weight="bold" />}
           </button>
         </div>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────
-          DHM DATA PROVENANCE & REAL DATA ARCHITECTURE BANNER (COLLAPSIBLE)
+          COLLAPSIBLE DHM PROVENANCE INFO PANEL
       ─────────────────────────────────────────────────────────────────────── */}
       {showProvenanceInfo && (
-        <div className="rounded-2xl border border-cyan-500/30 bg-[#091322] p-4 sm:p-6 space-y-3 shadow-xl backdrop-blur-md animate-in fade-in duration-200">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-2 text-cyan-300 font-bold text-sm">
-              <Globe className="h-4 w-4 text-cyan-400" />
-              <span>
-                {language === 'ne'
-                  ? 'नेपाल सरकार जल तथा मौसम विज्ञान विभाग (DHM) प्रत्यक्ष तथ्यांक प्रणाली'
-                  : 'Government of Nepal DHM Real-Time Hydrological Telemetry Network'}
-              </span>
-            </div>
+        <div className="rounded-xl border border-white/10 bg-[#1E293B] p-3.5 space-y-2 text-xs shadow-xl animate-in fade-in duration-150">
+          <div className="flex items-center justify-between pb-1 border-b border-white/10">
+            <span className="font-bold text-cyan-300 flex items-center gap-1.5">
+              <Info size={14} weight="bold" className="text-cyan-400" />
+              Government of Nepal DHM Real-Time Hydrological Telemetry Architecture
+            </span>
             <a
               href="http://hydrology.gov.np/"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-400 hover:text-cyan-300 underline"
+              className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 underline"
             >
-              <span>hydrology.gov.np</span>
-              <ExternalLink className="h-3 w-3" />
+              hydrology.gov.np
             </a>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-300 pt-1">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 space-y-1">
-              <span className="font-mono text-[10px] text-cyan-400 font-bold uppercase">1. Real Sensor Transducers</span>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                {language === 'ne'
-                  ? 'सप्तकोशी, बागमती, नारायणी, पश्चिम राप्ती र कर्णालीका ४७ वटा जलमापन केन्द्रहरूमा जडित रडार वाटर लेभल सेन्सर र प्रेसर ट्रान्सड्युसरहरूबाट प्रत्येक १०-१५ मिनेटमा जीएसएम/स्याटेलाइट मार्फत जलसतह तथ्यांक संकलन हुन्छ।'
-                  : 'Water level data is collected at 47+ automated hydrological stations using Ott radar water level sensors and pressure transducers transmitting via Ncell/NTC telemetry every 10–15 minutes.'}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px] text-[#94A3B8]">
+            <div className="p-2.5 rounded-lg bg-[#0F172A] border border-white/5 space-y-1">
+              <strong className="text-cyan-300 block uppercase font-mono text-[10px]">1. Radar Transducers</strong>
+              <p className="leading-relaxed">
+                47+ automated hydrological stations transmitting stage and discharge telemetry every 10–15 minutes via GSM/Satellite.
               </p>
             </div>
-
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 space-y-1">
-              <span className="font-mono text-[10px] text-amber-400 font-bold uppercase">2. Warning &amp; Danger Benchmarks</span>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                {language === 'ne'
-                  ? 'प्रत्येक केन्द्रको लागि नेपाल DHM ले आधिकारिक चेतावनी तह (Warning Level) र खतरा तह (Danger Level) निर्धारण गरेको छ, जसमा जलस्तर पुग्दा स्वतः रातो साइरन र एसएमएस अलर्ट जारी हुन्छ।'
-                  : 'Official DHM warning thresholds (सतर्कता तह) and danger thresholds (खतरा तह) in meters are calibrated based on riverbed bathymetry and embankment crest heights.'}
+            <div className="p-2.5 rounded-lg bg-[#0F172A] border border-white/5 space-y-1">
+              <strong className="text-amber-300 block uppercase font-mono text-[10px]">2. Calibrated Thresholds</strong>
+              <p className="leading-relaxed">
+                Official DHM Warning and Danger levels in meters calibrated to riverbed bathymetry and embankment crest heights.
               </p>
             </div>
-
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 space-y-1">
-              <span className="font-mono text-[10px] text-emerald-400 font-bold uppercase">3. Date &amp; Historic Flood Replay</span>
-              <p className="text-[11px] text-slate-300 leading-relaxed">
-                {language === 'ne'
-                  ? 'तल दिइएको "मिति / बाढी परिदृश्य" मेनुबाट २०२४ को असोज रेकर्ड बाढी, २०२३ को सतर्कता चरण, वा हिउँदको सामान्य बहाव चयन गरी ऐतिहासिक तथ्यांक हेर्न सकिन्छ।'
-                  : 'You can adjust water levels by date or scenario (e.g. Sept 2024 Record Deluge, July 2023 Warning Phase, or March 2024 Normal Flow) to inspect historical flood hydrographs.'}
+            <div className="p-2.5 rounded-lg bg-[#0F172A] border border-white/5 space-y-1">
+              <strong className="text-emerald-300 block uppercase font-mono text-[10px]">3. Monsoon Replay</strong>
+              <p className="leading-relaxed">
+                Replay historical monsoon deluge records (Sept 2024, July 2023, winter baseline) or simulate custom dates.
               </p>
             </div>
           </div>
@@ -321,394 +297,308 @@ export const Stage59RiverGaugesPage: React.FC = () => {
       )}
 
       {/* ─────────────────────────────────────────────────────────────────────
-          TELEMETRY SUMMARY HUD CARDS
+          2. TOP 4 HIGH-DENSITY KPI CARDS (MONOSPACE METRICS)
       ─────────────────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="rounded-2xl border border-slate-800 bg-[#0d1320]/90 p-4 shadow-lg backdrop-blur-sm">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span className="font-semibold">{language === 'ne' ? 'अनुगमन गरिएका केन्द्र' : 'Monitored DHM Gauges'}</span>
-            <Waves className="h-4 w-4 text-cyan-400" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        {/* KPI 1: Monitored Gauges */}
+        <div className="rounded-xl border border-white/10 bg-[#1E293B] p-3 text-left shadow-sm">
+          <div className="flex items-center justify-between text-[#94A3B8] text-[10px] font-mono uppercase tracking-wider font-bold">
+            <span>{language === 'ne' ? 'अनुगमन केन्द्र' : 'Monitored Gauges'}</span>
+            <Waves size={16} weight="bold" className="text-cyan-400" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-white font-mono mt-1 flex items-baseline gap-1.5">
             <span>{summary.totalStationsMonitored}</span>
             {filteredGauges.length !== gauges.length && (
-              <span className="text-xs text-slate-400 font-normal font-sans">
-                ({language === 'ne' ? `${gauges.length} मध्ये` : `of ${gauges.length}`})
+              <span className="text-xs text-[#94A3B8] font-normal font-sans">
+                ({filteredGauges.length} filtered)
               </span>
             )}
           </div>
-          <span className="text-[10px] text-cyan-400 font-medium block mt-0.5 truncate">
-            {filteredGauges.length !== gauges.length
-              ? (language === 'ne' ? 'फिल्टर गरिएको सक्रिय केन्द्रहरू' : 'Filtered Subset Active')
-              : (language === 'ne' ? '२१ तराई जिल्ला कोरिडोर' : '21 Lowland Terai Districts')}
-          </span>
+          <div className="text-[10px] font-mono text-cyan-400 mt-0.5 truncate">
+            21 Lowland Terai Districts
+          </div>
         </div>
 
-        <div className={`rounded-2xl border p-4 shadow-lg backdrop-blur-sm ring-1 transition-colors ${
+        {/* KPI 2: Danger Level Breached */}
+        <div className={`rounded-xl border p-3 text-left shadow-sm transition-colors ${
           summary.stationsInDangerOrExtreme > 0
-            ? 'border-rose-500/40 bg-rose-950/20 ring-rose-500/20'
-            : 'border-emerald-500/40 bg-emerald-950/20 ring-emerald-500/20'
+            ? 'border-rose-500/30 bg-rose-950/20'
+            : 'border-emerald-500/30 bg-emerald-950/20'
         }`}>
-          <div className={`flex items-center justify-between text-xs ${
+          <div className={`flex items-center justify-between text-[10px] font-mono uppercase tracking-wider font-bold ${
             summary.stationsInDangerOrExtreme > 0 ? 'text-rose-300' : 'text-emerald-300'
           }`}>
-            <span className="font-semibold">{language === 'ne' ? 'खतरा विन्दु पार गरेका नदी' : 'Danger Level Breached'}</span>
-            <AlertOctagon className={`h-4 w-4 ${summary.stationsInDangerOrExtreme > 0 ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`} />
+            <span>{language === 'ne' ? 'खतरा विन्दु पार' : 'Danger Level Breached'}</span>
+            <WarningOctagon size={16} weight="bold" className={summary.stationsInDangerOrExtreme > 0 ? 'text-[#EF4444] animate-pulse' : 'text-[#10B981]'} />
           </div>
           <div className={`text-xl sm:text-2xl font-black font-mono mt-1 ${
-            summary.stationsInDangerOrExtreme > 0 ? 'text-rose-400' : 'text-emerald-400'
+            summary.stationsInDangerOrExtreme > 0 ? 'text-[#EF4444]' : 'text-[#10B981]'
           }`}>
             {summary.stationsInDangerOrExtreme} / {summary.totalStationsMonitored}
           </div>
-          <span className={`text-[10px] font-medium block mt-0.5 truncate ${
-            summary.stationsInDangerOrExtreme > 0 ? 'text-rose-300/80' : 'text-emerald-300/80'
+          <div className={`text-[10px] font-mono mt-0.5 truncate ${
+            summary.stationsInDangerOrExtreme > 0 ? 'text-rose-300' : 'text-emerald-300'
           }`}>
             {summary.stationsInDangerOrExtreme > 0
-              ? (language === 'ne' ? 'तुरुन्त निकासी निर्देशन जारी' : 'Immediate Evacuation Orders Active')
-              : (language === 'ne' ? 'कुनै खतरा छैन • सामान्य सुरक्षित बहाव' : 'Safe Baseline • Zero Danger Breaches')}
-          </span>
+              ? (language === 'ne' ? 'तुरुन्त निकासी निर्देशन जारी' : 'Immediate Evacuation Active')
+              : (language === 'ne' ? 'सामान्य सुरक्षित बहाव' : 'Safe Flow • Zero Breaches')}
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-[#0d1320]/90 p-4 shadow-lg backdrop-blur-sm">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span className="font-semibold">{language === 'ne' ? 'अधिकतम जल प्रवाह' : 'Peak Discharge Flow'}</span>
-            <Activity className="h-4 w-4 text-cyan-400" />
+        {/* KPI 3: Peak Discharge Flow */}
+        <div className="rounded-xl border border-white/10 bg-[#1E293B] p-3 text-left shadow-sm">
+          <div className="flex items-center justify-between text-[#94A3B8] text-[10px] font-mono uppercase tracking-wider font-bold">
+            <span>{language === 'ne' ? 'अधिकतम जल प्रवाह' : 'Peak Discharge Flow'}</span>
+            <Gauge size={16} weight="bold" className="text-cyan-400" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-cyan-300 font-mono mt-1 truncate">
-            {summary.maximumDischargeCusecs.toLocaleString()}
+            {summary.maximumDischargeCusecs.toLocaleString()} <span className="text-xs font-normal text-[#94A3B8]">cusecs</span>
           </div>
-          <span className="text-[10px] text-slate-400 font-mono block mt-0.5 truncate">
-            cusecs &bull; {summary.maximumDischargeStation}
-          </span>
+          <div className="text-[10px] font-mono text-[#94A3B8] mt-0.5 truncate">
+            {summary.maximumDischargeStation}
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-950/20 p-4 shadow-lg backdrop-blur-sm">
-          <div className="flex items-center justify-between text-amber-300 text-xs">
-            <span className="font-semibold">{language === 'ne' ? 'जोखिममा रहेको तटीय जनसंख्या' : 'Downstream Population at Risk'}</span>
-            <Users className="h-4 w-4 text-amber-400" />
+        {/* KPI 4: Population at Risk */}
+        <div className="rounded-xl border border-amber-500/25 bg-amber-950/20 p-3 text-left shadow-sm">
+          <div className="flex items-center justify-between text-amber-300 text-[10px] font-mono uppercase tracking-wider font-bold">
+            <span>{language === 'ne' ? 'जोखिममा जनसंख्या' : 'Population at Risk'}</span>
+            <Users size={16} weight="bold" className="text-[#F59E0B]" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-amber-300 font-mono mt-1">
             {summary.totalDownstreamPopulationAtRisk.toLocaleString()}
           </div>
-          <span className="text-[10px] text-amber-400/80 font-medium block mt-0.5 truncate">
+          <div className="text-[10px] font-mono text-amber-400 mt-0.5 truncate">
             {summary.totalDownstreamPopulationAtRisk > 0
-              ? (language === 'ne' ? 'तुरुन्त अलर्ट सन्देश प्रेषित' : 'Receiving Vernacular SOS Alerts')
-              : (language === 'ne' ? 'जोखिममुक्त • सुरक्षित अवस्था' : 'Standard Baseline • Riparian Zones Safe')}
-          </span>
+              ? (language === 'ne' ? 'तुरुन्त अलर्ट सन्देश प्रेषित' : 'Vernacular SOS Dispatched')
+              : (language === 'ne' ? 'जोखिममुक्त अवस्था' : 'Riparian Zones Clear')}
+          </div>
         </div>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────
-          SEARCH, BASIN, SEVERITY & DATE FILTER CONTROLS
+          3. UNIFIED CONTROL BAR: ON-DEMAND STATION SELECTOR + BASIN FILTER
       ─────────────────────────────────────────────────────────────────────── */}
-      <div className="space-y-3 bg-slate-900/90 p-4 rounded-2xl border border-slate-800 shadow-md">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* Text Search with Clear Button and Focus Glow */}
-          <div className="flex items-center gap-2 flex-1 bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700/80 focus-within:border-cyan-500/70 focus-within:ring-1 focus-within:ring-cyan-500/30 transition-all">
-            <Search className="h-4 w-4 text-slate-400 shrink-0" />
+      <div className="rounded-xl border border-white/10 bg-[#1E293B] p-2.5 sm:p-3 space-y-2 shadow-md">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+          {/* ON-DEMAND STATION SELECTOR DROPDOWN (Primary Requirement) */}
+          <div className="flex items-center gap-2 flex-1">
+            <div className="relative w-full sm:max-w-md">
+              <select
+                value={selectedStation?.id || ''}
+                onChange={(e) => {
+                  const st = gauges.find((g) => g.id === e.target.value);
+                  if (st) handleStationSelect(st);
+                }}
+                className="w-full appearance-none rounded-lg border border-cyan-500/40 bg-[#0F172A] px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30 cursor-pointer shadow-sm pl-8 pr-8"
+              >
+                <option value="" disabled>
+                  {language === 'ne' ? 'जलमापन केन्द्र छान्नुहोस्...' : 'Select Gauged River Station...'}
+                </option>
+                {filteredGauges.map((g) => {
+                  const isD = g.status === 'danger' || g.status === 'extreme_flood';
+                  const isW = g.status === 'warning';
+                  const statusSymbol = isD ? '[DANGER]' : isW ? '[WARNING]' : '[SAFE]';
+                  return (
+                    <option key={g.id} value={g.id} className="bg-[#0F172A] text-white">
+                      {statusSymbol} {language === 'ne' ? g.nepaliName : g.name} &bull; {g.river} ({g.currentLevelMeters}m / {g.dangerLevelMeters}m)
+                    </option>
+                  );
+                })}
+              </select>
+              <Waves size={15} weight="bold" className="absolute left-2.5 top-2.5 text-cyan-400 pointer-events-none" />
+              <CaretDown size={14} weight="bold" className="absolute right-2.5 top-2.5 text-[#94A3B8] pointer-events-none" />
+            </div>
+
+            {selectedStation && (
+              <button
+                onClick={() => handleStationSelect(selectedStation)}
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/50 bg-cyan-950/60 hover:bg-cyan-900/60 px-3 py-2 text-xs font-bold text-cyan-300 shadow-sm transition-all cursor-pointer whitespace-nowrap active:scale-[0.98]"
+              >
+                <Gauge size={14} weight="bold" className="text-cyan-400" />
+                <span>{language === 'ne' ? 'विवरण हेर्नुहोस्' : 'Inspect Hydrograph'}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Basin, Status & Date Filters */}
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            {/* Single Clean Filter by River Basin Dropdown */}
+            <select
+              value={selectedBasin}
+              onChange={(e) => setSelectedBasin(e.target.value)}
+              className="rounded-lg border border-white/10 bg-[#0F172A] px-2.5 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-cyan-500 cursor-pointer"
+            >
+              <option value="all">{language === 'ne' ? 'सबै बेसिनहरू (All Basins)' : 'Filter by River Basin (All)'}</option>
+              <option value="Koshi">{language === 'ne' ? 'सप्तकोशी कोरिडोर (Koshi)' : 'Koshi Basin Corridor'}</option>
+              <option value="Bagmati">{language === 'ne' ? 'बागमती / कमला (Bagmati)' : 'Bagmati / Lalbakeya Delta'}</option>
+              <option value="Narayani">{language === 'ne' ? 'नारायणी / गण्डकी (Narayani)' : 'Narayani / Gandaki Basin'}</option>
+              <option value="Rapti">{language === 'ne' ? 'पश्चिम राप्ती (West Rapti)' : 'West Rapti Corridor'}</option>
+              <option value="Karnali">{language === 'ne' ? 'कर्णाली / मोहना (Karnali)' : 'Karnali / Mohana Corridor'}</option>
+            </select>
+
+            {/* Severity Status Filter */}
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="rounded-lg border border-white/10 bg-[#0F172A] px-2.5 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-cyan-500 cursor-pointer"
+            >
+              <option value="all">{language === 'ne' ? 'सबै अवस्था' : 'Severity Status (All)'}</option>
+              <option value="danger">{language === 'ne' ? 'खतरा विन्दु पार' : 'Danger Breached'}</option>
+              <option value="extreme_flood">{language === 'ne' ? 'अत्यन्त उच्च बाढी' : 'Extreme Deluge'}</option>
+              <option value="warning">{language === 'ne' ? 'सतर्कता तह' : 'Warning Watch'}</option>
+              <option value="normal">{language === 'ne' ? 'सामान्य बहाव' : 'Normal Flow'}</option>
+            </select>
+
+            {/* Scenario / Observation Date Selector */}
+            <select
+              value={selectedScenario}
+              onChange={(e) => handleScenarioChange(e.target.value)}
+              className="rounded-lg border border-white/10 bg-[#0F172A] px-2.5 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-cyan-500 cursor-pointer max-w-[150px] sm:max-w-none truncate"
+            >
+              {HISTORICAL_FLOOD_SCENARIOS.map((sc) => (
+                <option key={sc.id} value={sc.id} className="bg-[#0F172A] text-white">
+                  {language === 'ne' ? sc.nepaliLabel : sc.label}
+                </option>
+              ))}
+              <option value="custom" className="bg-[#0F172A] text-white">
+                {language === 'ne' ? 'कस्टम मिति...' : 'Custom Date...'}
+              </option>
+            </select>
+
+            {isFilterActive && (
+              <button
+                onClick={handleResetFilters}
+                className="text-xs font-bold text-cyan-400 hover:text-cyan-300 px-2 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-950/40 transition-colors cursor-pointer"
+                title="Reset All Filters"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Compact search input row */}
+        <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+          <div className="relative flex-1">
+            <MagnifyingGlass size={14} className="absolute left-2.5 top-2 text-[#94A3B8]" />
             <input
               type="text"
               placeholder={
                 language === 'ne'
-                  ? 'नदी वा केन्द्र खोज्नुहोस् (उदा: सप्तकोशी, बागमती, नारायणी, चतरा, DHM-695...)'
-                  : 'Search river or gauge station (e.g., Koshi, Bagmati, Narayani, Devghat, DHM-695)...'
+                  ? 'नदी वा केन्द्र खोज्नुहोस् (उदा: सप्तकोशी, बागमती, नारायणी, चतरा, DHM-695)...'
+                  : 'Search river, district, settlement or DHM station code (e.g., Koshi, Devghat, Gaur, DHM-695)...'
               }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none font-sans"
+              className="w-full rounded-lg bg-[#0F172A] pl-8 pr-7 py-1.5 text-xs text-white placeholder-slate-500 border border-white/10 focus:outline-none focus:border-cyan-500 font-sans"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="text-slate-400 hover:text-white p-0.5 rounded-full hover:bg-slate-700 transition-colors shrink-0 cursor-pointer"
-                title="Clear search query"
-                aria-label="Clear search"
+                className="absolute right-2 top-2 text-[#94A3B8] hover:text-white"
               >
-                <X className="h-3.5 w-3.5" />
+                <X size={12} weight="bold" />
               </button>
             )}
           </div>
-
-          {/* Date & Scenario Selector */}
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-700/80 text-xs focus-within:border-cyan-500/70">
-              <Calendar className="h-3.5 w-3.5 text-cyan-400" />
-              <select
-                value={selectedScenario}
-                onChange={(e) => handleScenarioChange(e.target.value)}
-                className="bg-transparent text-xs text-white focus:outline-none font-semibold cursor-pointer max-w-[210px] sm:max-w-none truncate"
-                title="Select Real Hydrological Date & Monsoon Flood Scenario"
-              >
-                {HISTORICAL_FLOOD_SCENARIOS.map((sc) => (
-                  <option key={sc.id} value={sc.id} className="bg-slate-900 text-white">
-                    {language === 'ne' ? sc.nepaliLabel : sc.label}
-                  </option>
-                ))}
-                <option value="custom" className="bg-slate-900 text-white">
-                  {language === 'ne' ? '📅 आफ्नै मिति छान्नुहोस् (Custom Date)...' : '📅 Custom Observation Date...'}
-                </option>
-              </select>
-            </div>
-
-            {/* Custom Date Input (Shown when user wants to simulate any calendar date) */}
-            {isCustomDate && (
-              <div className="flex items-center gap-1 bg-slate-800/90 px-2.5 py-1 rounded-xl border border-cyan-500/60 shadow-inner">
-                <span className="text-[10px] text-cyan-400 font-mono font-bold">DATE:</span>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent text-xs text-cyan-300 focus:outline-none font-mono cursor-pointer"
-                  title="Choose any calendar date to replay seasonal flow"
-                />
-              </div>
-            )}
-          </div>
+          <span className="text-[10px] font-mono text-[#94A3B8] shrink-0">
+            {filteredGauges.length} stations active
+          </span>
         </div>
-
-        {/* Basin and Severity Dropdowns */}
-        <div className="flex items-center justify-between gap-2.5 flex-wrap pt-1 border-t border-slate-800/80">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-mono text-slate-400 font-semibold uppercase tracking-wider">
-              {language === 'ne' ? 'फिल्टरहरू:' : 'Filter Corridors:'}
-            </span>
-
-            {/* Basin Filter */}
-            <select
-              value={selectedBasin}
-              onChange={(e) => setSelectedBasin(e.target.value)}
-              className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
-            >
-              <option value="all">{language === 'ne' ? 'सबै नदी बेसिनहरू (All Basins)' : 'All River Basins'}</option>
-              <option value="Koshi">{language === 'ne' ? 'सप्तकोशी कोरिडोर (Koshi & Kankai)' : 'Koshi Basin Corridor'}</option>
-              <option value="Bagmati">{language === 'ne' ? 'बागमती / लालबकैया / कमला' : 'Bagmati / Lalbakeya Delta'}</option>
-              <option value="Narayani">{language === 'ne' ? 'नारायणी / गण्डकी / तिनाउ' : 'Narayani / Gandaki'}</option>
-              <option value="Rapti">{language === 'ne' ? 'पश्चिम राप्ती तथा बबई' : 'West Rapti Corridor'}</option>
-              <option value="Karnali">{language === 'ne' ? 'कर्णाली तथा मोहना' : 'Karnali / Mohana Corridor'}</option>
-            </select>
-
-            {/* Status Filter */}
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 cursor-pointer"
-            >
-              <option value="all">{language === 'ne' ? 'सबै अवस्था (All Status)' : 'All Severity Levels'}</option>
-              <option value="extreme_flood">{language === 'ne' ? 'अत्यन्त उच्च बाढी (Extreme)' : 'Extreme Flood (Level 4)'}</option>
-              <option value="danger">{language === 'ne' ? 'खतरा विन्दु पार (Danger Breached)' : 'Danger Breached'}</option>
-              <option value="warning">{language === 'ne' ? 'सतर्कता तह (Warning Watch)' : 'Warning Watch'}</option>
-              <option value="normal">{language === 'ne' ? 'सामान्य बहाव (Normal Flow)' : 'Normal Flow'}</option>
-            </select>
-          </div>
-
-          {/* Reset All Filters Button */}
-          <button
-            onClick={handleResetFilters}
-            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-              isFilterActive
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <RefreshCw className="h-3 w-3" />
-            <span>{language === 'ne' ? 'सबै रिसेट गर्नुहोस्' : 'Reset All Filters'}</span>
-          </button>
-        </div>
-
-        {/* Active Filter Chips Bar (Visible when any filter is non-default) */}
-        {isFilterActive && (
-          <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-800/60 text-[11px]">
-            <span className="text-slate-400 font-mono text-[10px] uppercase font-bold">Active:</span>
-
-            {selectedScenario !== 'live_monsoon_deluge' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/20 border border-blue-500/40 text-blue-300 font-medium">
-                <span>{selectedScenario === 'custom' ? `Custom: ${selectedDate}` : selectedScenario.replace('_', ' ')}</span>
-                <button
-                  onClick={() => {
-                    setSelectedScenario('live_monsoon_deluge');
-                    setSelectedDate('2026-10-18');
-                    setIsCustomDate(false);
-                  }}
-                  className="hover:text-white cursor-pointer"
-                  title="Remove scenario filter"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-
-            {selectedBasin !== 'all' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-medium">
-                <span>Basin: {selectedBasin}</span>
-                <button
-                  onClick={() => setSelectedBasin('all')}
-                  className="hover:text-white cursor-pointer"
-                  title="Remove basin filter"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-
-            {selectedStatus !== 'all' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 font-medium">
-                <span>Severity: {selectedStatus.replace('_', ' ')}</span>
-                <button
-                  onClick={() => setSelectedStatus('all')}
-                  className="hover:text-white cursor-pointer"
-                  title="Remove severity filter"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-
-            {searchQuery && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-medium">
-                <span>Query: "{searchQuery}"</span>
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="hover:text-white cursor-pointer"
-                  title="Remove search query"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-
-            <span className="text-[10px] font-mono text-slate-400 ml-auto">
-              {filteredGauges.length} {language === 'ne' ? 'स्टेशन म्याच भयो' : 'stations matched'}
-            </span>
-          </div>
-        )}
       </div>
 
-      {/* Empty State Banner if no stations match */}
-      {filteredGauges.length === 0 && (
-        <div className="rounded-2xl border border-amber-500/40 bg-amber-950/20 p-4 text-xs text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
-          <div className="flex items-center gap-2.5">
-            <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0" />
-            <div>
-              <strong className="block text-amber-300 font-bold">
-                {language === 'ne' ? 'कुनै केन्द्र फेला परेन' : 'No Gauge Stations Match This Filter Combination'}
-              </strong>
-              <span>
-                {language === 'ne'
-                  ? `छनोट गरिएको बेसिन ("${selectedBasin}") र अवस्था ("${selectedStatus}") मा यो मितिमा कुनै नदी छैन।`
-                  : `In the "${selectedBasin}" corridor on this date, no stations are at "${selectedStatus}". (Stations may be at Danger level during peak deluge, or Normal during winter).`}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setSelectedStatus('all')}
-              className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-bold text-xs transition-colors cursor-pointer"
-            >
-              Show All Severities
-            </button>
-            <button
-              onClick={handleResetFilters}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition-colors cursor-pointer"
-            >
-              Reset Filters
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ─────────────────────────────────────────────────────────────────────
-          TACTICAL HYDROLOGICAL MAP (LEAFLET INTERACTIVE WITH DOTTED BASINS & RIVERS)
+          4. MAIN RIVER TELEMETRY MAP CANVAS (CONTAINER: <div id="map"></div>)
       ─────────────────────────────────────────────────────────────────────── */}
-      <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-slate-300">
-          <span className="flex items-center gap-2">
-            <Compass className="h-4 w-4 text-cyan-400" />
-            <span>
-              {language === 'ne'
-                ? 'तराई नदी तथा बेसिन जलसतह नक्सा (DHM नेटवर्क • थोप्ला रेखाहरू)'
-                : 'Nepal Terai River Telemetry Map (DHM Sensors • Dotted Basins & Rivers)'}
-            </span>
-            <span className="text-[11px] font-mono text-cyan-400 font-normal">
-              ({filteredGauges.length} {language === 'ne' ? 'स्टेशन' : 'stations'} &bull; 12 {language === 'ne' ? 'नदीहरू' : 'rivers'})
-            </span>
-          </span>
-          <span className="text-[11px] font-mono text-cyan-300 flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping"></span>
-            <span>
-              {language === 'ne'
-                ? 'नदी रेखा वा पिनमा ट्याप गरी प्रत्यक्ष विवरण हेर्नुहोस्'
-                : 'Tap any dotted river line or station pin for live telemetry updates'}
-            </span>
-          </span>
-        </div>
-
-        {/* Quick Tap River Pills Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1.5 no-scrollbar">
-          <span className="text-[10px] font-mono text-slate-400 uppercase font-bold shrink-0 flex items-center gap-1">
-            <Waves className="h-3 w-3 text-cyan-400" />
-            <span>{language === 'ne' ? 'नदीहरू' : 'Rivers'}:</span>
-          </span>
-          {activeRivers.map((riv) => {
-            const isDanger = riv.status === 'extreme_flood' || riv.status === 'danger';
-            return (
-              <button
-                key={riv.id}
-                onClick={() => {
-                  setSelectedRiverForModal(riv);
-                  setIsRiverModalOpen(true);
-                }}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold shrink-0 border transition-all cursor-pointer ${
-                  isDanger
-                    ? 'bg-rose-950/40 border-rose-500/50 text-rose-300 hover:bg-rose-900/60 shadow-sm shadow-rose-950/40'
-                    : 'bg-slate-900 border-slate-700/80 text-cyan-300 hover:border-cyan-500/50'
-                }`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${isDanger ? 'bg-rose-500 animate-ping' : 'bg-cyan-400'}`}></span>
-                <span>{language === 'ne' ? riv.nepaliName.split(' ')[0] : riv.name.replace(' River', '')}</span>
-                <span className="text-[10px] opacity-80">({riv.currentLevelMeters}m)</span>
-              </button>
-            );
-          })}
-        </div>
-
+      <div className="relative w-full rounded-2xl overflow-hidden border border-white/10 bg-[#1E293B] shadow-2xl">
         <RiverGaugeMap
           gauges={filteredGauges}
           selectedStation={selectedStation}
-          onSelectStation={(st) => setSelectedStation(st)}
+          onSelectStation={(st) => handleStationSelect(st)}
           onOpenSosModal={handleOpenSosModal}
           language={language}
         />
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────
-          INDIVIDUAL RIVER GAUGES GRID (ANIMATED LIQUID VISUALIZERS)
+          5. ON-DEMAND STATION INSPECTION SLIDE-OVER DRAWER / MODAL
+             (Replaces the 7 heavy static cards with zero vertical page scroll)
       ─────────────────────────────────────────────────────────────────────── */}
-      <div className="space-y-4 pt-2">
-        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-          <span className="flex items-center gap-2">
-            <Waves className="h-4 w-4 text-blue-400" />
-            <span>
-              {language === 'ne'
-                ? `सक्रिय जलमापन केन्द्रहरू (${filteredGauges.length})`
-                : `Active Hydrological Monitoring Stations (${filteredGauges.length})`}
-            </span>
-          </span>
-          <span className="text-[11px] text-slate-400">
-            {language === 'ne' ? '१२-घण्टे प्रवृत्ति र तटीय जोखिम बस्ती' : '12-Hour hydrograph & downstream riparian zones'}
-          </span>
-        </div>
+      {isInspectorOpen && inspectedStation && (
+        <div className="fixed inset-0 z-[600] flex justify-end bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="relative w-full max-w-3xl bg-[#0F172A] border-l border-white/10 shadow-2xl h-full flex flex-col z-[610] overflow-hidden"
+          >
+            {/* Drawer Header */}
+            <div className="p-4 sm:p-5 border-b border-white/10 bg-[#1E293B]/90 backdrop-blur-md flex items-center justify-between gap-3 shrink-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
+                      inspectedStation.status === 'danger' || inspectedStation.status === 'extreme_flood'
+                        ? 'bg-red-500/20 text-[#EF4444] border-red-500/40'
+                        : inspectedStation.status === 'warning'
+                        ? 'bg-amber-500/20 text-[#F59E0B] border-amber-500/40'
+                        : 'bg-emerald-500/20 text-[#10B981] border-emerald-500/40'
+                    }`}
+                  >
+                    {inspectedStation.status === 'danger' || inspectedStation.status === 'extreme_flood'
+                      ? 'DANGER BREACHED'
+                      : inspectedStation.status === 'warning'
+                      ? 'WARNING WATCH'
+                      : 'NORMAL FLOW'}
+                  </span>
+                  <span className="text-[10px] font-mono text-[#94A3B8]">
+                    DHM ID: {inspectedStation.dhmStationNumber} &bull; {inspectedStation.basin} Basin
+                  </span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-[#F8FAFC] tracking-tight truncate mt-1">
+                  {language === 'ne' ? inspectedStation.nepaliName : inspectedStation.name}
+                  <span className="text-sm font-normal text-[#94A3B8] ml-2 font-mono">
+                    ({inspectedStation.river})
+                  </span>
+                </h2>
+                <p className="text-xs text-[#94A3B8] truncate">
+                  {inspectedStation.district} District &bull; Officer: {inspectedStation.stationOfficer} ({inspectedStation.contactNumber})
+                </p>
+              </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {filteredGauges.map((gauge) => (
-            <WaterGaugeVisualizer
-              key={gauge.id}
-              gauge={gauge}
-              language={language}
-              onOpenSosModal={handleOpenSosModal}
-            />
-          ))}
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Action Button: Generate Vernacular SOS Broadcast */}
+                <button
+                  onClick={() => {
+                    handleOpenSosModal(inspectedStation);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-red-500/50 bg-[#EF4444] hover:bg-red-600 px-3 py-2 text-xs font-bold text-white shadow-md transition-all active:scale-[0.98] cursor-pointer"
+                  title="Generate Vernacular SOS Broadcast"
+                >
+                  <Radio size={15} weight="bold" className="animate-pulse" />
+                  <span className="hidden sm:inline">{language === 'ne' ? 'आपतकालीन SOS प्रसारण' : 'Generate Vernacular SOS'}</span>
+                </button>
+
+                {/* Close Drawer Button */}
+                <button
+                  onClick={() => setIsInspectorOpen(false)}
+                  className="rounded-lg p-2 text-[#94A3B8] hover:text-white hover:bg-[#334155] border border-white/10 transition-colors cursor-pointer"
+                  title="Close Inspector"
+                >
+                  <X size={18} weight="bold" />
+                </button>
+              </div>
+            </div>
+
+            {/* Drawer Body: Single Detailed Station Inspection */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              <WaterGaugeVisualizer
+                gauge={inspectedStation}
+                language={language}
+                onOpenSosModal={handleOpenSosModal}
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────────────
           VERNACULAR SOS ALERT GENERATOR MODAL
