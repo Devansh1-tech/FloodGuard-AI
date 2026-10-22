@@ -377,7 +377,85 @@ export const Stage59RiverGaugesPage: React.FC = () => {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────
-          3. UNIFIED CONTROL BAR: ON-DEMAND STATION SELECTOR + BASIN FILTER
+          3. REAL-TIME RIVER INFORMATION CARDS (MONITORED TERAI RIVERS)
+      ─────────────────────────────────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs font-bold text-[#F8FAFC]">
+          <span className="flex items-center gap-1.5">
+            <Waves size={16} weight="bold" className="text-cyan-400" />
+            <span>
+              {language === 'ne'
+                ? 'नेपालका प्रमुख नदीहरू (प्रत्यक्ष जलस्तर तथ्यांक)'
+                : 'Major Nepal Terai Rivers (Real-Time Hydrological Telemetry)'}
+            </span>
+            <span className="text-[10px] font-mono text-[#94A3B8]">
+              ({activeRivers.length} {language === 'ne' ? 'नदीहरू' : 'Rivers'})
+            </span>
+          </span>
+          <span className="text-[10px] font-mono text-cyan-400 hidden sm:inline">
+            {language === 'ne'
+              ? 'प्रत्यक्ष स्ट्रिम हेर्न कुनै पनि नदी कार्डमा ट्याप गर्नुहोस्'
+              : 'Click any river card for live hydrograph ticker'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+          {activeRivers.map((riv) => {
+            const isDanger = riv.status === 'extreme_flood' || riv.status === 'danger';
+            const isWarning = riv.status === 'warning';
+            return (
+              <button
+                key={riv.id}
+                onClick={() => {
+                  setSelectedRiverForModal(riv);
+                  setIsRiverModalOpen(true);
+                }}
+                className={`group text-left p-2.5 rounded-xl border transition-all duration-200 cursor-pointer shadow-sm hover:-translate-y-0.5 ${
+                  isDanger
+                    ? 'border-rose-500/40 bg-gradient-to-b from-rose-950/30 to-[#1E293B] hover:border-rose-500/70'
+                    : isWarning
+                    ? 'border-amber-500/40 bg-gradient-to-b from-amber-950/30 to-[#1E293B] hover:border-amber-500/70'
+                    : 'border-white/10 bg-[#1E293B] hover:border-cyan-500/50'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-xs font-extrabold text-[#F8FAFC] truncate group-hover:text-cyan-300">
+                    {language === 'ne' ? riv.nepaliName.split(' ')[0] : riv.name.replace(' River', '')}
+                  </span>
+                  <span
+                    className={`h-2 w-2 rounded-full shrink-0 ${
+                      isDanger
+                        ? 'bg-[#EF4444] animate-ping'
+                        : isWarning
+                        ? 'bg-[#F59E0B]'
+                        : 'bg-[#10B981]'
+                    }`}
+                  />
+                </div>
+
+                <div className="flex items-baseline gap-1 mt-1 font-mono">
+                  <span className={`text-base font-black ${
+                    isDanger ? 'text-[#EF4444]' : isWarning ? 'text-[#F59E0B]' : 'text-cyan-300'
+                  }`}>
+                    {riv.currentLevelMeters}m
+                  </span>
+                  <span className="text-[10px] text-[#94A3B8]">
+                    / {riv.dangerLevelMeters}m
+                  </span>
+                </div>
+
+                <div className="mt-1 pt-1 border-t border-white/5 flex items-center justify-between text-[9.5px] font-mono text-[#94A3B8]">
+                  <span className="truncate">{riv.basinName}</span>
+                  <span className="text-cyan-400 font-bold shrink-0">{riv.dischargeCusecs.toLocaleString()} cfs</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────────────
+          4. UNIFIED CONTROL BAR: ON-DEMAND STATION SELECTOR + BASIN FILTER
       ─────────────────────────────────────────────────────────────────────── */}
       <div className="rounded-xl border border-white/10 bg-[#1E293B] p-2.5 sm:p-3 space-y-2 shadow-md">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
