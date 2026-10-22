@@ -87,4 +87,99 @@ describe('OpticalDualImageCompare Component', () => {
     expect(selector).toBeInTheDocument();
     expect(selector.children.length).toBe(10);
   });
+
+  it('renders Google Earth Engine live badge and dataset selector with all collections', () => {
+    render(<OpticalDualImageCompare />);
+    
+    // Check GEE Project ID Badge
+    expect(screen.getByText(/Live GEE: home-credit-505106/i)).toBeInTheDocument();
+
+    // Check Satellite Dataset Selector
+    const datasetSelect = screen.getByTitle(/Select Live Earth Engine Surface Reflectance Dataset/i);
+    expect(datasetSelect).toBeInTheDocument();
+    expect(datasetSelect.children.length).toBe(4); // Sentinel-2, Sentinel-1, Landsat-8, Landsat-9
+
+    // Check Direct GEE Stream Toggle button
+    const geeToggle = screen.getByTitle(/Toggle between direct Google Earth Engine API stream and cached assets/i);
+    expect(geeToggle).toBeInTheDocument();
+    expect(screen.getByText(/GEE Live: ON/i)).toBeInTheDocument();
+
+    // Toggle OFF
+    fireEvent.click(geeToggle);
+    expect(screen.getByText(/GEE Live: OFF/i)).toBeInTheDocument();
+  });
+
+  it('supports interactive zoom in, zoom out, presets, and reset controls', () => {
+    render(<OpticalDualImageCompare />);
+    
+    // Check initial zoom percentage: 100%
+    expect(screen.getAllByText('100%').length).toBeGreaterThan(0);
+    
+    // Check Zoom In button exists
+    const zoomInBtns = screen.getAllByTitle(/Zoom In/i);
+    expect(zoomInBtns.length).toBeGreaterThan(0);
+    
+    // Click Zoom In
+    fireEvent.click(zoomInBtns[0]);
+    expect(screen.getAllByText('150%').length).toBeGreaterThan(0);
+    
+    // Reset button should now be visible
+    const resetBtns = screen.getAllByTitle(/Reset Zoom/i);
+    expect(resetBtns.length).toBeGreaterThan(0);
+    
+    // Click Reset
+    fireEvent.click(resetBtns[0]);
+    expect(screen.getAllByText('100%').length).toBeGreaterThan(0);
+    
+    // Click 2x preset
+    const preset2x = screen.getByTitle(/Set zoom to 2x/i);
+    fireEvent.click(preset2x);
+    expect(screen.getAllByText('200%').length).toBeGreaterThan(0);
+  });
+
+  it('supports cloud removal toggle between REMOVED (SCL/QA60 clear sky) and RAW mode', () => {
+    render(<OpticalDualImageCompare />);
+    
+    // Check initial state: Clouds: REMOVED is active by default
+    expect(screen.getByText(/Clouds: REMOVED/i)).toBeInTheDocument();
+    
+    // Find the toolbar cloud removal button
+    const cloudToolbarBtn = screen.getByTitle(/Cloud Filter Active: SCL & QA60 pixels masked out/i);
+    expect(cloudToolbarBtn).toBeInTheDocument();
+    
+    // Also find floating canvas HUD button
+    const cloudHudBtn = screen.getByLabelText(/Toggle Cloud Removal Filter/i);
+    expect(cloudHudBtn).toBeInTheDocument();
+    
+    // Click toolbar toggle to switch to RAW mode
+    fireEvent.click(cloudToolbarBtn);
+    expect(screen.getByText(/Clouds: RAW/i)).toBeInTheDocument();
+    expect(screen.getByTitle(/Cloud Filter Inactive: Showing raw optical satellite scene/i)).toBeInTheDocument();
+    
+    // Click HUD toggle to switch back to REMOVED
+    fireEvent.click(cloudHudBtn);
+    expect(screen.getByText(/Clouds: REMOVED/i)).toBeInTheDocument();
+  });
+
+  it('supports independent cloud removal for non-flooded image specifically and renders side-by-side view', () => {
+    render(<OpticalDualImageCompare />);
+    
+    // Check Side-by-Side Comparison indicator
+    expect(screen.getByText(/Side-by-Side Comparison/i)).toBeInTheDocument();
+
+    // Check independent non-flooded cloud removal toggle button
+    const nonFloodedBtn = screen.getByLabelText(/Toggle Non-Flooded Cloud Removal/i);
+    expect(nonFloodedBtn).toBeInTheDocument();
+    expect(screen.getByText(/Non-Flooded: CLEAN/i)).toBeInTheDocument();
+
+    // Click to toggle non-flooded cloud to RAW
+    fireEvent.click(nonFloodedBtn);
+    expect(screen.getByText(/Non-Flooded: RAW/i)).toBeInTheDocument();
+
+    // Click again to re-enable cloud removal
+    fireEvent.click(nonFloodedBtn);
+    expect(screen.getByText(/Non-Flooded: CLEAN/i)).toBeInTheDocument();
+  });
 });
+
+

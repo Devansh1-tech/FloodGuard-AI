@@ -24,6 +24,8 @@ import {
   Popup,
   TileLayer,
   useMap,
+  CircleMarker,
+  Tooltip,
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -31,6 +33,7 @@ import {
   Activity,
   AlertCircle,
   AlertTriangle,
+  Anchor,
   ArrowRight,
   Award,
   BarChart3,
@@ -39,6 +42,8 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  Cloud,
+  CloudRain,
   Compass,
   Download,
   Eye,
@@ -52,13 +57,18 @@ import {
   Layers,
   MapPin,
   Maximize2,
+  MessageCircle,
   Minimize2,
+  Navigation,
+  Plane,
   Play,
   Radio,
   RefreshCw,
   RotateCcw,
+  Route,
   Satellite,
   Search,
+  Send,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -68,6 +78,7 @@ import {
   Truck,
   Users,
   Waves,
+  Wind,
   X,
   Zap,
 } from 'lucide-react';
@@ -80,8 +91,31 @@ import {
   SettlementImpactTier,
   AffectedSettlementItem,
 } from '@/data/opticalFloodData';
-import { OpticalDualImageCompare } from '@/components/comparison/OpticalDualImageCompare';
+import {
+  OpticalDualImageCompare,
+  GeeSatelliteResponse,
+} from '@/components/comparison/OpticalDualImageCompare';
 import { nepalBoundaries } from '@/data/nepalBoundaries';
+import { TERAI_HOSPITALS, HospitalFacility } from '@/data/teraiInfrastructure';
+import { TERAI_SAFE_HAVENS, SafeHavenFacility } from '@/data/teraiSafeHavens';
+import { TERAI_ROAD_SEGMENTS, TERAI_BRIDGES, TeraiBridge } from '@/data/teraiRoadNetwork';
+import { GeminiFloodAssistant } from '@/components/intelligence/GeminiFloodAssistant';
+import { EmergencyLogisticsHub } from '@/components/logistics/EmergencyLogisticsHub';
+import {
+  getReliefRoutesForSector,
+  getAlternateRoutesForSector,
+  getHelicopterSortiesForSector,
+  getWeatherStatusLabel,
+  getFlightStatusLabel,
+  ReliefConvoyRoute,
+  AlternateRoute,
+  HelicopterSortie,
+} from '@/data/teraiReliefRoutes';
+import { generateFloodDetailedReportPdf } from '@/utils/floodPdfReport';
+import {
+  getStoredGeminiApiKey,
+  setStoredGeminiApiKey,
+} from '@/services/geminiService';
 
 // Map Center Controller
 const ChangeMapView: React.FC<{ center: [number, number]; zoom: number }> = ({ center, zoom }) => {
@@ -90,6 +124,82 @@ const ChangeMapView: React.FC<{ center: [number, number]; zoom: number }> = ({ c
     map.setView(center, zoom, { animate: true });
   }, [center, zoom, map]);
   return null;
+};
+
+// Generates a realistic 8-point dotted perimeter around a flooded village/city
+const getVillageDottedPerimeter = (center: [number, number], seedId: string, footprintPct: number): [number, number][] => {
+  const [lat, lon] = center;
+  const baseRadius = 0.010 + (footprintPct / 100) * 0.007;
+  const points: [number, number][] = [];
+  const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+  for (let i = 0; i < angles.length; i++) {
+    const rad = (angles[i] * Math.PI) / 180;
+    const hash = (seedId.charCodeAt(seedId.length - 1 - (i % seedId.length)) * (i + 1)) % 10;
+    const r = baseRadius * (0.82 + (hash / 10) * 0.36);
+    points.push([lat + r * Math.sin(rad), lon + r * Math.cos(rad) * 1.1]);
+  }
+  points.push(points[0]);
+  return points;
+};
+
+// Custom Leaflet pin for Safe Havens & Shelters
+const createSafeHavenMarker = (name: string, capacity: number) => {
+  return L.divIcon({
+    className: 'custom-safe-haven-marker',
+    html: `
+      <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <div style="position: absolute; width: 28px; height: 28px; border-radius: 50%; background: rgba(16, 185, 129, 0.35); animation: pulse 2s infinite;"></div>
+        <div style="
+          background: #10B981;
+          width: 22px;
+          height: 22px;
+          border-radius: 6px;
+          border: 2px solid #FFFFFF;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 0 10px rgba(16, 185, 129, 0.7);
+        ">
+          <span style="color: #FFFFFF; font-size: 11px; font-weight: 900;">⛺</span>
+        </div>
+      </div>
+    `,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -12],
+  });
+};
+
+// Custom Leaflet pin for Hospitals & Primary Health Centers
+const createHospitalMarker = (name: string, isFlooded: boolean) => {
+  return L.divIcon({
+    className: 'custom-hospital-marker',
+    html: `
+      <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        ${
+          isFlooded
+            ? `<div style="position: absolute; width: 30px; height: 30px; border-radius: 50%; background: rgba(239, 68, 68, 0.45); animation: ping 1.2s infinite;"></div>`
+            : ''
+        }
+        <div style="
+          background: ${isFlooded ? '#EF4444' : '#0284C7'};
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          border: 2px solid #FFFFFF;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 0 10px ${isFlooded ? 'rgba(239, 68, 68, 0.8)' : 'rgba(2, 132, 199, 0.7)'};
+        ">
+          <span style="color: #FFFFFF; font-size: 11px; font-weight: 900;">✚</span>
+        </div>
+      </div>
+    `,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -12],
+  });
 };
 
 // Create custom leaflet marker pins for 4-tier settlements
@@ -130,6 +240,72 @@ const createTierMarker = (tier: SettlementImpactTier, name: string) => {
   });
 };
 
+// Custom Leaflet pin for Critical Bridges & Barrages
+const createBridgeMarker = (name: string, status: string) => {
+  const isDanger = status === 'critical_danger';
+  const isWarning = status === 'high_warning';
+  const color = isDanger ? '#EF4444' : isWarning ? '#F59E0B' : '#10B981';
+
+  return L.divIcon({
+    className: 'custom-bridge-marker',
+    html: `
+      <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        ${
+          isDanger
+            ? `<div style="position: absolute; width: 32px; height: 32px; border-radius: 50%; background: rgba(239, 68, 68, 0.45); animation: ping 1.2s infinite;"></div>`
+            : isWarning
+            ? `<div style="position: absolute; width: 28px; height: 28px; border-radius: 50%; background: rgba(245, 158, 11, 0.35); animation: pulse 2s infinite;"></div>`
+            : ''
+        }
+        <div style="
+          background: ${color};
+          width: 22px;
+          height: 22px;
+          border-radius: 6px;
+          border: 2px solid #FFFFFF;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 0 10px ${color}80;
+        ">
+          <span style="color: #FFFFFF; font-size: 11px; font-weight: 900;">🌉</span>
+        </div>
+      </div>
+    `,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -12],
+  });
+};
+
+// Custom Leaflet pin for Helicopter Landing Zones & Air Sorties
+const createHeliMarker = (name: string) => {
+  return L.divIcon({
+    className: 'custom-heli-marker',
+    html: `
+      <div style="position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <div style="position: absolute; width: 30px; height: 30px; border-radius: 50%; background: rgba(2, 132, 199, 0.4); animation: pulse 2s infinite;"></div>
+        <div style="
+          background: #0284C7;
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          border: 2px solid #FFFFFF;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 0 10px rgba(2, 132, 199, 0.8);
+        ">
+          <span style="color: #FFFFFF; font-size: 11px; font-weight: 900;">🚁</span>
+        </div>
+      </div>
+    `,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -12],
+  });
+};
+
 export const Stage51ComparisonPage: React.FC = () => {
   // Sector Selection
   const [selectedSectorKey, setSelectedSectorKey] = useState<string>('koshi_sector');
@@ -149,10 +325,33 @@ export const Stage51ComparisonPage: React.FC = () => {
 
   // Map Layer Toggles
   const [showFloodExtent, setShowFloodExtent] = useState<boolean>(true);
+  const [showNewlyFlooded, setShowNewlyFlooded] = useState<boolean>(true);
+  const [showFloodedVillagePerimeters, setShowFloodedVillagePerimeters] = useState<boolean>(true);
   const [showBaselineRiver, setShowBaselineRiver] = useState<boolean>(true);
-  const [showDemSlopeMask, setShowDemSlopeMask] = useState<boolean>(true);
+  const [showDemSlopeMask, setShowDemSlopeMask] = useState<boolean>(false);
   const [showSettlementMarkers, setShowSettlementMarkers] = useState<boolean>(true);
-  const [mapBaseLayer, setMapBaseLayer] = useState<'satellite' | 'dark' | 'topo'>('satellite');
+  const [showSafeHouses, setShowSafeHouses] = useState<boolean>(true);
+  const [showHospitals, setShowHospitals] = useState<boolean>(true);
+  const [showRoadCorridors, setShowRoadCorridors] = useState<boolean>(true);
+  const [showBridges, setShowBridges] = useState<boolean>(true);
+  const [showReliefRoutes, setShowReliefRoutes] = useState<boolean>(true);
+  const [showAlternateRoutes, setShowAlternateRoutes] = useState<boolean>(true);
+  const [showAirSupport, setShowAirSupport] = useState<boolean>(true);
+  const [selectedReliefRoute, setSelectedReliefRoute] = useState<ReliefConvoyRoute | null>(null);
+  const [selectedAlternateRoute, setSelectedAlternateRoute] = useState<AlternateRoute | null>(null);
+  const [selectedSortie, setSelectedSortie] = useState<HelicopterSortie | null>(null);
+  const [activeLogisticsTab, setActiveLogisticsTab] = useState<'relief' | 'alternate' | 'helicopter'>('relief');
+  const [mapBaseLayer, setMapBaseLayer] = useState<'satellite' | 'dark' | 'gee'>('satellite');
+
+  // PDF Generation State
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
+
+  // Live GEE Data Stream State
+  const [currentGeeData, setCurrentGeeData] = useState<{
+    left?: GeeSatelliteResponse | null;
+    right?: GeeSatelliteResponse | null;
+    dataset: string;
+  } | null>(null);
 
   // Live Pipeline Run State
   const [isRunningPipeline, setIsRunningPipeline] = useState<boolean>(false);
@@ -194,6 +393,52 @@ export const Stage51ComparisonPage: React.FC = () => {
     return Math.max(10.0, Number((sector.totalFloodedAreaKm2 * factor).toFixed(2)));
   }, [sector.totalFloodedAreaKm2, thresholdShift]);
 
+  // Operational Infrastructure: Safe havens, hospitals, and roads relevant to active sector
+  const sectorSafeHavens = useMemo(() => {
+    return TERAI_SAFE_HAVENS.filter(
+      (h) =>
+        sector.districts.includes(h.district) ||
+        (Math.abs(h.coords[0] - sector.center[0]) < 0.85 && Math.abs(h.coords[1] - sector.center[1]) < 1.1)
+    );
+  }, [sector]);
+
+  const sectorHospitals = useMemo(() => {
+    return TERAI_HOSPITALS.filter(
+      (h) =>
+        sector.districts.includes(h.district) ||
+        (Math.abs(h.coords[0] - sector.center[0]) < 0.85 && Math.abs(h.coords[1] - sector.center[1]) < 1.1)
+    );
+  }, [sector]);
+
+  const sectorRoads = useMemo(() => {
+    return TERAI_ROAD_SEGMENTS.filter(
+      (r) =>
+        sector.districts.includes(r.district) ||
+        r.path.some(([lat, lng]) => Math.abs(lat - sector.center[0]) < 0.75 && Math.abs(lng - sector.center[1]) < 1.0)
+    );
+  }, [sector]);
+
+  // Operational Multi-Modal Routes & Bridges for Active Sector
+  const sectorReliefRoutes = useMemo(() => {
+    return getReliefRoutesForSector(selectedSectorKey);
+  }, [selectedSectorKey]);
+
+  const sectorAlternateRoutes = useMemo(() => {
+    return getAlternateRoutesForSector(selectedSectorKey);
+  }, [selectedSectorKey]);
+
+  const sectorHelicopterSorties = useMemo(() => {
+    return getHelicopterSortiesForSector(selectedSectorKey);
+  }, [selectedSectorKey]);
+
+  const sectorBridges = useMemo(() => {
+    return TERAI_BRIDGES.filter(
+      (b) =>
+        sector.districts.some((d) => b.district.toLowerCase().includes(d.toLowerCase())) ||
+        (Math.abs(b.coords[0] - sector.center[0]) < 0.95 && Math.abs(b.coords[1] - sector.center[1]) < 1.1)
+    );
+  }, [sector]);
+
   // Execute Pipeline Simulation / Live Call
   const handleTriggerPipeline = async () => {
     setIsRunningPipeline(true);
@@ -230,6 +475,32 @@ export const Stage51ComparisonPage: React.FC = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadDetailedPdfReport = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      await generateFloodDetailedReportPdf({
+        sector,
+        preDate: '2024-06-15',
+        postDate: '2024-10-01',
+        preImageUrl: currentGeeData?.left?.thumb_url || '/images/koshi_pre_flood.jpg',
+        postImageUrl: currentGeeData?.right?.thumb_url || '/images/koshi_post_flood.jpg',
+        selectedIndexName: indexMeta.name,
+        removeCloudsLeft: true,
+        removeCloudsRight: true,
+        hospitals: TERAI_HOSPITALS,
+        safeHavens: TERAI_SAFE_HAVENS,
+        bridges: sectorBridges,
+        reliefRoutes: sectorReliefRoutes,
+        alternateRoutes: sectorAlternateRoutes,
+        helicopterSorties: sectorHelicopterSorties,
+      });
+    } catch (err) {
+      console.error('PDF Generation Error:', err);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const handleDownloadSettlementsReportJson = () => {
@@ -400,7 +671,17 @@ export const Stage51ComparisonPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+            <button
+              onClick={handleDownloadDetailedPdfReport}
+              disabled={isGeneratingPdf}
+              className="flex-1 md:flex-none px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer bg-slate-950 hover:bg-slate-900 text-rose-300 border border-rose-500/50 shadow-rose-950/20 active:scale-95"
+              title="Download publication-grade emergency sitrep PDF with embedded optical satellite imagery"
+            >
+              <FileDown className="h-4 w-4 text-rose-400" />
+              <span>{isGeneratingPdf ? 'Compiling PDF SitRep...' : 'Download Full Report (PDF)'}</span>
+            </button>
+
             <button
               onClick={handleTriggerPipeline}
               disabled={isRunningPipeline}
@@ -529,6 +810,7 @@ export const Stage51ComparisonPage: React.FC = () => {
       <OpticalDualImageCompare
         sectorKey={selectedSectorKey}
         onSectorChange={setSelectedSectorKey}
+        onGeeDataUpdate={setCurrentGeeData}
       />
 
       {/* ─────────────────────────────────────────────────────────────────────────
@@ -635,6 +917,21 @@ export const Stage51ComparisonPage: React.FC = () => {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────────
+          GEMINI AI FLOOD INTELLIGENCE ASSISTANT (USER REQUIREMENT 2)
+      ───────────────────────────────────────────────────────────────────────── */}
+      <GeminiFloodAssistant
+        sector={sector}
+        adjustedFloodArea={adjustedFloodArea}
+        selectedIndexName={indexMeta.name}
+        hospitals={sectorHospitals}
+        bridges={sectorBridges}
+        safeHavens={sectorSafeHavens}
+        reliefRoutes={sectorReliefRoutes}
+        alternateRoutes={sectorAlternateRoutes}
+        helicopterSorties={sectorHelicopterSorties}
+      />
+
+      {/* ─────────────────────────────────────────────────────────────────────────
           SPLIT LEAFLET INTERACTIVE SATELLITE MAP
       ───────────────────────────────────────────────────────────────────────── */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900/90 overflow-hidden shadow-xl">
@@ -666,20 +963,52 @@ export const Stage51ComparisonPage: React.FC = () => {
               >
                 Dark Radar
               </button>
+              <button
+                onClick={() => setMapBaseLayer('gee')}
+                className={`px-2 py-1 rounded font-semibold transition-colors cursor-pointer flex items-center gap-1 ${
+                  mapBaseLayer === 'gee'
+                    ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Overlay Live Google Earth Engine Tile Layer (home-credit-505106)"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                GEE Live
+              </button>
             </div>
 
             {/* Layer Checkboxes */}
-            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer">
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer hover:border-orange-500/50">
+              <input
+                type="checkbox"
+                checked={showNewlyFlooded}
+                onChange={(e) => setShowNewlyFlooded(e.target.checked)}
+                className="accent-orange-500 rounded"
+              />
+              <span className="font-semibold text-orange-400">Newly Flooded (+{sector.newlyFloodedAreaKm2} km²)</span>
+            </label>
+
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer hover:border-rose-500/50">
+              <input
+                type="checkbox"
+                checked={showFloodedVillagePerimeters}
+                onChange={(e) => setShowFloodedVillagePerimeters(e.target.checked)}
+                className="accent-rose-500 rounded"
+              />
+              <span className="font-semibold text-rose-400">Flooded Villages (Dotted)</span>
+            </label>
+
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer hover:border-cyan-500/50">
               <input
                 type="checkbox"
                 checked={showFloodExtent}
                 onChange={(e) => setShowFloodExtent(e.target.checked)}
                 className="accent-cyan-400 rounded"
               />
-              <span className="font-medium text-cyan-300">Deluge Flood</span>
+              <span className="font-medium text-cyan-300">Total Deluge</span>
             </label>
 
-            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer">
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer hover:border-blue-500/50">
               <input
                 type="checkbox"
                 checked={showBaselineRiver}
@@ -687,6 +1016,76 @@ export const Stage51ComparisonPage: React.FC = () => {
                 className="accent-blue-500 rounded"
               />
               <span className="font-medium text-blue-300">Baseline River</span>
+            </label>
+
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer hover:border-emerald-500/50">
+              <input
+                type="checkbox"
+                checked={showSafeHouses}
+                onChange={(e) => setShowSafeHouses(e.target.checked)}
+                className="accent-emerald-500 rounded"
+              />
+              <span className="font-semibold text-emerald-400">Safe Houses ({sectorSafeHavens.length})</span>
+            </label>
+
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer hover:border-sky-500/50">
+              <input
+                type="checkbox"
+                checked={showHospitals}
+                onChange={(e) => setShowHospitals(e.target.checked)}
+                className="accent-sky-500 rounded"
+              />
+              <span className="font-semibold text-sky-400">Hospitals ({sectorHospitals.length})</span>
+            </label>
+
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer hover:border-amber-500/50">
+              <input
+                type="checkbox"
+                checked={showRoadCorridors}
+                onChange={(e) => setShowRoadCorridors(e.target.checked)}
+                className="accent-amber-500 rounded"
+              />
+              <span className="font-medium text-amber-300">Road Corridors</span>
+            </label>
+
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer hover:border-red-500/50">
+              <input
+                type="checkbox"
+                checked={showBridges}
+                onChange={(e) => setShowBridges(e.target.checked)}
+                className="accent-red-500 rounded"
+              />
+              <span className="font-semibold text-red-400">🌉 Bridges ({sectorBridges.length})</span>
+            </label>
+
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer hover:border-emerald-500/50">
+              <input
+                type="checkbox"
+                checked={showReliefRoutes}
+                onChange={(e) => setShowReliefRoutes(e.target.checked)}
+                className="accent-emerald-500 rounded"
+              />
+              <span className="font-semibold text-emerald-300">🚚 Relief Routes ({sectorReliefRoutes.length})</span>
+            </label>
+
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer hover:border-amber-500/50">
+              <input
+                type="checkbox"
+                checked={showAlternateRoutes}
+                onChange={(e) => setShowAlternateRoutes(e.target.checked)}
+                className="accent-amber-500 rounded"
+              />
+              <span className="font-semibold text-amber-300">🚗 Bypasses ({sectorAlternateRoutes.length})</span>
+            </label>
+
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer hover:border-sky-500/50">
+              <input
+                type="checkbox"
+                checked={showAirSupport}
+                onChange={(e) => setShowAirSupport(e.target.checked)}
+                className="accent-sky-500 rounded"
+              />
+              <span className="font-semibold text-sky-300">🚁 Air Support ({sectorHelicopterSorties.length})</span>
             </label>
 
             <label className="flex items-center gap-1.5 text-[11px] text-slate-300 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded cursor-pointer">
@@ -706,7 +1105,7 @@ export const Stage51ComparisonPage: React.FC = () => {
                 onChange={(e) => setShowSettlementMarkers(e.target.checked)}
                 className="accent-rose-500 rounded"
               />
-              <span className="font-medium text-rose-300">4-Tier Settlements</span>
+              <span className="font-medium text-rose-300">Settlements</span>
             </label>
           </div>
         </div>
@@ -722,7 +1121,13 @@ export const Stage51ComparisonPage: React.FC = () => {
             <ChangeMapView center={sector.center} zoom={sector.zoom} />
 
             {/* Base Tile Layer */}
-            {mapBaseLayer === 'satellite' ? (
+            {mapBaseLayer === 'gee' && currentGeeData?.right?.tile_url ? (
+              <TileLayer
+                attribution="&copy; Google Earth Engine / Copernicus / USGS (home-credit-505106)"
+                url={currentGeeData.right.tile_url}
+                maxZoom={20}
+              />
+            ) : mapBaseLayer === 'satellite' ? (
               <TileLayer
                 attribution="&copy; Google Satellite / Earth Engine"
                 url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
@@ -796,7 +1201,39 @@ export const Stage51ComparisonPage: React.FC = () => {
                 </Polygon>
               ))}
 
-            {/* Newly Flooded Optical Polygon Layer */}
+            {/* 1. Newly Flooded Deluge Optical Polygons (Monsoon Expansion) */}
+            {showNewlyFlooded &&
+              sector.floodPolygons.map((poly, idx) => (
+                <Polygon
+                  key={`new-flood-${idx}`}
+                  positions={poly}
+                  pathOptions={{
+                    color: '#F97316',
+                    fillColor: '#EA580C',
+                    fillOpacity: 0.65,
+                    weight: 2.5,
+                  }}
+                >
+                  <Popup>
+                    <div className="p-2 text-xs text-slate-900 font-sans max-w-[240px]">
+                      <div className="flex items-center justify-between border-b pb-1">
+                        <strong className="text-orange-700 font-bold text-sm">Newly Flooded Deluge</strong>
+                        <span className="text-[10px] font-mono bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded font-bold">
+                          +{sector.newlyFloodedAreaKm2} km²
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-700 mt-1">
+                        Fresh monsoon inundation expansion isolated by excluding pre-flood baseline channel.
+                      </p>
+                      <div className="mt-1 pt-1 border-t border-slate-200 text-[10px] font-mono text-slate-600">
+                        W_new = W_post ∧ ¬W_pre &bull; DEM Slope &lt; 5&deg;
+                      </div>
+                    </div>
+                  </Popup>
+                </Polygon>
+              ))}
+
+            {/* 2. Total Deluge Optical Polygon Layer */}
             {showFloodExtent &&
               sector.floodPolygons.map((poly, idx) => (
                 <Polygon
@@ -805,13 +1242,13 @@ export const Stage51ComparisonPage: React.FC = () => {
                   pathOptions={{
                     color: indexMeta.highlightColor,
                     fillColor: indexMeta.highlightColor,
-                    fillOpacity: 0.55,
+                    fillOpacity: 0.45,
                     weight: 2,
                   }}
                 >
                   <Popup>
                     <div className="p-1 text-xs text-slate-900 font-sans">
-                      <strong className="text-cyan-800">Newly Inundated Deluge ({indexMeta.name})</strong>
+                      <strong className="text-cyan-800">Total Deluge Inundation ({indexMeta.name})</strong>
                       <p className="text-[11px] mt-0.5">
                         Active flood extent: <strong>{adjustedFloodArea} km&sup2;</strong>
                       </p>
@@ -823,7 +1260,218 @@ export const Stage51ComparisonPage: React.FC = () => {
                 </Polygon>
               ))}
 
-            {/* 4-Tier Settlement Pins */}
+            {/* 3. Dotted Municipal Boundary for Flooded Villages and Cities */}
+            {showFloodedVillagePerimeters &&
+              sector.settlements
+                .filter(
+                  (s) =>
+                    s.inundation_percentage > 0 ||
+                    s.impact_flag === 'CRITICAL_INUNDATED' ||
+                    s.impact_flag === 'PARTIALLY_SUBMERGED'
+                )
+                .map((settlement) => {
+                  const perimeter = getVillageDottedPerimeter(
+                    settlement.coords,
+                    settlement.settlement_id,
+                    settlement.inundation_percentage
+                  );
+                  const isCritical = settlement.impact_flag === 'CRITICAL_INUNDATED';
+                  const strokeColor = isCritical ? '#EF4444' : '#F59E0B';
+                  return (
+                    <Polygon
+                      key={`dotted-village-${settlement.settlement_id}`}
+                      positions={perimeter}
+                      pathOptions={{
+                        color: strokeColor,
+                        fillColor: strokeColor,
+                        fillOpacity: 0.18,
+                        weight: 2.5,
+                        dashArray: '6, 6', // Dotted line highlighting proper village/city area
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-2 text-xs text-slate-900 font-sans max-w-[260px]">
+                          <div className="flex items-center justify-between border-b pb-1">
+                            <strong className="text-sm font-bold text-slate-950">
+                              {settlement.settlement_name}
+                            </strong>
+                            <span
+                              className="text-[9px] font-bold px-1.5 py-0.5 rounded text-white"
+                              style={{ background: strokeColor }}
+                            >
+                              {settlement.inundation_percentage}% FLOODED
+                            </span>
+                          </div>
+                          <div className="mt-1 space-y-1 text-[11px] text-slate-700">
+                            <div>
+                              Municipality: <strong>{settlement.municipality}</strong> ({settlement.district})
+                            </div>
+                            <div>
+                              Affected Population: <strong>{settlement.population.toLocaleString()}</strong>
+                            </div>
+                            <div>
+                              Flooded Buildings: <strong>{settlement.flooded_buildings_count}</strong> structures
+                            </div>
+                            <div>
+                              Road Status:{' '}
+                              <strong
+                                className={
+                                  settlement.access_status === 'SEVERED'
+                                    ? 'text-red-600 font-bold'
+                                    : 'text-amber-600 font-bold'
+                                }
+                              >
+                                {settlement.access_status}
+                              </strong>
+                            </div>
+                            <div className="pt-1 text-[10px] bg-red-50 p-1.5 rounded border border-red-200">
+                              <span className="font-bold text-red-800">Dotted Perimeter:</span> Municipal
+                              inundation boundary (~1.5 km buffer)
+                            </div>
+                          </div>
+                        </div>
+                      </Popup>
+                    </Polygon>
+                  );
+                })}
+
+            {/* 4. Critical Terai Road Corridors */}
+            {showRoadCorridors &&
+              sectorRoads.map((road) => {
+                const isSubmerged = road.status === 'submerged';
+                const isRestricted = road.status === 'restricted';
+                const lineColor = isSubmerged ? '#EF4444' : isRestricted ? '#F59E0B' : '#10B981';
+                return (
+                  <Polyline
+                    key={`road-${road.id}`}
+                    positions={road.path}
+                    pathOptions={{
+                      color: lineColor,
+                      weight: 3.5,
+                      opacity: 0.85,
+                      dashArray: isSubmerged ? '6, 6' : undefined,
+                    }}
+                  >
+                    <Popup>
+                      <div className="p-2 text-xs text-slate-900 font-sans max-w-[240px]">
+                        <div className="flex items-center justify-between border-b pb-1">
+                          <strong className="font-bold text-sm text-slate-900">{road.name}</strong>
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded text-white"
+                            style={{ background: lineColor }}
+                          >
+                            {road.status.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="mt-1 space-y-0.5 text-[11px] text-slate-700">
+                          <div>
+                            Highway: <strong>{road.highwayCode}</strong> &bull; {road.corridor}
+                          </div>
+                          <div>
+                            Submerged Length: <strong>{road.submergedLengthKm} km</strong> (Depth:{' '}
+                            {road.maxWaterDepthMeters}m)
+                          </div>
+                          <div className="pt-1 text-[10px] italic text-slate-800">
+                            {road.clearanceAdvice}
+                          </div>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Polyline>
+                );
+              })}
+
+            {/* 5. Safe Houses & Evacuation Camps */}
+            {showSafeHouses &&
+              sectorSafeHavens.map((haven) => (
+                <Marker
+                  key={`haven-${haven.id}`}
+                  position={haven.coords}
+                  icon={createSafeHavenMarker(haven.name, haven.totalCapacity)}
+                >
+                  <Popup>
+                    <div className="p-2 text-xs text-slate-900 font-sans max-w-[250px]">
+                      <div className="flex items-center justify-between border-b pb-1">
+                        <strong className="font-bold text-sm text-emerald-800 flex items-center gap-1">
+                          ⛺ {haven.name}
+                        </strong>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white">
+                          SAFE SHELTER
+                        </span>
+                      </div>
+                      <div className="mt-1 space-y-0.5 text-[11px] text-slate-700">
+                        <div>
+                          District: <strong>{haven.district}</strong> &bull; {haven.type.replace(/_/g, ' ')}
+                        </div>
+                        <div>
+                          Capacity: <strong>{haven.totalCapacity.toLocaleString()} evacuees</strong>
+                        </div>
+                        <div>
+                          Occupancy: <strong>{haven.currentOccupancy.toLocaleString()}</strong> ({haven.suitabilityGrade} Grade)
+                        </div>
+                        <div>
+                          Helipad: <strong>{haven.hasHelipad ? 'Yes (Active HLZ)' : 'No'}</strong> &bull; Gen:{' '}
+                          <strong>{haven.hasBackupGenerator ? 'Yes' : 'No'}</strong>
+                        </div>
+                        <div className="pt-1 text-[10px] text-emerald-800 font-semibold">
+                          Warden ({haven.wardenAgency}): {haven.wardenPhone}
+                        </div>
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+
+            {/* 6. Hospitals & Primary Health Centers */}
+            {showHospitals &&
+              sectorHospitals.map((hosp) => (
+                <Marker
+                  key={`hosp-${hosp.id}`}
+                  position={hosp.coords}
+                  icon={createHospitalMarker(hosp.name, hosp.isFlooded)}
+                >
+                  <Popup>
+                    <div className="p-2 text-xs text-slate-900 font-sans max-w-[250px]">
+                      <div className="flex items-center justify-between border-b pb-1">
+                        <strong className="font-bold text-sm text-slate-900 flex items-center gap-1">
+                          ✚ {hosp.name}
+                        </strong>
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded text-white ${
+                            hosp.isFlooded ? 'bg-red-600' : 'bg-sky-600'
+                          }`}
+                        >
+                          {hosp.isFlooded ? 'SUBMERGED' : 'OPERATIONAL'}
+                        </span>
+                      </div>
+                      <div className="mt-1 space-y-0.5 text-[11px] text-slate-700">
+                        <div>
+                          District: <strong>{hosp.district}</strong> &bull; {hosp.type}
+                        </div>
+                        <div>
+                          Capacity: <strong>{hosp.beds} beds</strong>
+                        </div>
+                        <div>
+                          Status:{' '}
+                          <strong className={hosp.isFlooded ? 'text-red-600' : 'text-emerald-600'}>
+                            {hosp.status}
+                          </strong>
+                        </div>
+                        <div>
+                          Emergency Phone: <strong>{hosp.phone}</strong>
+                        </div>
+                        {hosp.nearestSafeHaven && (
+                          <div className="pt-1 text-[10px] text-slate-600">
+                            Nearest Safe Haven: <strong>{hosp.nearestSafeHaven}</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+
+            {/* 7. 4-Tier Settlement Pins */}
             {showSettlementMarkers &&
               filteredSettlements.map((settlement) => {
                 const tierConf = TIER_CONFIG[settlement.impact_flag];
@@ -866,6 +1514,263 @@ export const Stage51ComparisonPage: React.FC = () => {
                   </Marker>
                 );
               })}
+
+            {/* 8. Critical River Bridges & Barrages */}
+            {showBridges &&
+              sectorBridges.map((bridge) => {
+                const isDanger = bridge.status === 'critical_danger';
+                const isWarning = bridge.status === 'high_warning';
+                const badgeColor = isDanger ? 'bg-red-600' : isWarning ? 'bg-amber-600' : 'bg-emerald-600';
+                return (
+                  <Marker
+                    key={`bridge-${bridge.id}`}
+                    position={bridge.coords}
+                    icon={createBridgeMarker(bridge.name, bridge.status)}
+                  >
+                    <Popup>
+                      <div className="p-2 text-xs text-slate-900 font-sans max-w-[260px]">
+                        <div className="flex items-center justify-between border-b pb-1">
+                          <strong className="font-bold text-sm text-slate-950 flex items-center gap-1">
+                            🌉 {bridge.name}
+                          </strong>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded text-white ${badgeColor}`}>
+                            {bridge.status.replace(/_/g, ' ').toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="mt-1 space-y-0.5 text-[11px] text-slate-700">
+                          <div>
+                            River: <strong>{bridge.river}</strong> ({bridge.district})
+                          </div>
+                          <div>
+                            Traffic: <strong className={bridge.trafficStatus === 'closed' ? 'text-red-600' : bridge.trafficStatus === 'restricted_single_lane' ? 'text-amber-600' : 'text-emerald-600'}>{bridge.trafficStatus.replace(/_/g, ' ').toUpperCase()}</strong>
+                          </div>
+                          {bridge.dischargeCusecs && (
+                            <div>
+                              Discharge: <strong>{bridge.dischargeCusecs.toLocaleString()} cusecs</strong>
+                            </div>
+                          )}
+                          <div className="pt-1 text-[10px] text-slate-800 italic">
+                            {bridge.structuralStatus}
+                          </div>
+                          {bridge.notes && (
+                            <div className="pt-1 text-[9.5px] text-slate-600 border-t border-slate-200 mt-1">
+                              <strong>APF Notice:</strong> {bridge.notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })}
+
+            {/* 9. Ground Relief Support Convoys */}
+            {showReliefRoutes &&
+              sectorReliefRoutes.map((route) => (
+                <React.Fragment key={`relief-${route.id}`}>
+                  <Polyline
+                    positions={route.path}
+                    pathOptions={{
+                      color: route.color || '#22C55E',
+                      weight: 4.5,
+                      opacity: 0.9,
+                    }}
+                  >
+                    <Popup>
+                      <div className="p-2 text-xs text-slate-900 font-sans max-w-[260px]">
+                        <div className="flex items-center justify-between border-b pb-1">
+                          <strong className="font-bold text-sm text-emerald-800 flex items-center gap-1">
+                            🚚 {route.name}
+                          </strong>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white">
+                            RELIEF CONVOY
+                          </span>
+                        </div>
+                        <div className="mt-1 space-y-0.5 text-[11px] text-slate-700">
+                          <div>Origin: <strong>{route.origin}</strong></div>
+                          <div>Destination: <strong>{route.destination}</strong></div>
+                          <div>
+                            Distance: <strong>{route.totalDistanceKm} km</strong> &bull; Transit: <strong>~{route.estimatedTimeMins} mins</strong>
+                          </div>
+                          <div>Fleet: <strong>{route.convoyType.replace(/_/g, ' ').toUpperCase()}</strong></div>
+                          <div>Capacity: <strong>{route.payloadCapacity}</strong></div>
+                          <div className="pt-1 text-[10px] text-emerald-800 italic">{route.roadCondition}</div>
+                          <div className="pt-1 text-[10px] text-slate-600">
+                            <strong>Waypoints:</strong> {route.waypoints.join(' ➔ ')}
+                          </div>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Polyline>
+                  {route.path.map((pt, pIdx) => (
+                    <CircleMarker
+                      key={`waypoint-${route.id}-${pIdx}`}
+                      center={pt}
+                      radius={4.5}
+                      pathOptions={{
+                        color: '#FFFFFF',
+                        fillColor: route.color || '#22C55E',
+                        fillOpacity: 1,
+                        weight: 2,
+                      }}
+                    >
+                      <Tooltip direction="top" offset={[0, -5]} opacity={0.9}>
+                        <span className="font-mono text-[10px] font-bold text-slate-900">
+                          {route.waypoints[pIdx] || `Waypoint ${pIdx + 1}`}
+                        </span>
+                      </Tooltip>
+                    </CircleMarker>
+                  ))}
+                </React.Fragment>
+              ))}
+
+            {/* 10. Civilian Alternate Bypass Detour Routes */}
+            {showAlternateRoutes &&
+              sectorAlternateRoutes.map((alt) => (
+                <Polyline
+                  key={`alt-${alt.id}`}
+                  positions={alt.path}
+                  pathOptions={{
+                    color: alt.color || '#F59E0B',
+                    weight: 4,
+                    opacity: 0.95,
+                    dashArray: '8, 8',
+                  }}
+                >
+                  <Popup>
+                    <div className="p-2 text-xs text-slate-900 font-sans max-w-[260px]">
+                      <div className="flex items-center justify-between border-b pb-1">
+                        <strong className="font-bold text-sm text-amber-800 flex items-center gap-1">
+                          🚗 {alt.name}
+                        </strong>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white">
+                          CIVILIAN BYPASS
+                        </span>
+                      </div>
+                      <div className="mt-1 space-y-0.5 text-[11px] text-slate-700">
+                        <div>Blocked: <strong>{alt.blockedRoad}</strong> ({alt.blockedSegment})</div>
+                        <div>Detour: <strong>{alt.bypassName}</strong></div>
+                        <div>
+                          Length: <strong>{alt.bypassDistanceKm} km</strong> (+{alt.extraTimeMins} mins vs normal)
+                        </div>
+                        <div>Suitable For: <strong>{alt.suitableFor.join(', ').toUpperCase()}</strong></div>
+                        <div className="pt-1 text-[10px] text-emerald-800 font-bold">
+                          {alt.safetyRating === 'safe' ? '✓ 100% FLOOD-FREE ELEVATED ROUTE' : '⚠ HIGH CLEARANCE RECOMMENDED'}
+                        </div>
+                        <div className="pt-1 text-[10px] text-slate-600">
+                          <strong>Advisory:</strong> {alt.advisoryNote}
+                        </div>
+                      </div>
+                    </div>
+                  </Popup>
+                </Polyline>
+              ))}
+
+            {/* 11. Helicopter Air Support Sorties */}
+            {showAirSupport &&
+              sectorHelicopterSorties.map((sortie) => {
+                const weatherStatus = getWeatherStatusLabel(sortie.currentWeather);
+                return (
+                  <React.Fragment key={`heli-${sortie.id}`}>
+                    <Polyline
+                      positions={sortie.flightPath}
+                      pathOptions={{
+                        color: sortie.color || '#38BDF8',
+                        weight: 3.5,
+                        opacity: 0.9,
+                        dashArray: '5, 5',
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-2 text-xs text-slate-900 font-sans max-w-[270px]">
+                          <div className="flex items-center justify-between border-b pb-1">
+                            <strong className="font-bold text-sm text-sky-800 flex items-center gap-1">
+                              🚁 {sortie.name}
+                            </strong>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-600 text-white">
+                              AIR SORTIE
+                            </span>
+                          </div>
+                          <div className="mt-1 space-y-0.5 text-[11px] text-slate-700">
+                            <div>
+                              Aircraft: <strong>{sortie.aircraftType.replace(/_/g, ' ')}</strong>
+                            </div>
+                            <div>
+                              Origin: <strong>{sortie.originBase}</strong> ➔ HLZ: <strong>{sortie.destinationHLZ}</strong>
+                            </div>
+                            <div>
+                              Flight Time: <strong>~{sortie.estimatedFlightTimeMins} mins</strong> ({sortie.distanceNm} NM)
+                            </div>
+                            <div>
+                              Capacity: <strong>{sortie.maxPayloadKg.toLocaleString()} kg cargo / {sortie.maxPassengers} passengers</strong>
+                            </div>
+                            <div className="pt-1 border-t border-slate-200 mt-1">
+                              <span className="font-bold text-slate-900">Aviation Weather:</span>{' '}
+                              <strong style={{ color: weatherStatus.color }}>{weatherStatus.label}</strong>
+                              <div className="text-[10px] text-slate-600">
+                                Ceiling: {sortie.weatherDetails.ceiling_ft.toLocaleString()} ft &bull; Vis: {sortie.weatherDetails.visibility_km} km &bull; Wind: {sortie.weatherDetails.wind_speed_knots} kts {sortie.weatherDetails.wind_direction}
+                              </div>
+                            </div>
+                            <div className="pt-1 text-[10px] text-slate-600 italic">
+                              {sortie.sortieNotes}
+                            </div>
+                          </div>
+                        </div>
+                      </Popup>
+                    </Polyline>
+
+                    {/* Origin Heli Base Pin */}
+                    <Marker position={sortie.originCoords} icon={createHeliMarker(sortie.originBase)}>
+                      <Tooltip direction="top" offset={[0, -12]}>
+                        <span className="font-bold text-xs text-slate-900">{sortie.originBase}</span>
+                      </Tooltip>
+                    </Marker>
+
+                    {/* Destination Safe Haven HLZ Pin */}
+                    <Marker position={sortie.destinationCoords} icon={createHeliMarker(sortie.destinationHLZ)}>
+                      <Tooltip direction="top" offset={[0, -12]}>
+                        <span className="font-bold text-xs text-slate-900">{sortie.destinationHLZ} (HLZ)</span>
+                      </Tooltip>
+                    </Marker>
+                  </React.Fragment>
+                );
+              })}
+
+            {/* 12. Evacuation Proximity Vectors to Nearest Safe Shelter */}
+            {showSafeHouses &&
+              filteredSettlements
+                .filter((s) => s.impact_flag === 'CRITICAL_INUNDATED' || s.impact_flag === 'ISOLATED_CUTOFF')
+                .slice(0, 5)
+                .map((settlement) => {
+                  let nearestHaven = sectorSafeHavens[0];
+                  let minDistance = 999999;
+                  sectorSafeHavens.forEach((haven) => {
+                    const d = Math.hypot(haven.coords[0] - settlement.coords[0], haven.coords[1] - settlement.coords[1]);
+                    if (d < minDistance) {
+                      minDistance = d;
+                      nearestHaven = haven;
+                    }
+                  });
+                  if (!nearestHaven) return null;
+                  return (
+                    <Polyline
+                      key={`evac-vector-${settlement.settlement_id}`}
+                      positions={[settlement.coords, nearestHaven.coords]}
+                      pathOptions={{
+                        color: '#06B6D4',
+                        weight: 2,
+                        opacity: 0.6,
+                        dashArray: '4, 6',
+                      }}
+                    >
+                      <Tooltip direction="center">
+                        <span className="text-[10px] text-slate-900 font-bold">
+                          Evacuate {settlement.settlement_name} ➔ {nearestHaven.name}
+                        </span>
+                      </Tooltip>
+                    </Polyline>
+                  );
+                })}
           </MapContainer>
 
           {/* Map Legend Overlay */}
@@ -876,16 +1781,36 @@ export const Stage51ComparisonPage: React.FC = () => {
             </div>
             <div className="space-y-1.5 text-[11px]">
               <div className="flex items-center gap-2">
-                <div className="w-3.5 h-3.5 rounded border border-cyan-400 bg-cyan-500/60"></div>
-                <span className="text-slate-200">Newly Inundated Deluge ({indexMeta.id.toUpperCase()})</span>
+                <div className="w-3.5 h-3.5 rounded border border-orange-400 bg-orange-500/70"></div>
+                <span className="text-slate-200">Newly Flooded (+{sector.newlyFloodedAreaKm2} km²)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0 border-t-2 border-dashed border-rose-500"></div>
+                <span className="text-rose-300 font-semibold">Flooded Village Boundary (Dotted)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3.5 h-3.5 rounded border border-blue-500 bg-blue-600/60"></div>
-                <span className="text-slate-300">Baseline River Mainstem (Permanent)</span>
+                <span className="text-slate-300">Baseline River (Permanent Channel)</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3.5 h-3.5 rounded border border-amber-500 bg-amber-500/20"></div>
-                <span className="text-slate-300">DEM Slope Exclusion (&ge; 5&deg;)</span>
+                <div className="w-3.5 h-3.5 rounded border border-emerald-500 bg-emerald-600 flex items-center justify-center text-[9px] text-white">⛺</div>
+                <span className="text-emerald-300">Safe House / Evacuation Camp</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-3.5 rounded border border-rose-500 bg-rose-600 flex items-center justify-center text-[9px] text-white">🌉</div>
+                <span className="text-rose-300">Bridge / Barrage Crossing</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0 border-t-2 border-emerald-500"></div>
+                <span className="text-emerald-300">Ground Relief Convoy</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0 border-t-2 border-dashed border-amber-400"></div>
+                <span className="text-amber-300">Civilian Detour Bypass</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0 border-t-2 border-dashed border-sky-400"></div>
+                <span className="text-sky-300">Helicopter Air Sortie</span>
               </div>
             </div>
             <div className="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-1.5 text-[10px]">
@@ -909,6 +1834,16 @@ export const Stage51ComparisonPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ─────────────────────────────────────────────────────────────────────────
+          MULTI-MODAL EMERGENCY LOGISTICS & AIR SORTIE OPERATIONS HUB
+      ───────────────────────────────────────────────────────────────────────── */}
+      <EmergencyLogisticsHub
+        reliefRoutes={sectorReliefRoutes}
+        alternateRoutes={sectorAlternateRoutes}
+        helicopterSorties={sectorHelicopterSorties}
+        bridges={sectorBridges}
+      />
 
       {/* ─────────────────────────────────────────────────────────────────────────
           4-TIER RUBRIC AFFECTED SETTLEMENTS DOSSIER (CORE DELIVERABLE)
@@ -1257,8 +2192,34 @@ export const Stage51ComparisonPage: React.FC = () => {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Deliverable 1: Affected Settlements JSON */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {/* Deliverable 1: Detailed Flood Assessment Report PDF with Satellite Images */}
+          <div className="p-3.5 rounded-xl border border-rose-500/50 bg-gradient-to-b from-rose-950/40 via-slate-950/80 to-slate-950/90 flex flex-col justify-between space-y-3">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs text-white flex items-center gap-1.5">
+                  <FileDown className="h-3.5 w-3.5 text-rose-400" />
+                  Full SitRep PDF
+                </span>
+                <span className="font-mono text-[9px] bg-rose-500/25 text-rose-300 border border-rose-500/40 px-1.5 py-0.5 rounded font-bold">
+                  PDF + SATELLITE
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Official NEOC emergency situation report with embedded pre &amp; post flood satellite imagery, 4-tier settlements, and hospital status.
+              </p>
+            </div>
+            <button
+              onClick={handleDownloadDetailedPdfReport}
+              disabled={isGeneratingPdf}
+              className="w-full py-2 rounded-lg text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-950/40 border border-rose-500/60 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              {isGeneratingPdf ? 'Compiling PDF...' : 'FullReport_SitRep.pdf'}
+            </button>
+          </div>
+
+          {/* Deliverable 2: Affected Settlements JSON */}
           <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/80 flex flex-col justify-between space-y-3">
             <div>
               <div className="flex items-center justify-between">
@@ -1281,7 +2242,7 @@ export const Stage51ComparisonPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Deliverable 2: Affected Settlements CSV */}
+          {/* Deliverable 3: Affected Settlements CSV */}
           <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/80 flex flex-col justify-between space-y-3">
             <div>
               <div className="flex items-center justify-between">
@@ -1304,7 +2265,7 @@ export const Stage51ComparisonPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Deliverable 3: Flood Vector GeoJSON */}
+          {/* Deliverable 4: Flood Vector GeoJSON */}
           <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/80 flex flex-col justify-between space-y-3">
             <div>
               <div className="flex items-center justify-between">
@@ -1327,7 +2288,7 @@ export const Stage51ComparisonPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Deliverable 4: Accuracy Validation JSON */}
+          {/* Deliverable 5: Accuracy Validation JSON */}
           <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/80 flex flex-col justify-between space-y-3">
             <div>
               <div className="flex items-center justify-between">
