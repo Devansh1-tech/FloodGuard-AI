@@ -68,6 +68,12 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           accent: 'hsl(var(--sidebar-accent))',
         },
+        /* Command Center domain accents */
+        'cc-canvas': '#0F172A',
+        'cc-panel': '#1E293B',
+        'cc-safe': '#10B981',
+        'cc-critical': '#EF4444',
+        'cc-warning': '#F59E0B',
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -75,7 +81,8 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['Inter', 'Manrope', 'system-ui', 'sans-serif'],
+        sans: ['Geist', 'Satoshi', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       keyframes: {
         'accordion-down': {
@@ -90,11 +97,16 @@ export default {
           '0%, 100%': { opacity: '0.4' },
           '50%': { opacity: '0.8' },
         },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'pulse-glow': 'pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        shimmer: 'shimmer 2s linear infinite',
       },
     },
   },

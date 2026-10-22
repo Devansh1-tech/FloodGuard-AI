@@ -1,0 +1,15 @@
+# =============================================================================
+# FloodGuard-AI Unified Root Requirements
+# =============================================================================
+
+# Backend Dependencies (FastAPI, SQLAlchemy, SQLite/PostgreSQL, Auth, Testing)
+-r backend/requirements.txt
+
+# Settlement Impact Engine (GeoPandas, OSMnx, Shapely, PyOgrio, Rasterio, NetworkX)
+-r SettlementImpactEngine/requirements.txt
+
+# Earth Observation & Detection Engine Extras
+earthengine-api>=0.1.390
+fiona>=1.9.5
+opencv-python-headless>=4.9.0
+tqdm>=4.66.0
