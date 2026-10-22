@@ -19,6 +19,7 @@ from app.api.v1.reports import router as reports_router
 from app.api.v1.system import router as system_router
 from app.api.v1.telemetry import router as telemetry_router
 from app.api.v1.gee import router as gee_router
+from app.api.v1.chure_hydrology import router as chure_router
 
 # Master v1 router with prefix /api/v1
 api_v1_router = APIRouter(prefix="/api/v1")
@@ -33,3 +34,4 @@ api_v1_router.include_router(downloads_router)
 api_v1_router.include_router(system_router)
 api_v1_router.include_router(telemetry_router, prefix="/telemetry", tags=["telemetry"])
 api_v1_router.include_router(gee_router)
+api_v1_router.include_router(chure_router)

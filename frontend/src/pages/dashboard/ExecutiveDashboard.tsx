@@ -11,7 +11,7 @@
  * 7. Google Earth Engine Sentinel-1 SAR Analysis Code Modal launcher.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   MapContainer,
   Marker,
@@ -48,6 +48,7 @@ import {
   Radio,
   RefreshCw,
   Satellite,
+  Search,
   Shield,
   ShieldAlert,
   ShieldCheck,
@@ -56,6 +57,7 @@ import {
   TrendingUp,
   Users,
   Waves,
+  X,
   Zap,
 } from 'lucide-react';
 
@@ -271,9 +273,14 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
     }
   };
 
-  // Filtered district statistics
-  const filteredDistricts =
-    selectedRegionKey === 'full_terai'
+  // District Table Hazard Filters, Search, and Sort State
+  const [districtHazardFilter, setDistrictHazardFilter] = useState<'ALL' | 'CRITICAL_DELUGE' | 'MODERATE_WARNING' | 'STABLE_MONITORING'>('ALL');
+  const [districtSearchQuery, setDistrictSearchQuery] = useState<string>('');
+  const [districtSortBy, setDistrictSortBy] = useState<'inundated' | 'atRisk' | 'name'>('inundated');
+
+  // Base districts filtered by selected region
+  const activeRegionBaseDistricts = useMemo(() => {
+    return selectedRegionKey === 'full_terai'
       ? TERAI_DISTRICT_STATS
       : TERAI_DISTRICT_STATS.filter((d) => {
           if (selectedRegionKey === 'eastern_terai') return d.basin === 'Eastern Terai';
@@ -282,6 +289,46 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
           if (selectedRegionKey === 'far_western_terai') return d.basin === 'Far-Western Terai';
           return true;
         });
+  }, [selectedRegionKey]);
+
+  // Dynamic counts for hazard filter pills
+  const districtHazardCounts = useMemo(() => {
+    return {
+      ALL: activeRegionBaseDistricts.length,
+      CRITICAL_DELUGE: activeRegionBaseDistricts.filter((d) => d.inundatedAreaKm2 > 40).length,
+      MODERATE_WARNING: activeRegionBaseDistricts.filter((d) => d.inundatedAreaKm2 > 20 && d.inundatedAreaKm2 <= 40).length,
+      STABLE_MONITORING: activeRegionBaseDistricts.filter((d) => d.inundatedAreaKm2 <= 20).length,
+    };
+  }, [activeRegionBaseDistricts]);
+
+  // Filtered and sorted district statistics
+  const filteredDistricts = useMemo(() => {
+    let list = [...activeRegionBaseDistricts];
+
+    // Hazard Level Filter
+    if (districtHazardFilter === 'CRITICAL_DELUGE') {
+      list = list.filter((d) => d.inundatedAreaKm2 > 40);
+    } else if (districtHazardFilter === 'MODERATE_WARNING') {
+      list = list.filter((d) => d.inundatedAreaKm2 > 20 && d.inundatedAreaKm2 <= 40);
+    } else if (districtHazardFilter === 'STABLE_MONITORING') {
+      list = list.filter((d) => d.inundatedAreaKm2 <= 20);
+    }
+
+    // Text Search
+    if (districtSearchQuery.trim()) {
+      const q = districtSearchQuery.toLowerCase();
+      list = list.filter(
+        (d) => d.district.toLowerCase().includes(q) || d.basin.toLowerCase().includes(q)
+      );
+    }
+
+    // Sorting
+    return list.sort((a, b) => {
+      if (districtSortBy === 'inundated') return b.inundatedAreaKm2 - a.inundatedAreaKm2;
+      if (districtSortBy === 'atRisk') return b.atRiskPopulation - a.atRiskPopulation;
+      return a.district.localeCompare(b.district);
+    });
+  }, [activeRegionBaseDistricts, districtHazardFilter, districtSearchQuery, districtSortBy]);
 
   // Filtered settlements by district
   const filteredSettlements =
@@ -904,9 +951,136 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
             </p>
           </div>
 
-          <span className="text-xs font-bold text-slate-300 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-            Showing {filteredDistricts.length} Districts in {activeRegion.shortName}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-300 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+              Showing {filteredDistricts.length} of {activeRegionBaseDistricts.length} Districts in {activeRegion.shortName}
+            </span>
+          </div>
+        </div>
+
+        {/* ── HAZARD FILTER TOOLBAR & CONTROLS ── */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1">
+          {/* Hazard Filter Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setDistrictHazardFilter('ALL')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                districtHazardFilter === 'ALL'
+                  ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-500/20'
+                  : 'bg-slate-950/80 text-slate-300 border-slate-800 hover:text-white hover:border-slate-700'
+              }`}
+            >
+              <span>All Districts</span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+                districtHazardFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
+              }`}>
+                {districtHazardCounts.ALL}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setDistrictHazardFilter('CRITICAL_DELUGE')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                districtHazardFilter === 'CRITICAL_DELUGE'
+                  ? 'bg-red-500/30 text-red-200 border-red-500 shadow-md shadow-red-500/20 ring-1 ring-red-500/50'
+                  : 'bg-slate-950/80 text-red-400 border-red-900/50 hover:bg-red-950/30 hover:border-red-700'
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+              <span>Critical Deluge</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-red-950 border border-red-800/80 text-red-300">
+                {districtHazardCounts.CRITICAL_DELUGE}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setDistrictHazardFilter('MODERATE_WARNING')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                districtHazardFilter === 'MODERATE_WARNING'
+                  ? 'bg-amber-500/30 text-amber-200 border-amber-500 shadow-md shadow-amber-500/20 ring-1 ring-amber-500/50'
+                  : 'bg-slate-950/80 text-amber-400 border-amber-900/50 hover:bg-amber-950/30 hover:border-amber-700'
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              <span>Moderate Warning</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-amber-950 border border-amber-800/80 text-amber-300">
+                {districtHazardCounts.MODERATE_WARNING}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setDistrictHazardFilter('STABLE_MONITORING')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                districtHazardFilter === 'STABLE_MONITORING'
+                  ? 'bg-emerald-500/30 text-emerald-200 border-emerald-500 shadow-md shadow-emerald-500/20 ring-1 ring-emerald-500/50'
+                  : 'bg-slate-950/80 text-emerald-400 border-emerald-900/50 hover:bg-emerald-950/30 hover:border-emerald-700'
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span>Stable Monitoring</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-800/80 text-emerald-300">
+                {districtHazardCounts.STABLE_MONITORING}
+              </span>
+            </button>
+          </div>
+
+          {/* Quick Search & Sort Control */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search district or basin..."
+                value={districtSearchQuery}
+                onChange={(e) => setDistrictSearchQuery(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-44 sm:w-52 transition-colors"
+              />
+              {districtSearchQuery && (
+                <button
+                  onClick={() => setDistrictSearchQuery('')}
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5 text-[11px]">
+              <button
+                onClick={() => setDistrictSortBy('inundated')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                  districtSortBy === 'inundated'
+                    ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Sort by Inundated Area (Highest First)"
+              >
+                Inundation
+              </button>
+              <button
+                onClick={() => setDistrictSortBy('atRisk')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                  districtSortBy === 'atRisk'
+                    ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Sort by Population at Risk (Highest First)"
+              >
+                At-Risk Pop
+              </button>
+              <button
+                onClick={() => setDistrictSortBy('name')}
+                className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                  districtSortBy === 'name'
+                    ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Sort Alphabetically (A-Z)"
+              >
+                A-Z
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -923,52 +1097,75 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-sans">
-              {filteredDistricts.map((d) => {
-                const isHighHazard = d.inundatedAreaKm2 > 40;
-                const isModerateHazard = d.inundatedAreaKm2 > 20 && d.inundatedAreaKm2 <= 40;
+              {filteredDistricts.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-10 text-center text-slate-400">
+                    <AlertCircle className="h-6 w-6 text-slate-500 mx-auto mb-2" />
+                    <p className="font-semibold text-white">No districts found matching criteria</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {districtHazardFilter !== 'ALL'
+                        ? `No districts currently categorized under "${districtHazardFilter.replace(/_/g, ' ')}"`
+                        : 'Try adjusting your search query'}
+                    </p>
+                    <button
+                      onClick={() => {
+                        setDistrictHazardFilter('ALL');
+                        setDistrictSearchQuery('');
+                      }}
+                      className="mt-3 text-xs font-bold text-cyan-400 hover:text-cyan-300 underline cursor-pointer"
+                    >
+                      Reset all filters
+                    </button>
+                  </td>
+                </tr>
+              ) : (
+                filteredDistricts.map((d) => {
+                  const isHighHazard = d.inundatedAreaKm2 > 40;
+                  const isModerateHazard = d.inundatedAreaKm2 > 20 && d.inundatedAreaKm2 <= 40;
 
-                return (
-                  <tr key={d.district} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          isHighHazard ? 'bg-red-500 animate-ping' : isModerateHazard ? 'bg-amber-400' : 'bg-emerald-400'
-                        }`}
-                      />
-                      {d.district}
-                    </td>
-                    <td className="py-3 px-4 text-slate-400">{d.basin}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-cyan-400">
-                      {d.inundatedAreaKm2.toFixed(1)} km²
-                    </td>
-                    <td className="py-3 px-4 font-mono">{d.totalPopulation.toLocaleString()}</td>
-                    <td className="py-3 px-4 font-mono text-rose-300 font-bold">
-                      {d.atRiskPopulation.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                          isHighHazard
-                            ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                            : isModerateHazard
-                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                            : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                        }`}
-                      >
-                        {isHighHazard ? 'CRITICAL DELUGE' : isModerateHazard ? 'MODERATE WARNING' : 'STABLE MONITORING'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => onNavigateToTab('command_map')}
-                        className="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
-                      >
-                        Inspect on Map
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                  return (
+                    <tr key={d.district} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3 px-4 font-bold text-white flex items-center gap-2">
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            isHighHazard ? 'bg-red-500 animate-ping' : isModerateHazard ? 'bg-amber-400' : 'bg-emerald-400'
+                          }`}
+                        />
+                        {d.district}
+                      </td>
+                      <td className="py-3 px-4 text-slate-400">{d.basin}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-cyan-400">
+                        {d.inundatedAreaKm2.toFixed(1)} km²
+                      </td>
+                      <td className="py-3 px-4 font-mono">{d.totalPopulation.toLocaleString()}</td>
+                      <td className="py-3 px-4 font-mono text-rose-300 font-bold">
+                        {d.atRiskPopulation.toLocaleString()}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            isHighHazard
+                              ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                              : isModerateHazard
+                              ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                              : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                          }`}
+                        >
+                          {isHighHazard ? 'CRITICAL DELUGE' : isModerateHazard ? 'MODERATE WARNING' : 'STABLE MONITORING'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={() => onNavigateToTab('command_map')}
+                          className="rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+                        >
+                          Inspect on Map
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
