@@ -353,6 +353,7 @@ export interface GoogleMapsViewerProps {
   beforeDate?: string;
   afterDate?: string;
   initialRouteId?: string;
+  selectedRouteId?: string;
   hideHeader?: boolean;
   provider?: 'google_maps' | 'leaflet';
   onProviderChange?: (provider: 'google_maps' | 'leaflet') => void;
@@ -382,6 +383,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   beforeDate: propBeforeDate,
   afterDate: propAfterDate,
   initialRouteId = 'none',
+  selectedRouteId: propSelectedRouteId,
   hideHeader = false,
   provider: propProvider,
   onProviderChange,
@@ -437,7 +439,16 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   const [focusedVillage, setFocusedVillage] = useState<VillageTownItem | null>(null);
 
   // Emergency Routing State (Point 7 & 9)
-  const [selectedRouteId, setSelectedRouteId] = useState<string>(initialRouteId);
+  const [selectedRouteId, setSelectedRouteId] = useState<string>(
+    propSelectedRouteId || initialRouteId
+  );
+
+  useEffect(() => {
+    if (propSelectedRouteId !== undefined && propSelectedRouteId !== selectedRouteId) {
+      setSelectedRouteId(propSelectedRouteId);
+    }
+  }, [propSelectedRouteId]);
+
   const activeRoute: EmergencyRoute | undefined = EMERGENCY_ROUTES.find((r) => r.id === selectedRouteId);
 
   // Fullscreen Mode State

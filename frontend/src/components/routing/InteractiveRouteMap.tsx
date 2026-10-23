@@ -26,24 +26,25 @@ import {
   RouteNode,
 } from '@/data/teraiRoutingNetwork';
 import {
-  AlertTriangle,
-  ArrowRight,
+  Warning,
   Compass,
   MapPin,
-  Shield,
+  ShieldCheck,
   Truck,
-  Waves,
-  Zap,
-} from 'lucide-react';
+  CheckCircle,
+  WarningOctagon,
+} from '@phosphor-icons/react';
 
-interface InteractiveRouteMapProps {
+export interface InteractiveRouteMapProps {
   route: ComputedRouteResult;
   selectedStepIndex?: number | null;
   onSelectStep?: (index: number) => void;
+  className?: string;
+  id?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CUSTOM LEAFLET DIV ICONS
+// CUSTOM LEAFLET DIV ICONS (ANTI-EMOJI POLICY COMPLIANT)
 // ─────────────────────────────────────────────────────────────────────────────
 const createOriginIcon = (node: RouteNode) => {
   const isDepot = node.type === 'depot';
@@ -73,12 +74,11 @@ const createOriginIcon = (node: RouteNode) => {
           align-items: center;
           gap: 4px;
           color: #FFFFFF;
-          font-family: ui-sans-serif, system-ui, sans-serif;
+          font-family: ui-monospace, monospace;
           font-size: 10px;
           font-weight: 800;
           white-space: nowrap;
         ">
-          <span>${isDepot ? '🚚' : '📍'}</span>
           <span>${label}</span>
         </div>
         <div style="
@@ -87,6 +87,7 @@ const createOriginIcon = (node: RouteNode) => {
           border: 1px solid #334155;
           border-radius: 4px;
           padding: 1px 4px;
+          font-family: ui-monospace, monospace;
           font-size: 8px;
           font-weight: 700;
           margin-top: 2px;
@@ -129,12 +130,11 @@ const createDestinationIcon = (node: RouteNode) => {
           align-items: center;
           gap: 4px;
           color: #FFFFFF;
-          font-family: ui-sans-serif, system-ui, sans-serif;
+          font-family: ui-monospace, monospace;
           font-size: 10px;
           font-weight: 800;
           white-space: nowrap;
         ">
-          <span>${isSafeHaven ? '🛡️' : '🌊'}</span>
           <span>${label}</span>
         </div>
         <div style="
@@ -143,6 +143,7 @@ const createDestinationIcon = (node: RouteNode) => {
           border: 1px solid #334155;
           border-radius: 4px;
           padding: 1px 4px;
+          font-family: ui-monospace, monospace;
           font-size: 8px;
           font-weight: 700;
           margin-top: 2px;
@@ -171,6 +172,7 @@ const createWaypointIcon = (stepNum: number, isSelected: boolean) => {
         display: flex;
         align-items: center;
         justify-content: center;
+        font-family: ui-monospace, monospace;
         font-size: 10px;
         font-weight: 900;
         box-shadow: 0 2px 6px rgba(0,0,0,0.5);
@@ -196,15 +198,15 @@ const createBlockedWarningIcon = () => {
         color: #FFFFFF;
         border-radius: 6px;
         padding: 2px 6px;
+        font-family: ui-monospace, monospace;
         font-size: 9px;
         font-weight: 900;
         display: flex;
         align-items: center;
-        gap: 3px;
+        gap: 4px;
         box-shadow: 0 3px 8px rgba(0,0,0,0.6);
         white-space: nowrap;
       ">
-        <span>⛔</span>
         <span>SUBMERGED ROAD BLOCKED</span>
       </div>
     `,
@@ -256,6 +258,8 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
   route,
   selectedStepIndex,
   onSelectStep,
+  className,
+  id,
 }) => {
   const isEvacuation = route.mode === 'civilian_alternate';
   const primaryColor = isEvacuation ? '#F59E0B' : '#10B981'; // Amber for Evac, Emerald for Convoy
@@ -277,7 +281,13 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
   }, [route.blockedDirectPath]);
 
   return (
-    <div className="relative isolate z-10 w-full h-[520px] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-950">
+    <div
+      id={id}
+      className={
+        className ||
+        'relative isolate z-10 w-full h-[520px] rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-[#0F172A]'
+      }
+    >
       <MapContainer
         center={defaultCenter}
         zoom={8}
@@ -311,7 +321,7 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
               <Popup>
                 <div className="p-2 space-y-1 font-sans text-xs text-white">
                   <div className="font-bold text-rose-400 text-sm flex items-center gap-1.5 border-b border-slate-700/80 pb-1">
-                    <span>⛔</span> Direct Highway Submerged &amp; Impassable
+                    Direct Highway Submerged &amp; Impassable
                   </div>
                   <p className="text-slate-300 text-[11px] leading-relaxed">
                     This road has floodwater exceeding 1.5m. The system has automatically calculated a safe high-ground detour.
@@ -356,7 +366,7 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
             <Popup>
               <div className="p-2 space-y-1.5 font-sans text-xs text-white">
                 <div className="font-bold text-emerald-400 text-sm flex items-center gap-1.5 border-b border-slate-700/80 pb-1">
-                  <span>✅</span> {route.title}
+                  {route.title}
                 </div>
                 <div className="text-slate-300 text-[11px]">
                   Distance: <strong className="text-white font-bold">{route.distanceKm} km</strong> &bull; Est. Time: <strong className="text-cyan-400 font-bold">{route.estimatedMinutes} mins</strong>
@@ -374,7 +384,7 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
           <Popup>
             <div className="p-2 font-sans text-xs space-y-1.5 text-white">
               <div className="font-bold text-white text-sm flex items-center gap-1.5 border-b border-slate-700/80 pb-1">
-                <span>📍</span> {route.origin.name}
+                {route.origin.name}
               </div>
               <div className="text-cyan-400 text-[11px] font-medium">{route.origin.nepaliName}</div>
               <div className="text-slate-300 text-[11px] leading-relaxed">{route.origin.description}</div>
@@ -390,7 +400,7 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
           <Popup>
             <div className="p-2 font-sans text-xs space-y-1.5 text-white">
               <div className="font-bold text-white text-sm flex items-center gap-1.5 border-b border-slate-700/80 pb-1">
-                <span>🎯</span> {route.destination.name}
+                {route.destination.name}
               </div>
               <div className="text-cyan-400 text-[11px] font-medium">{route.destination.nepaliName}</div>
               <div className="text-slate-300 text-[11px] leading-relaxed">{route.destination.description}</div>
@@ -405,7 +415,7 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
 
         {/* ── 6. NUMBERED WAYPOINT MARKERS ──────────────────────────────────── */}
         {route.steps.map((step, idx) => {
-          if (idx === 0 || idx === route.steps.length - 1) return null; // Skip start & end since they have dedicated pins
+          if (idx === 0 || idx === route.steps.length - 1) return null;
           const isSelected = selectedStepIndex === idx;
 
           return (
@@ -426,7 +436,7 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
                   <div className="text-cyan-400 text-[10px] italic">{step.nepaliInstruction}</div>
                   {step.hazardAlert && (
                     <div className="text-amber-300 font-medium text-[10px] bg-amber-500/20 p-1.5 rounded border border-amber-500/30">
-                      ⚠️ {step.hazardAlert}
+                      {step.hazardAlert}
                     </div>
                   )}
                   <div className="font-mono text-[10px] text-slate-400 pt-0.5">
@@ -440,8 +450,8 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
       </MapContainer>
 
       {/* ── MAP OVERLAY BADGES ────────────────────────────────────────────── */}
-      <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-2 max-w-sm">
-        <div className="rounded-xl border border-slate-700/80 bg-slate-900/90 backdrop-blur-md p-3 shadow-xl">
+      <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-2 max-w-sm pointer-events-none">
+        <div className="rounded-xl border border-white/10 bg-[#1E293B]/90 backdrop-blur-md p-3 shadow-xl pointer-events-auto">
           <div className="flex items-center gap-2">
             <span
               className={`h-2.5 w-2.5 rounded-full ${
@@ -467,8 +477,8 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
         </div>
 
         {route.submergedKmBypassed > 0 && (
-          <div className="rounded-xl border border-rose-500/40 bg-rose-950/80 backdrop-blur-md px-3 py-1.5 shadow-lg flex items-center gap-2 text-[11px] text-rose-300">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-400" />
+          <div className="rounded-xl border border-rose-500/40 bg-rose-950/80 backdrop-blur-md px-3 py-1.5 shadow-lg flex items-center gap-2 text-[11px] text-rose-300 pointer-events-auto">
+            <WarningOctagon size={14} weight="bold" className="shrink-0 text-rose-400" />
             <span>
               <strong>{route.submergedKmBypassed} km</strong> flooded highway avoided on direct route
             </span>
@@ -477,10 +487,10 @@ export const InteractiveRouteMap: React.FC<InteractiveRouteMapProps> = ({
       </div>
 
       {/* ── MAP LEGEND ────────────────────────────────────────────────────── */}
-      <div className="absolute bottom-3 right-3 z-[1000] rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md px-3 py-2 text-[10px] space-y-1 text-slate-300 shadow-xl">
-        <div className="font-bold text-white flex items-center gap-1.5 pb-0.5 border-b border-slate-800">
-          <Compass className="h-3 w-3 text-cyan-400" />
-          Tactical Map Legend
+      <div className="absolute bottom-3 right-3 z-[1000] rounded-xl border border-white/10 bg-[#1E293B]/90 backdrop-blur-md px-3 py-2 text-[10px] font-mono space-y-1 text-slate-300 shadow-xl pointer-events-auto">
+        <div className="font-bold text-white flex items-center gap-1.5 pb-0.5 border-b border-white/10">
+          <Compass size={12} weight="bold" className="text-cyan-400" />
+          <span>Tactical Map Legend</span>
         </div>
         <div className="flex items-center gap-2">
           <span

@@ -1162,7 +1162,7 @@ export const TERAI_CITIES_DATA: TeraiCityData[] = [
     majorRivers: ['Babai', 'Karnali (Geruwa Branch)', 'Aurahi'],
     villagesAndTowns: [
       {
-        id: 'v_bar_1',
+        id: 'v_bardiya_1',
         name: 'Rajapur Riverine Island Town',
         type: 'town',
         coords: [28.42, 81.08],
@@ -1174,7 +1174,7 @@ export const TERAI_CITIES_DATA: TeraiCityData[] = [
         nearestShelter: 'Rajapur Food Corporation High Silos',
       },
       {
-        id: 'v_bar_2',
+        id: 'v_bardiya_2',
         name: 'Gulariya Babai Lowlands',
         type: 'town',
         coords: [28.23, 81.33],
@@ -1186,7 +1186,7 @@ export const TERAI_CITIES_DATA: TeraiCityData[] = [
         nearestShelter: 'Gulariya District Coordination Campus',
       },
       {
-        id: 'v_bar_3',
+        id: 'v_bardiya_3',
         name: 'Bansgadhi Highway High Ridge',
         type: 'safe_shelter',
         coords: [28.28, 81.52],

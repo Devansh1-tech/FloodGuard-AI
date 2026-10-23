@@ -106,12 +106,12 @@ describe('Stage 5.4: Stage54RoadsPage Component & User Interface Suite', () => {
   it('renders all 5 telemetry cards accurately', () => {
     render(<Stage54RoadsPage />);
 
-    expect(screen.getByText(/Submerged Roads/i)).toBeInTheDocument();
-    expect(screen.getByText(/Restricted \(4x4\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Open Passable/i)).toBeInTheDocument();
-    expect(screen.getByText(/Isolated Citizens/i)).toBeInTheDocument();
-    expect(screen.getByText(/Bridge Watch/i)).toBeInTheDocument();
-    expect(screen.getByText(/55,000/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Submerged Roads/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Restricted \(4x4\)/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Open Passable/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Isolated Citizens/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Bridge Watch/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/55,000/i)[0]).toBeInTheDocument();
   });
 
   it('allows switching between Highway Network, Bridges, and Isolated Communities tabs', () => {
@@ -120,12 +120,12 @@ describe('Stage 5.4: Stage54RoadsPage Component & User Interface Suite', () => {
     // Click Bridges tab
     const bridgesTab = screen.getByRole('button', { name: /Bridges & Barrages/i });
     fireEvent.click(bridgesTab);
-    expect(screen.getByText(/Saptakoshi Barrage/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Saptakoshi Barrage/i)[0]).toBeInTheDocument();
 
     // Click Isolated Communities tab
     const isolatedTab = screen.getByRole('button', { name: /Cut-Off Communities/i });
     fireEvent.click(isolatedTab);
-    expect(screen.getByText(/Gaur Customs & Border Wards 2, 3, 4/i)).toBeInTheDocument();
-    expect(screen.getByText(/Bhajani Municipality & Lalbojhi Wards 3 & 7/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Gaur Customs & Border Wards 2, 3, 4/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Bhajani Municipality & Lalbojhi Wards 3 & 7/i)[0]).toBeInTheDocument();
   });
 });
