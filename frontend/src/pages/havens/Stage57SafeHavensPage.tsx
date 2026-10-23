@@ -1,55 +1,52 @@
 /**
  * Stage57SafeHavensPage.tsx — Stage 5.7 Safe Haven & Refugee Camp Proximity Detector.
  *
- * Implements Point 8 of the Master Plan:
- * 1. Geospatial k-NN proximity engine scanning 5km - 40km around flooded Terai settlement centroids.
- * 2. Multi-criteria site suitability ranking (Elevation ASL, Concrete structural rating, WASH, HLZ Helipads).
- * 3. Interactive proximity map with concentric distance rings and radial egress vectors.
- * 4. Sphere Standards emergency refugee camp deployment simulator (Tents, Latrines, Water Bladders, Microgrids).
+ * Overhauled to "Tactical Dispatch & Evacuation Command View" (VISUAL_DENSITY: 8, SKILL.md):
+ * 1. Information Pruned: Abolished debug badges, redundant hotlines, and long descriptions.
+ * 2. Full-Viewport Hero Map Canvas: <div id="map"></div> primary focus with edge-to-edge layout.
+ * 3. Floating Glass Proximity Toolbar: Origin centroid, radius slider, capacity, and HLZ toggle.
+ * 4. Floating Monospace KPI Strip: Detected Havens, Nearest High Ground, Remaining Capacity, Rotary Pads.
+ * 5. Sliding Right Humanitarian Inspector Drawer: Tab 1 (Site Suitability & Ranking) & Tab 2 (UN Sphere Camp Planner).
+ * 6. Consolidated Action: "Export Official Sphere Camp Layout (PDF)" with jsPDF binary generation & print directive.
+ * 7. Standardized WCAG AA Palette: Deep Slate (#0F172A), Dark Slate (#1E293B), Off-White (#F8FAFC).
+ * 8. Anti-Emoji Policy: Exclusively @phosphor-icons/react SVGs.
  */
 
 import React, { useMemo, useState } from 'react';
 import {
-  Activity,
-  AlertTriangle,
-  ArrowRight,
-  Boxes,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  ChevronRight,
-  Clock,
-  Compass,
-  Droplet,
-  ExternalLink,
-  Eye,
-  FileText,
-  Filter,
-  Gauge,
-  HeartPulse,
-  Info,
-  Layers,
-  MapPin,
-  Maximize2,
-  Navigation,
-  Phone,
-  Plane,
-  Printer,
-  Radio,
-  RefreshCw,
-  Search,
-  Shield,
-  ShieldAlert,
-  ShieldCheck,
-  Sliders,
-  Sparkles,
   Tent,
-  Truck,
-  Users,
+  Mountains,
+  Bed,
+  AirplaneTilt,
+  NavigationArrow,
+  PhoneCall,
+  ShieldCheck,
+  Shield,
   Waves,
+  Drop,
+  Compass,
+  SlidersHorizontal,
+  Users,
+  FilePdf,
+  Printer,
   X,
-  Zap,
-} from 'lucide-react';
+  CheckCircle,
+  Clock,
+  Truck,
+  Tractor,
+  Heartbeat,
+  FirstAidKit,
+  Lightning,
+  Toilet,
+  Buildings,
+  ListBullets,
+  CaretRight,
+  ArrowsClockwise,
+  Eye,
+  Info,
+} from '@phosphor-icons/react';
+import { jsPDF } from 'jspdf';
+
 import { SafeHavenFacility, TERAI_SAFE_HAVENS } from '@/data/teraiSafeHavens';
 import {
   findNearbySafeHavens,
@@ -60,7 +57,7 @@ import {
 import { SafeHavenDetectorMap } from '@/components/havens/SafeHavenDetectorMap';
 
 // Preset Flooded Settlements across the 21 Terai districts
-interface FloodedSettlementPreset {
+export interface FloodedSettlementPreset {
   id: string;
   name: string;
   nepaliName: string;
@@ -73,7 +70,7 @@ interface FloodedSettlementPreset {
   breachCause: string;
 }
 
-const FLOODED_SETTLEMENT_PRESETS: FloodedSettlementPreset[] = [
+export const FLOODED_SETTLEMENT_PRESETS: FloodedSettlementPreset[] = [
   {
     id: 'settlement_gaur',
     name: 'Gaur District Headquarters & Border Wards',
@@ -149,16 +146,20 @@ const FLOODED_SETTLEMENT_PRESETS: FloodedSettlementPreset[] = [
 ];
 
 export const Stage57SafeHavensPage: React.FC = () => {
-  // Selected Flooded Settlement
+  // Selected Flooded Settlement & Proximity State
   const [selectedSettlementId, setSelectedSettlementId] = useState<string>('settlement_gaur');
   const [scanRadiusKm, setScanRadiusKm] = useState<number>(30);
   const [minCapacityFilter, setMinCapacityFilter] = useState<number>(0);
   const [requiresHelipad, setRequiresHelipad] = useState<boolean>(false);
-  const [selectedHavenId, setSelectedHavenId] = useState<string | null>('haven_rautahat_chandranigahapur');
+  const [selectedHavenId, setSelectedHavenId] = useState<string | null>('haven_rautahat_pipra_terrace');
 
   // Refugee Camp Deployment Simulator State
   const [targetEvacuees, setTargetEvacuees] = useState<number>(5000);
   const [showDeploymentModal, setShowDeploymentModal] = useState<boolean>(false);
+
+  // Inspector Drawer State
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(true);
+  const [activeDrawerTab, setActiveDrawerTab] = useState<'suitability' | 'sphere'>('suitability');
 
   // Active settlement object
   const activeSettlement = useMemo(() => {
@@ -192,6 +193,14 @@ export const Stage57SafeHavensPage: React.FC = () => {
     return proximityMatches[0]?.haven || TERAI_SAFE_HAVENS[0];
   }, [selectedHavenId, proximityMatches]);
 
+  // Selected match object
+  const selectedMatch: ProximityMatch | undefined = useMemo(() => {
+    return (
+      proximityMatches.find((m) => m.haven.id === selectedHaven.id) ||
+      proximityMatches[0]
+    );
+  }, [proximityMatches, selectedHaven]);
+
   // Compute Sphere Camp Manifest
   const campManifest: RefugeeCampManifest = useMemo(() => {
     return calculateSphereCampRequirements(targetEvacuees);
@@ -200,602 +209,843 @@ export const Stage57SafeHavensPage: React.FC = () => {
   // Handle selecting a safe haven
   const handleSelectHaven = (haven: SafeHavenFacility) => {
     setSelectedHavenId(haven.id);
+    setIsDrawerOpen(true);
+    setActiveDrawerTab('suitability');
   };
 
-  // Quick stats across all monitored safe havens
-  const totalMonitoredCapacity = TERAI_SAFE_HAVENS.reduce((sum, h) => sum + h.totalCapacity, 0);
-  const totalHelipadsCount = TERAI_SAFE_HAVENS.filter((h) => h.hasHelipad).length;
+  // Quick stats across proximity matches
+  const totalRemainingCapacity = useMemo(() => {
+    return proximityMatches.reduce((sum, m) => sum + m.remainingCapacity, 0);
+  }, [proximityMatches]);
+
+  const helipadsCount = useMemo(() => {
+    return proximityMatches.filter((m) => m.haven.hasHelipad).length;
+  }, [proximityMatches]);
+
+  const nearestMatch = proximityMatches[0];
+
+  // Binary PDF Generation using jsPDF
+  const handleExportPdf = () => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
+    let y = 14;
+
+    // Header Band
+    doc.setFillColor(15, 23, 42); // #0F172A
+    doc.rect(0, 0, pageWidth, 28, 'F');
+    doc.setFillColor(16, 185, 129); // #10B981 Emerald Top Accent
+    doc.rect(0, 0, pageWidth, 3, 'F');
+
+    doc.setTextColor(248, 250, 252);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('GOVERNMENT OF NEPAL | MINISTRY OF HOME AFFAIRS (MoHA)', margin, 11);
+
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(203, 213, 225);
+    doc.text(
+      'National Emergency Operations Centre (NEOC) & UN-SPIDER Humanitarian Shelter Coordination',
+      margin,
+      17
+    );
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(16, 185, 129);
+    const directiveNo = `RCAMP-${Date.now().toString().slice(-6)}`;
+    doc.text(`DIRECTIVE REF: ${directiveNo} | SPHERE HUMANITARIAN CAMP BLUEPRINT`, margin, 23);
+
+    doc.setTextColor(148, 163, 184);
+    doc.text(new Date().toISOString().slice(0, 10), pageWidth - margin, 23, { align: 'right' });
+
+    y = 36;
+
+    // Section 1: Strategic Deployment Directive
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(margin, y, pageWidth - margin * 2, 38, 2, 2, 'F');
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('1. TACTICAL REFUGE ASSIGNMENT & ELEVATION PROFILE', margin + 4, y + 7);
+
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+
+    doc.text(`Origin Inundated Centroid: ${activeSettlement.name} (${activeSettlement.district})`, margin + 4, y + 14);
+    doc.text(`Centroid Water Depth: ${activeSettlement.waterDepthMeters}m | Elevation: ${activeSettlement.elevationMeters}m ASL`, margin + 4, y + 20);
+    doc.text(`Assigned Safe Haven: ${selectedHaven.name} (Grade: ${selectedHaven.suitabilityGrade})`, margin + 4, y + 26);
+    doc.text(
+      `Site Elevation: ${selectedHaven.elevationMeters}m ASL (+${selectedMatch?.elevationGainMeters || 0}m gain) | Radial Distance: ${selectedMatch?.distanceKm || 0} km (${selectedMatch?.compassDirection || 'N'})`,
+      margin + 4,
+      y + 32
+    );
+
+    y += 45;
+
+    // Section 2: Command & Rotary Access
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(margin, y, pageWidth - margin * 2, 28, 2, 2, 'F');
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('2. SITE MARSHAL & MILITARY ROTARY ACCESS (HLZ)', margin + 4, y + 7);
+
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    doc.text(`Lead Coordination Agency: ${selectedHaven.wardenAgency}`, margin + 4, y + 14);
+    doc.text(`Station Marshal: ${selectedHaven.wardenName} | 24/7 Hotline: ${selectedHaven.wardenPhone}`, margin + 4, y + 20);
+    doc.text(
+      `Helicopter Landing Zone (HLZ): ${selectedHaven.hasHelipad ? 'Mi-17 Certified Concrete Pad Active' : 'Ground Logistics Only (Paved Highway / Levee)'}`,
+      margin + 4,
+      y + 26
+    );
+
+    y += 35;
+
+    // Section 3: Sphere Standards Logistics Requisition
+    doc.setFillColor(241, 245, 249);
+    doc.roundedRect(margin, y, pageWidth - margin * 2, 70, 2, 2, 'F');
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(`3. UN SPHERE HUMANITARIAN LOGISTICS REQUISITION (TARGET: ${targetEvacuees.toLocaleString()} EVACUEES)`, margin + 4, y + 7);
+
+    const items = [
+      ['Standard Family Tents (16m² unit / family of 5)', `${campManifest.familyTentsCount.toLocaleString()} units`],
+      ['Emergency Sanitation Latrines (1:20 gender-separated ratio)', `${campManifest.latrinesRequired.toLocaleString()} pits`],
+      ['Daily Potable Water Supply (Sphere 15 L / person / day)', `${campManifest.waterDailyLiters.toLocaleString()} Liters/day`],
+      ['T-11 Water Bladders (11,000L flexible pillow tanks)', `${campManifest.waterBladdersT11Count} tanks`],
+      ['Communal Handwash Taps (1 tap per 100 evacuees)', `${campManifest.communalHandwashTaps} points`],
+      ['Mobile Medical Triage Clinics (1 clinic per 1,500 people)', `${campManifest.medicalTriageTents} clinics`],
+      ['Emergency Power Generators (Water pumps & vaccine cold chain)', `${campManifest.powerMicrogridsKva} kVA`],
+      ['Required Camp Land Footprint (45 m² / person total area)', `${(campManifest.requiredLandAreaSqMeters / 1000).toFixed(1)}k m²`],
+    ];
+
+    doc.setFontSize(8);
+    let rowY = y + 15;
+    items.forEach(([label, val]) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(71, 85, 105);
+      doc.text(label, margin + 4, rowY);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text(val, pageWidth - margin - 4, rowY, { align: 'right' });
+      rowY += 6.5;
+    });
+
+    y += 77;
+
+    // Section 4: National Hotlines
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(
+      'National Emergency Operations Centre (NEOC): 1155 | Nepal Red Cross Shelter Corps: 1130 | Armed Police Force (APF): 1114',
+      margin,
+      y
+    );
+
+    doc.save(`Sphere_Camp_Deployment_Directive_${directiveNo}.pdf`);
+  };
 
   return (
-    <div className="space-y-6 pb-16 text-slate-100">
+    <div className="min-h-[100dvh] bg-[#0F172A] text-[#F8FAFC] pb-10 space-y-3 px-2 sm:px-4 max-w-[1400px] mx-auto w-full">
       {/* ─────────────────────────────────────────────────────────────────────
-          PAGE HEADER & ARCHITECTURE BADGE
+          TOP TACTICAL CONTROL BAR: CLEAN CONCISE TITLE + UNIFIED ACTIONS
       ─────────────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3 pt-1">
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="rounded-md bg-blue-500/20 px-2.5 py-1 text-xs font-bold text-blue-400 border border-blue-500/30 flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              STAGE 5.7: SAFE HAVEN &amp; REFUGEE CAMP PROXIMITY DETECTOR
-            </span>
-            <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-300 border border-emerald-500/30">
-              Point 8: Nearby Safe Area Detector
-            </span>
-            <span className="rounded-md bg-cyan-500/20 px-2 py-0.5 text-[11px] font-bold text-cyan-300 border border-cyan-500/30">
-              Sphere Humanitarian Standards
-            </span>
-          </div>
-
-          <h1 className="text-2xl md:text-3xl font-black text-white mt-1.5 flex items-center gap-2.5">
-            <Tent className="h-7 w-7 text-emerald-400" />
-            Terai Safe Haven &amp; Refugee Shelter Engine
+          <h1 className="text-xl sm:text-2xl font-black text-[#F8FAFC] tracking-tight flex items-center gap-2">
+            <Tent size={24} weight="bold" className="text-[#10B981]" />
+            <span>Terai Safe Haven &amp; Refugee Shelter Command</span>
           </h1>
-          <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-4xl">
-            Automatically scans a 5km to 40km radial perimeter around inundated settlements to locate flood-resistant, elevated terrain. Evaluates site suitability across elevation, structural concrete rating, WASH readiness, and Nepal Army helicopter landing zones (HLZ).
+          <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
+            Geospatial k-NN Shelter Allocation &bull; UN Sphere Standards &bull; Rotary HLZ Directives
           </p>
         </div>
 
-        {/* Action Button */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Action Controls */}
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {/* Drawer Toggle Button */}
           <button
-            onClick={() => setShowDeploymentModal(true)}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-emerald-500/20 hover:from-emerald-500 hover:to-teal-500 transition-all border border-emerald-400/30"
+            onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all active:scale-[0.98] cursor-pointer shadow-sm ${
+              isDrawerOpen
+                ? 'border-cyan-500/40 bg-cyan-950/40 text-cyan-300'
+                : 'border-white/10 bg-[#1E293B] hover:bg-[#334155] text-[#F8FAFC]'
+            }`}
+            title="Toggle Shelter & Camp Logistics Drawer"
           >
-            <Tent className="h-4 w-4" />
-            Generate Sphere Camp Deployment Sheet
+            <ListBullets size={14} weight="bold" />
+            <span>Logistics Drawer</span>
+            <span className="rounded bg-[#0F172A] px-1.5 py-0.2 font-mono text-[10px] text-cyan-400 border border-white/10">
+              {proximityMatches.length}
+            </span>
+          </button>
+
+          {/* Consolidated Primary CTA */}
+          <button
+            onClick={() => {
+              setShowDeploymentModal(true);
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] px-3.5 py-1.5 text-xs font-bold text-white shadow-md border border-emerald-400/30 transition-all cursor-pointer font-sans"
+          >
+            <FilePdf size={15} weight="bold" />
+            <span>Export Official Sphere Camp Layout (PDF)</span>
           </button>
         </div>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────
-          SETTLEMENT SCANNER & PROXIMITY CONTROLS HUD
+          MAIN HERO VIEWPORT: MAP CANVAS WITH FLOATING DOCKS & SLIDING DRAWER
       ─────────────────────────────────────────────────────────────────────── */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Flooded Settlement Centroid Selector */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
-              <Waves className="h-3 w-3 text-rose-400" />
-              1. Inundated Settlement Centroid
-            </label>
-            <select
-              value={selectedSettlementId}
-              onChange={(e) => {
-                setSelectedSettlementId(e.target.value);
-                const s = FLOODED_SETTLEMENT_PRESETS.find((p) => p.id === e.target.value);
-                if (s) setTargetEvacuees(Math.round(s.displacedPopulation * 0.5));
-              }}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {FLOODED_SETTLEMENT_PRESETS.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.waterDepthMeters}m water)
-                </option>
-              ))}
-            </select>
-          </div>
+      <div className="relative w-full h-[78dvh] min-h-[580px] rounded-2xl overflow-hidden border border-white/10 bg-[#0F172A] shadow-2xl flex">
+        {/* Leaflet Map Hero Container (DOM ID "map" strictly preserved) */}
+        <div className="w-full h-full relative">
+          <SafeHavenDetectorMap
+            centerSettlement={activeSettlement}
+            proximityMatches={proximityMatches}
+            selectedHavenId={selectedHavenId}
+            onSelectHaven={handleSelectHaven}
+            scanRadiusKm={scanRadiusKm}
+            className="w-full h-full"
+          />
 
-          {/* Proximity Radius Selector */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
-              <Compass className="h-3 w-3 text-cyan-400" />
-              2. k-NN Search Radius: <strong className="text-white">{scanRadiusKm} km</strong>
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="range"
-                min={10}
-                max={45}
-                step={5}
-                value={scanRadiusKm}
-                onChange={(e) => setScanRadiusKm(Number(e.target.value))}
-                className="w-full accent-cyan-400 cursor-pointer"
-              />
-              <span className="font-mono text-xs font-bold text-cyan-400 shrink-0">
-                {scanRadiusKm}km
-              </span>
+          {/* ─────────────────────────────────────────────────────────────────
+              TOP PROXIMITY SEARCH BAR (Floating Glass Dock over Map)
+          ─────────────────────────────────────────────────────────────────── */}
+          <div className="absolute top-3 left-3 z-[400] max-w-[calc(100%-24px)] md:max-w-none pointer-events-auto">
+            <div className="rounded-xl border border-white/10 bg-[#1E293B]/90 backdrop-blur-md p-2 sm:p-2.5 shadow-2xl flex flex-wrap items-center gap-2.5 text-xs text-[#F8FAFC]">
+              {/* 1. Inundated Settlement Centroid */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#94A3B8] font-bold flex items-center gap-1 shrink-0">
+                  <Waves size={13} weight="bold" className="text-[#EF4444]" />
+                  <span>1. Settlement:</span>
+                </span>
+                <select
+                  aria-label="Inundated Settlement Centroid"
+                  value={selectedSettlementId}
+                  onChange={(e) => {
+                    setSelectedSettlementId(e.target.value);
+                    const s = FLOODED_SETTLEMENT_PRESETS.find((p) => p.id === e.target.value);
+                    if (s) setTargetEvacuees(Math.round(s.displacedPopulation * 0.5));
+                  }}
+                  className="rounded-lg border border-white/10 bg-[#0F172A] px-2.5 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-cyan-400 cursor-pointer max-w-[200px] sm:max-w-[240px] truncate"
+                >
+                  {FLOODED_SETTLEMENT_PRESETS.map((s) => (
+                    <option key={s.id} value={s.id} className="bg-[#0F172A] text-white">
+                      {s.name.split(' ')[0]} ({s.district}) &bull; {s.waterDepthMeters}m deluge
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 2. Radius Slider */}
+              <div className="flex items-center gap-2 border-l border-white/10 pl-2.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#94A3B8] font-bold flex items-center gap-1 shrink-0">
+                  <Compass size={13} weight="bold" className="text-cyan-400" />
+                  <span>2. Radius:</span>
+                </span>
+                <input
+                  type="range"
+                  min={10}
+                  max={45}
+                  step={5}
+                  value={scanRadiusKm}
+                  onChange={(e) => setScanRadiusKm(Number(e.target.value))}
+                  className="w-20 sm:w-28 accent-cyan-400 cursor-pointer"
+                  title={`k-NN Search Radius: ${scanRadiusKm} km`}
+                />
+                <span className="font-mono text-xs font-bold text-cyan-400 shrink-0">
+                  {scanRadiusKm}km
+                </span>
+              </div>
+
+              {/* 3. Min Capacity Filter */}
+              <div className="flex items-center gap-1.5 border-l border-white/10 pl-2.5 hidden sm:flex">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[#94A3B8] font-bold flex items-center gap-1 shrink-0">
+                  <Users size={13} weight="bold" className="text-blue-400" />
+                  <span>3. Capacity:</span>
+                </span>
+                <select
+                  aria-label="Minimum Shelter Capacity"
+                  value={minCapacityFilter}
+                  onChange={(e) => setMinCapacityFilter(Number(e.target.value))}
+                  className="rounded-lg border border-white/10 bg-[#0F172A] px-2 py-1.5 text-xs font-semibold text-white focus:outline-none focus:border-cyan-400 cursor-pointer"
+                >
+                  <option value={0} className="bg-[#0F172A] text-white">All (&ge; 3,000)</option>
+                  <option value={5000} className="bg-[#0F172A] text-white">Large (&ge; 5,000)</option>
+                  <option value={8000} className="bg-[#0F172A] text-white">Mega (&ge; 8,000)</option>
+                </select>
+              </div>
+
+              {/* 4. HLZ Helipad Toggle */}
+              <div className="border-l border-white/10 pl-2.5">
+                <button
+                  onClick={() => setRequiresHelipad(!requiresHelipad)}
+                  className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                    requiresHelipad
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 ring-1 ring-emerald-500/40'
+                      : 'bg-[#0F172A] text-[#94A3B8] border-white/10 hover:text-white'
+                  }`}
+                  title="Filter for Nepal Army Mi-17 Certified Rotary Helipads"
+                >
+                  <AirplaneTilt size={13} weight="bold" className={requiresHelipad ? 'text-[#10B981]' : 'text-[#94A3B8]'} />
+                  <span>{requiresHelipad ? 'HLZ: YES' : 'HLZ: ANY'}</span>
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Capacity Filter */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1">
-              <Users className="h-3 w-3 text-blue-400" />
-              3. Minimum Shelter Capacity
-            </label>
-            <select
-              value={minCapacityFilter}
-              onChange={(e) => setMinCapacityFilter(Number(e.target.value))}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value={0}>All Capacities (&ge; 3,000)</option>
-              <option value={5000}>Large Camps (&ge; 5,000 evacuees)</option>
-              <option value={8000}>Mega Refuges (&ge; 8,000 evacuees)</option>
-            </select>
-          </div>
+          {/* ─────────────────────────────────────────────────────────────────
+              FLOATING KPI SUMMARY STRIP (Monospace Metrics Overlaid on Map)
+          ─────────────────────────────────────────────────────────────────── */}
+          <div className="absolute bottom-3 left-3 z-[400] max-w-[calc(100%-24px)] md:max-w-2xl pointer-events-auto">
+            <div className="rounded-xl border border-white/10 bg-[#1E293B]/90 backdrop-blur-md p-2 shadow-2xl grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              {/* KPI 1: Detected Safe Havens */}
+              <div className="p-2 rounded-lg bg-[#0F172A] border border-white/5 space-y-0.5">
+                <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#94A3B8] font-bold">
+                  <span>Detected Safe Havens</span>
+                  <Tent size={14} weight="bold" className="text-[#10B981]" />
+                </div>
+                <div className="text-sm sm:text-base font-black text-white font-mono flex items-baseline gap-1">
+                  <span>{proximityMatches.length} Sites</span>
+                </div>
+                <div className="text-[10px] font-mono text-[#10B981] truncate">
+                  within {scanRadiusKm}km radius
+                </div>
+              </div>
 
-          {/* Military Helipad Toggle */}
-          <div className="flex flex-col justify-end">
-            <button
-              onClick={() => setRequiresHelipad(!requiresHelipad)}
-              className={`w-full flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition-all shadow-md ${
-                requiresHelipad
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 ring-1 ring-emerald-500/40'
-                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-              }`}
-            >
-              <Plane className="h-3.5 w-3.5" />
-              <span>{requiresHelipad ? 'HLZ Helipad: REQUIRED' : 'HLZ Helipad: Optional'}</span>
-            </button>
-          </div>
-        </div>
-      </div>
+              {/* KPI 2: Nearest High Ground */}
+              <div className="p-2 rounded-lg bg-[#0F172A] border border-white/5 space-y-0.5">
+                <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#94A3B8] font-bold">
+                  <span>Nearest High Ground</span>
+                  <NavigationArrow size={14} weight="bold" className="text-cyan-400" />
+                </div>
+                <div className="text-sm sm:text-base font-black text-cyan-400 font-mono truncate">
+                  {nearestMatch ? `${nearestMatch.distanceKm} km` : 'N/A'}
+                </div>
+                <div className="text-[10px] font-mono text-[#94A3B8] truncate">
+                  {nearestMatch ? `${nearestMatch.haven.name.split(' ')[0]} (${nearestMatch.compassDirection})` : 'None in range'}
+                </div>
+              </div>
 
-      {/* ─────────────────────────────────────────────────────────────────────
-          TACTICAL GEOSPATIAL MAP VIEW
-      ─────────────────────────────────────────────────────────────────────── */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Compass className="h-4 w-4 text-emerald-400" />
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-              High-Ground Proximity Map &amp; Radial Vectors
-            </h3>
-            <span className="text-xs text-slate-400 font-mono">
-              ({proximityMatches.length} candidate safe havens within {scanRadiusKm} km)
-            </span>
-          </div>
+              {/* KPI 3: Remaining Capacity */}
+              <div className="p-2 rounded-lg bg-[#0F172A] border border-white/5 space-y-0.5">
+                <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#94A3B8] font-bold">
+                  <span>Remaining Capacity</span>
+                  <Bed size={14} weight="bold" className="text-blue-400" />
+                </div>
+                <div className="text-sm sm:text-base font-black text-blue-400 font-mono truncate">
+                  {totalRemainingCapacity.toLocaleString()}
+                </div>
+                <div className="text-[10px] font-mono text-[#94A3B8] truncate">
+                  Beds / Tents Available
+                </div>
+              </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
-            <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-            <span>Origin Elev: <strong>{activeSettlement.elevationMeters}m ASL</strong></span>
-          </div>
-        </div>
-
-        <SafeHavenDetectorMap
-          centerSettlement={activeSettlement}
-          proximityMatches={proximityMatches}
-          selectedHavenId={selectedHavenId}
-          onSelectHaven={handleSelectHaven}
-          scanRadiusKm={scanRadiusKm}
-        />
-      </div>
-
-      {/* ─────────────────────────────────────────────────────────────────────
-          TELEMETRY METRIC CARDS
-      ─────────────────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Metric 1: Havens Detected */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span className="font-bold uppercase tracking-wider">Detected Safe Havens</span>
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
-          </div>
-          <div className="text-2xl md:text-3xl font-black text-white font-mono">
-            {proximityMatches.length}{' '}
-            <span className="text-xs font-bold text-slate-400 font-sans">Sites</span>
-          </div>
-          <div className="text-[11px] text-emerald-400 font-medium">
-            Within {scanRadiusKm}km perimeter
+              {/* KPI 4: Rotary Airdrop Pads */}
+              <div className="p-2 rounded-lg bg-[#0F172A] border border-white/5 space-y-0.5">
+                <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-[#94A3B8] font-bold">
+                  <span>Rotary Airdrop Pads</span>
+                  <AirplaneTilt size={14} weight="bold" className="text-purple-400" />
+                </div>
+                <div className="text-sm sm:text-base font-black text-purple-300 font-mono">
+                  {helipadsCount} HLZ
+                </div>
+                <div className="text-[10px] font-mono text-[#94A3B8] truncate">
+                  Mi-17 Certified Pads
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Metric 2: Closest Safe Refuge */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span className="font-bold uppercase tracking-wider">Nearest High Ground</span>
-            <Navigation className="h-4 w-4 text-cyan-400" />
-          </div>
-          <div className="text-2xl md:text-3xl font-black text-cyan-400 font-mono">
-            {proximityMatches[0]?.distanceKm || 0}{' '}
-            <span className="text-xs font-bold text-slate-400 font-sans">km</span>
-          </div>
-          <div className="text-[11px] text-slate-400 truncate">
-            {proximityMatches[0]?.haven.name.split(' ')[0] || 'N/A'} ({proximityMatches[0]?.compassDirection || ''})
-          </div>
-        </div>
+        {/* ─────────────────────────────────────────────────────────────────────
+            SLIDING RIGHT HUMANITARIAN INSPECTOR DRAWER (Width: 400px Desktop)
+        ─────────────────────────────────────────────────────────────────────── */}
+        {isDrawerOpen && (
+          <div className="absolute top-0 right-0 bottom-0 z-[500] w-full sm:w-[400px] bg-[#1E293B]/95 backdrop-blur-md border-l border-white/10 shadow-2xl flex flex-col pointer-events-auto animate-in slide-in-from-right duration-200">
+            {/* Drawer Header */}
+            <div className="p-3.5 border-b border-white/10 flex items-center justify-between gap-2 shrink-0 bg-[#0F172A]/80">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono uppercase font-bold text-cyan-400 flex items-center gap-1">
+                    <ShieldCheck size={13} weight="bold" />
+                    Tactical Route Brief
+                  </span>
+                  <span className="text-[10px] font-mono text-[#94A3B8]">
+                    ({proximityMatches.length} Sites)
+                  </span>
+                </div>
+                <h3 className="text-sm font-bold text-white tracking-tight truncate mt-0.5">
+                  Shelter &amp; Camp Logistics Drawer
+                </h3>
+              </div>
 
-        {/* Metric 3: Total Available Vacancy */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span className="font-bold uppercase tracking-wider">Remaining Capacity</span>
-            <Users className="h-4 w-4 text-blue-400" />
-          </div>
-          <div className="text-2xl md:text-3xl font-black text-blue-400 font-mono">
-            {proximityMatches.reduce((sum, m) => sum + m.remainingCapacity, 0).toLocaleString()}
-          </div>
-          <div className="text-[11px] text-slate-400">
-            Available beds &amp; tent plots
-          </div>
-        </div>
+              <button
+                onClick={() => setIsDrawerOpen(false)}
+                className="p-1 rounded-md text-[#94A3B8] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                title="Minimize Logistics Drawer"
+              >
+                <X size={16} weight="bold" />
+              </button>
+            </div>
 
-        {/* Metric 4: Military Helipads */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span className="font-bold uppercase tracking-wider">Rotary Airdrop Pads</span>
-            <Plane className="h-4 w-4 text-purple-400" />
-          </div>
-          <div className="text-2xl md:text-3xl font-black text-purple-400 font-mono">
-            {proximityMatches.filter((m) => m.haven.hasHelipad).length}{' '}
-            <span className="text-xs font-bold text-slate-400 font-sans">HLZ</span>
-          </div>
-          <div className="text-[11px] text-slate-400">
-            Nepal Army Mi-17 certified
-          </div>
-        </div>
-      </div>
+            {/* Tabbed Switcher */}
+            <div className="grid grid-cols-2 border-b border-white/10 p-1 bg-[#0F172A] gap-1 shrink-0 text-xs font-bold">
+              <button
+                onClick={() => setActiveDrawerTab('suitability')}
+                className={`py-1.5 px-2 rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  activeDrawerTab === 'suitability'
+                    ? 'bg-[#1E293B] text-cyan-300 shadow-sm border border-white/10'
+                    : 'text-[#94A3B8] hover:text-white'
+                }`}
+              >
+                <Shield size={13} weight="bold" />
+                <span>Site Suitability</span>
+              </button>
 
-      {/* ─────────────────────────────────────────────────────────────────────
-          SPLIT DETAIL COLUMNS: RANKED SAFE HAVENS VS SPHERE CAMP SIMULATOR
-      ─────────────────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* ── LEFT: RANKED CANDIDATE SAFE HAVENS (7 COLS) ───────────────────── */}
-        <div className="lg:col-span-7 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-emerald-400" />
-              Ranked Safe Havens by Site Suitability Score
-            </h3>
-            <span className="text-[11px] text-slate-400 font-mono">
-              Proximity &amp; Elevation Matrix
-            </span>
-          </div>
+              <button
+                onClick={() => setActiveDrawerTab('sphere')}
+                className={`py-1.5 px-2 rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  activeDrawerTab === 'sphere'
+                    ? 'bg-[#1E293B] text-emerald-300 shadow-sm border border-white/10'
+                    : 'text-[#94A3B8] hover:text-white'
+                }`}
+              >
+                <Tent size={13} weight="bold" />
+                <span>UN Sphere Planner</span>
+              </button>
+            </div>
 
-          <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
-            {proximityMatches.map((match) => {
-              const haven = match.haven;
-              const isSelected = selectedHavenId === haven.id;
+            {/* Tab Content Body */}
+            <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
+              {/* ── TAB 1: SITE SUITABILITY & RANKING ───────────────────────── */}
+              {activeDrawerTab === 'suitability' && (
+                <div className="space-y-3">
+                  {/* Selected Haven Detailed Card */}
+                  <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/20 p-3 space-y-2.5 shadow-md">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase font-mono ${
+                              selectedHaven.suitabilityGrade === 'A+' || selectedHaven.suitabilityGrade === 'A'
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            }`}
+                          >
+                            GRADE {selectedHaven.suitabilityGrade} &bull; Score: {selectedMatch?.compositeScore || selectedHaven.suitabilityScore}/100
+                          </span>
+                          {selectedHaven.hasHelipad && (
+                            <span className="rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 text-[9px] font-bold flex items-center gap-1 font-mono">
+                              <AirplaneTilt size={10} weight="bold" />
+                              HLZ HELIPAD
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-sm font-bold text-white mt-1 leading-snug">
+                          {selectedHaven.name}
+                        </h4>
+                        <p className="text-[11px] text-[#94A3B8] italic mt-0.5">
+                          {selectedHaven.nepaliName}
+                        </p>
+                      </div>
 
-              return (
-                <div
-                  key={haven.id}
-                  onClick={() => handleSelectHaven(haven)}
-                  className={`rounded-xl p-4 border transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-emerald-950/60 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-lg shadow-emerald-950/50'
-                      : 'bg-slate-950/80 border-slate-800/80 hover:bg-slate-800/60 hover:border-slate-700'
-                  }`}
-                >
-                  {/* Top Haven Header */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase ${
-                            haven.suitabilityGrade === 'A+'
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                              : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                      <div className="text-right shrink-0">
+                        <div className="font-mono text-base font-black text-emerald-400">
+                          {selectedMatch?.distanceKm || 0} km
+                        </div>
+                        <span className="text-[10px] text-[#94A3B8] font-mono">
+                          {selectedMatch?.compassDirection || 'N'} Bearing
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Elevation ASL & Capacity Grid */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/10 text-[11px] font-mono">
+                      <div>
+                        <span className="text-[9px] text-[#94A3B8] uppercase block">Elevation</span>
+                        <strong className="text-white">{selectedHaven.elevationMeters}m ASL</strong>{' '}
+                        <span className="text-emerald-400 text-[10px]">
+                          (+{selectedMatch?.elevationGainMeters || 0}m)
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-[#94A3B8] uppercase block">Max Cap</span>
+                        <strong className="text-white">{selectedHaven.totalCapacity.toLocaleString()}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-[#94A3B8] uppercase block">Vacancy</span>
+                        <strong className="text-cyan-400">
+                          {selectedMatch?.remainingCapacity.toLocaleString() || 0}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {/* Monospace Transit Times */}
+                    <div className="flex items-center justify-between text-[10px] font-mono bg-[#0F172A] p-2 rounded-lg border border-white/10 text-[#F8FAFC]">
+                      <div className="flex items-center gap-1">
+                        <Truck size={13} weight="bold" className="text-cyan-400" />
+                        <span>Truck: <strong>{selectedMatch?.estimatedTransitTimeMinutes.convoyTruck || 15}m</strong></span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Tractor size={13} weight="bold" className="text-amber-400" />
+                        <span>Tractor: <strong>{selectedMatch?.estimatedTransitTimeMinutes.tractor || 34}m</strong></span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Users size={13} weight="bold" className="text-emerald-400" />
+                        <span>Walk: <strong>{Math.floor((selectedMatch?.estimatedTransitTimeMinutes.walking || 168) / 60)}h {(selectedMatch?.estimatedTransitTimeMinutes.walking || 168) % 60}m</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Site Marshal & Hotline */}
+                    <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-[#94A3B8]">
+                      <span>
+                        Marshal: <strong className="text-white">{selectedHaven.wardenName}</strong>
+                      </span>
+                      <span className="flex items-center gap-1 text-emerald-400 font-mono font-bold">
+                        <PhoneCall size={12} weight="bold" />
+                        {selectedHaven.wardenPhone}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* All Ranked Havens Directory */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between text-[10px] font-mono text-[#94A3B8] uppercase font-bold px-1">
+                      <span>Candidate High Ground Sites</span>
+                      <span>Ranked by Score</span>
+                    </div>
+
+                    {proximityMatches.map((match) => {
+                      const haven = match.haven;
+                      const isSelected = selectedHavenId === haven.id;
+                      const isHigh = haven.suitabilityGrade === 'A+' || haven.suitabilityGrade === 'A' || haven.suitabilityGrade === 'B+';
+
+                      return (
+                        <button
+                          key={haven.id}
+                          onClick={() => handleSelectHaven(haven)}
+                          className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                            isSelected
+                              ? 'border-emerald-500/60 bg-emerald-950/40 ring-1 ring-emerald-500/40'
+                              : 'border-white/10 bg-[#0F172A] hover:bg-[#1E293B] hover:border-white/20'
                           }`}
                         >
-                          GRADE {haven.suitabilityGrade} &bull; Score: {match.compositeScore}/100
-                        </span>
-                        {haven.hasHelipad && (
-                          <span className="rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 text-[9px] font-bold flex items-center gap-0.5">
-                            <Plane className="h-2.5 w-2.5" />
-                            HLZ HELIPAD
-                          </span>
-                        )}
-                      </div>
-                      <h4 className="text-sm font-bold text-white mt-1">
-                        {haven.name}
-                      </h4>
-                      <p className="text-[11px] text-slate-400 italic">
-                        {haven.nepaliName}
-                      </p>
-                    </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`text-[9px] font-black font-mono px-1 rounded ${
+                                  isHigh
+                                    ? 'bg-emerald-500/20 text-emerald-300'
+                                    : 'bg-amber-500/20 text-amber-300'
+                                }`}
+                              >
+                                {haven.suitabilityGrade}
+                              </span>
+                              <span className="text-xs font-bold text-white truncate">
+                                {haven.name}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-[#94A3B8] font-mono mt-0.5 flex items-center gap-2">
+                              <span>Elev: {haven.elevationMeters}m (+{match.elevationGainMeters}m)</span>
+                              <span>&bull;</span>
+                              <span>Vac: {match.remainingCapacity.toLocaleString()}</span>
+                            </div>
+                          </div>
 
-                    <div className="text-right shrink-0">
-                      <div className="font-mono text-base font-black text-emerald-400">
-                        {match.distanceKm} km
-                      </div>
-                      <span className="text-[10px] text-slate-400 uppercase font-semibold">
-                        {match.compassDirection} Bearing
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Elevation & Capacity Strip */}
-                  <div className="grid grid-cols-3 gap-2 mt-3 pt-2 border-t border-slate-800/80 text-[11px] font-mono">
-                    <div>
-                      <span className="text-[9px] text-slate-500 uppercase block">Elevation</span>
-                      <strong className="text-white">{haven.elevationMeters}m ASL</strong>{' '}
-                      <span className="text-emerald-400 text-[10px]">
-                        (+{match.elevationGainMeters}m)
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[9px] text-slate-500 uppercase block">Max Capacity</span>
-                      <strong className="text-white">{haven.totalCapacity.toLocaleString()}</strong>
-                    </div>
-
-                    <div>
-                      <span className="text-[9px] text-slate-500 uppercase block">Vacancy</span>
-                      <strong className="text-cyan-400">
-                        {match.remainingCapacity.toLocaleString()}
-                      </strong>{' '}
-                      <span className="text-slate-500 text-[9px]">({match.occupancyPercent}% full)</span>
-                    </div>
-                  </div>
-
-                  {/* Transit Times */}
-                  <div className="flex items-center gap-4 mt-2.5 text-[10px] text-slate-300 bg-slate-900/80 p-2 rounded-lg border border-slate-800">
-                    <div className="flex items-center gap-1">
-                      <Truck className="h-3 w-3 text-cyan-400" />
-                      <span>Truck: <strong>{match.estimatedTransitTimeMinutes.convoyTruck}m</strong></span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3 text-amber-400" />
-                      <span>Tractor: <strong>{match.estimatedTransitTimeMinutes.tractor}m</strong></span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Users className="h-3 w-3 text-emerald-400" />
-                      <span>Walk: <strong>{Math.floor(match.estimatedTransitTimeMinutes.walking / 60)}h {match.estimatedTransitTimeMinutes.walking % 60}m</strong></span>
-                    </div>
-                  </div>
-
-                  {/* Warden Hotline */}
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/60 text-[11px] text-slate-400">
-                    <span>
-                      Marshal: <strong>{haven.wardenName}</strong> ({haven.wardenAgency.split(' ')[0]})
-                    </span>
-                    <span className="flex items-center gap-1 text-emerald-400 font-mono font-bold">
-                      <Phone className="h-3 w-3" />
-                      {haven.wardenPhone}
-                    </span>
+                          <div className="text-right shrink-0 font-mono">
+                            <div className="text-xs font-bold text-cyan-400">
+                              {match.distanceKm}km
+                            </div>
+                            <div className="text-[9px] text-[#94A3B8]">
+                              {match.compassDirection}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              );
-            })}
+              )}
+
+              {/* ── TAB 2: UN SPHERE CAMP PLANNER ───────────────────────────── */}
+              {activeDrawerTab === 'sphere' && (
+                <div className="space-y-3.5">
+                  {/* Evacuee Headcount Interactive Slider */}
+                  <div className="rounded-xl border border-white/10 bg-[#0F172A] p-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-[#F8FAFC]">Target Displaced Evacuees:</span>
+                      <span className="font-mono text-base font-black text-cyan-400">
+                        {targetEvacuees.toLocaleString()} Persons
+                      </span>
+                    </div>
+
+                    <input
+                      type="range"
+                      min={500}
+                      max={15000}
+                      step={500}
+                      value={targetEvacuees}
+                      onChange={(e) => setTargetEvacuees(Number(e.target.value))}
+                      className="w-full accent-cyan-400 cursor-pointer"
+                      title="Adjust displaced population headcount"
+                    />
+
+                    <div className="flex justify-between text-[10px] text-[#94A3B8] font-mono">
+                      <span>500</span>
+                      <span>5,000</span>
+                      <span>10,000</span>
+                      <span>15,000</span>
+                    </div>
+                  </div>
+
+                  {/* UN Sphere Resource Requisition Grid */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {/* Family Tents */}
+                    <div className="rounded-xl border border-white/10 bg-[#0F172A] p-2.5 space-y-1">
+                      <div className="flex items-center gap-1.5 text-[11px] text-amber-400 font-bold">
+                        <Tent size={14} weight="bold" />
+                        <span>Family Tents</span>
+                      </div>
+                      <div className="text-lg font-black text-white font-mono">
+                        {campManifest.familyTentsCount.toLocaleString()}{' '}
+                        <span className="text-[10px] font-normal text-[#94A3B8]">units</span>
+                      </div>
+                      <div className="text-[9.5px] text-[#94A3B8] truncate">
+                        16 m² tent / family of 5
+                      </div>
+                    </div>
+
+                    {/* Emergency Latrines */}
+                    <div className="rounded-xl border border-white/10 bg-[#0F172A] p-2.5 space-y-1">
+                      <div className="flex items-center gap-1.5 text-[11px] text-rose-400 font-bold">
+                        <Toilet size={14} weight="bold" />
+                        <span>Emergency Latrines</span>
+                      </div>
+                      <div className="text-lg font-black text-white font-mono">
+                        {campManifest.latrinesRequired.toLocaleString()}{' '}
+                        <span className="text-[10px] font-normal text-[#94A3B8]">pits</span>
+                      </div>
+                      <div className="text-[9.5px] text-[#94A3B8] truncate">
+                        1:20 gender-separated
+                      </div>
+                    </div>
+
+                    {/* Daily Water Volume */}
+                    <div className="rounded-xl border border-white/10 bg-[#0F172A] p-2.5 space-y-1">
+                      <div className="flex items-center gap-1.5 text-[11px] text-cyan-400 font-bold">
+                        <Drop size={14} weight="bold" />
+                        <span>Daily Water Volume</span>
+                      </div>
+                      <div className="text-lg font-black text-white font-mono">
+                        {campManifest.waterDailyLiters.toLocaleString()}{' '}
+                        <span className="text-[10px] font-normal text-[#94A3B8]">L/day</span>
+                      </div>
+                      <div className="text-[9.5px] text-[#94A3B8] truncate">
+                        15 L / person / day
+                      </div>
+                    </div>
+
+                    {/* T-11 Water Bladders */}
+                    <div className="rounded-xl border border-white/10 bg-[#0F172A] p-2.5 space-y-1">
+                      <div className="flex items-center gap-1.5 text-[11px] text-blue-400 font-bold">
+                        <Lightning size={14} weight="bold" />
+                        <span>T-11 Water Bladders</span>
+                      </div>
+                      <div className="text-lg font-black text-white font-mono">
+                        {campManifest.waterBladdersT11Count}{' '}
+                        <span className="text-[10px] font-normal text-[#94A3B8]">Tanks</span>
+                      </div>
+                      <div className="text-[9.5px] text-[#94A3B8] truncate">
+                        11,000L pillow tanks
+                      </div>
+                    </div>
+
+                    {/* Medical Triage Clinics */}
+                    <div className="rounded-xl border border-white/10 bg-[#0F172A] p-2.5 space-y-1">
+                      <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-bold">
+                        <Heartbeat size={14} weight="bold" />
+                        <span>Medical Triage Clinics</span>
+                      </div>
+                      <div className="text-lg font-black text-white font-mono">
+                        {campManifest.medicalTriageTents}{' '}
+                        <span className="text-[10px] font-normal text-[#94A3B8]">Clinics</span>
+                      </div>
+                      <div className="text-[9.5px] text-[#94A3B8] truncate">
+                        1 clinic / 1,500 people
+                      </div>
+                    </div>
+
+                    {/* Camp Area Footprint */}
+                    <div className="rounded-xl border border-white/10 bg-[#0F172A] p-2.5 space-y-1">
+                      <div className="flex items-center gap-1.5 text-[11px] text-purple-400 font-bold">
+                        <Buildings size={14} weight="bold" />
+                        <span>Camp Area Footprint</span>
+                      </div>
+                      <div className="text-lg font-black text-white font-mono">
+                        {(campManifest.requiredLandAreaSqMeters / 1000).toFixed(1)}{' '}
+                        <span className="text-[10px] font-normal text-[#94A3B8]">k m²</span>
+                      </div>
+                      <div className="text-[9.5px] text-[#94A3B8] truncate">
+                        45 m² / person total area
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Secondary Manifest Data (Power & Handwash) */}
+                  <div className="rounded-xl border border-white/10 bg-[#0F172A] p-2.5 grid grid-cols-2 gap-2 text-[11px] font-mono text-[#94A3B8]">
+                    <div>
+                      <span>Handwash Taps:</span>{' '}
+                      <strong className="text-white">{campManifest.communalHandwashTaps} points</strong>
+                    </div>
+                    <div>
+                      <span>Emergency Power:</span>{' '}
+                      <strong className="text-amber-400">{campManifest.powerMicrogridsKva} kVA</strong>
+                    </div>
+                  </div>
+
+                  {/* Action CTA inside Tab 2 */}
+                  <button
+                    onClick={() => {
+                      setShowDeploymentModal(true);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] py-2.5 text-xs font-bold text-white shadow-md transition-all cursor-pointer font-sans"
+                  >
+                    <FilePdf size={15} weight="bold" />
+                    <span>Export Official Sphere Camp Layout (PDF)</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-
-        {/* ── RIGHT: SPHERE REFUGEE CAMP DEPLOYMENT SIMULATOR (5 COLS) ───────── */}
-        <div className="lg:col-span-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Tent className="h-4 w-4 text-cyan-400" />
-              Sphere Refugee Camp Deployment Planner
-            </h3>
-            <span className="rounded bg-cyan-500/20 px-2 py-0.5 text-[10px] font-bold text-cyan-300 border border-cyan-500/30">
-              UN-SPIDER / Sphere
-            </span>
-          </div>
-
-          <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-300">Target Displaced Evacuees:</span>
-              <span className="font-mono text-base font-black text-cyan-400">
-                {targetEvacuees.toLocaleString()} Persons
-              </span>
-            </div>
-
-            <input
-              type="range"
-              min={500}
-              max={15000}
-              step={500}
-              value={targetEvacuees}
-              onChange={(e) => setTargetEvacuees(Number(e.target.value))}
-              className="w-full accent-cyan-400 cursor-pointer"
-            />
-
-            <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-              <span>500</span>
-              <span>5,000</span>
-              <span>10,000</span>
-              <span>15,000</span>
-            </div>
-          </div>
-
-          {/* Deployment Requirements Grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Family Tents */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-amber-400 font-bold">
-                <Tent className="h-3.5 w-3.5" />
-                Standard Family Tents
-              </div>
-              <div className="text-xl font-black text-white font-mono">
-                {campManifest.familyTentsCount.toLocaleString()}{' '}
-                <span className="text-xs font-normal text-slate-400 font-sans">units</span>
-              </div>
-              <div className="text-[10px] text-slate-400">
-                16 m² tent per family of 5
-              </div>
-            </div>
-
-            {/* Emergency Latrines */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-rose-400 font-bold">
-                <Boxes className="h-3.5 w-3.5" />
-                Emergency Latrines
-              </div>
-              <div className="text-xl font-black text-white font-mono">
-                {campManifest.latrinesRequired.toLocaleString()}{' '}
-                <span className="text-xs font-normal text-slate-400 font-sans">pits</span>
-              </div>
-              <div className="text-[10px] text-slate-400">
-                1:20 gender-separated ratio
-              </div>
-            </div>
-
-            {/* Potable Water Supply */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-cyan-400 font-bold">
-                <Droplet className="h-3.5 w-3.5" />
-                Daily Water Volume
-              </div>
-              <div className="text-xl font-black text-white font-mono">
-                {campManifest.waterDailyLiters.toLocaleString()}{' '}
-                <span className="text-xs font-normal text-slate-400 font-sans">L/day</span>
-              </div>
-              <div className="text-[10px] text-slate-400">
-                Sphere: 15 L / person / day
-              </div>
-            </div>
-
-            {/* T-11 Water Bladders */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-blue-400 font-bold">
-                <Zap className="h-3.5 w-3.5" />
-                T-11 Water Bladders
-              </div>
-              <div className="text-xl font-black text-white font-mono">
-                {campManifest.waterBladdersT11Count}{' '}
-                <span className="text-xs font-normal text-slate-400 font-sans">Tanks</span>
-              </div>
-              <div className="text-[10px] text-slate-400">
-                11,000L flexible pillow bladders
-              </div>
-            </div>
-
-            {/* Medical Triage Clinics */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-bold">
-                <HeartPulse className="h-3.5 w-3.5" />
-                Medical Triage Clinics
-              </div>
-              <div className="text-xl font-black text-white font-mono">
-                {campManifest.medicalTriageTents}{' '}
-                <span className="text-xs font-normal text-slate-400 font-sans">Tents</span>
-              </div>
-              <div className="text-[10px] text-slate-400">
-                1 mobile clinic / 1,500 people
-              </div>
-            </div>
-
-            {/* Land Area Required */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-purple-400 font-bold">
-                <Building2 className="h-3.5 w-3.5" />
-                Camp Area Footprint
-              </div>
-              <div className="text-xl font-black text-white font-mono">
-                {(campManifest.requiredLandAreaSqMeters / 1000).toFixed(1)}{' '}
-                <span className="text-xs font-normal text-slate-400 font-sans">k m²</span>
-              </div>
-              <div className="text-[10px] text-slate-400">
-                45 m² / person total area
-              </div>
-            </div>
-          </div>
-
-          {/* Action Trigger */}
-          <button
-            onClick={() => setShowDeploymentModal(true)}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 py-3 text-xs font-bold text-white shadow-lg shadow-blue-500/20 transition-all cursor-pointer"
-          >
-            <FileText className="h-4 w-4" />
-            <span>Generate Official Camp Layout Sheet</span>
-          </button>
-        </div>
+        )}
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────
-          SPHERE CAMP DEPLOYMENT MODAL (PRINT & EXPORT)
+          OFFICIAL SPHERE CAMP DEPLOYMENT DIRECTIVE MODAL (PRINT & EXPORT)
       ─────────────────────────────────────────────────────────────────────── */}
       {showDeploymentModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-3xl rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto text-slate-100">
+        <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-3xl rounded-2xl border border-white/10 bg-[#1E293B] p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto text-[#F8FAFC]">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
-                <Tent className="h-5 w-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">
+                <Tent size={20} weight="bold" className="text-[#10B981]" />
+                <h3 className="text-base font-bold text-white tracking-tight">
                   Government Emergency Refugee Camp Deployment Directive
                 </h3>
               </div>
               <button
+                aria-label="Close"
                 onClick={() => setShowDeploymentModal(false)}
-                className="rounded-lg p-1 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                className="rounded-lg p-1 text-[#94A3B8] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
-                <X className="h-5 w-5" />
+                <X size={18} weight="bold" />
               </button>
             </div>
 
             {/* Directive Metadata */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-3 text-xs">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-slate-300">
+            <div className="rounded-xl border border-white/10 bg-[#0F172A] p-4 space-y-3 text-xs">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[#94A3B8]">
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Directive #</span>
-                  <span className="font-mono font-bold text-emerald-400">RCAMP-{Date.now().toString().slice(-6)}</span>
+                  <span className="text-[10px] font-bold text-[#94A3B8] uppercase block font-mono">Directive #</span>
+                  <span className="font-mono font-bold text-[#10B981]">RCAMP-{Date.now().toString().slice(-6)}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Selected Safe Haven</span>
-                  <span className="font-bold text-white">{selectedHaven.name}</span>
+                  <span className="text-[10px] font-bold text-[#94A3B8] uppercase block font-mono">Selected Haven</span>
+                  <span className="font-bold text-white truncate block">{selectedHaven.name}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Site Elevation</span>
+                  <span className="text-[10px] font-bold text-[#94A3B8] uppercase block font-mono">Site Elevation</span>
                   <span className="font-mono font-bold text-cyan-400">{selectedHaven.elevationMeters}m ASL</span>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Target Headcount</span>
+                  <span className="text-[10px] font-bold text-[#94A3B8] uppercase block font-mono">Target Headcount</span>
                   <span className="font-mono font-bold text-white">{targetEvacuees.toLocaleString()} Evacuees</span>
                 </div>
               </div>
 
-              <div className="border-t border-slate-800 pt-2 space-y-1">
-                <div><strong>Inundation Centroid:</strong> {activeSettlement.name} ({activeSettlement.waterDepthMeters}m water)</div>
-                <div><strong>Lead Coordination Agency:</strong> {selectedHaven.wardenAgency} &bull; Warden: {selectedHaven.wardenName} ({selectedHaven.wardenPhone})</div>
-                <div><strong>Rotary Access (HLZ):</strong> {selectedHaven.hasHelipad ? 'Mi-17 Certified Concrete Helipad Ready' : 'Ground Logistics Only'}</div>
+              <div className="border-t border-white/10 pt-2 space-y-1 text-[#94A3B8]">
+                <div><strong className="text-white">Inundation Centroid:</strong> {activeSettlement.name} ({activeSettlement.waterDepthMeters}m water)</div>
+                <div><strong className="text-white">Lead Coordination Agency:</strong> {selectedHaven.wardenAgency} &bull; Warden: {selectedHaven.wardenName} ({selectedHaven.wardenPhone})</div>
+                <div><strong className="text-white">Rotary Access (HLZ):</strong> {selectedHaven.hasHelipad ? 'Mi-17 Certified Concrete Helipad Ready' : 'Ground Logistics Only'}</div>
               </div>
             </div>
 
             {/* Sphere Resource Breakdown */}
             <div className="space-y-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[#94A3B8] font-mono">
                 Sphere Minimum Logistics Requisition Checklist
               </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
-                <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                  <div className="text-[10px] text-slate-400 uppercase">Family Tents (16m²)</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-mono">
+                <div className="p-2.5 rounded-lg bg-[#0F172A] border border-white/10">
+                  <div className="text-[10px] text-[#94A3B8] uppercase">Family Tents (16m²)</div>
                   <div className="text-base font-black text-white">{campManifest.familyTentsCount} units</div>
                 </div>
-                <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                  <div className="text-[10px] text-slate-400 uppercase">Sanitation Latrines</div>
-                  <div className="text-base font-black text-rose-300">{campManifest.latrinesRequired} units</div>
+                <div className="p-2.5 rounded-lg bg-[#0F172A] border border-white/10">
+                  <div className="text-[10px] text-[#94A3B8] uppercase">Sanitation Latrines</div>
+                  <div className="text-base font-black text-rose-300">{campManifest.latrinesRequired} pits</div>
                 </div>
-                <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                  <div className="text-[10px] text-slate-400 uppercase">T-11 Water Bladders</div>
+                <div className="p-2.5 rounded-lg bg-[#0F172A] border border-white/10">
+                  <div className="text-[10px] text-[#94A3B8] uppercase">T-11 Water Bladders</div>
                   <div className="text-base font-black text-cyan-300">{campManifest.waterBladdersT11Count} tanks</div>
                 </div>
-                <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                  <div className="text-[10px] text-slate-400 uppercase">Handwash Taps</div>
+                <div className="p-2.5 rounded-lg bg-[#0F172A] border border-white/10">
+                  <div className="text-[10px] text-[#94A3B8] uppercase">Handwash Taps</div>
                   <div className="text-base font-black text-white">{campManifest.communalHandwashTaps} points</div>
                 </div>
-                <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                  <div className="text-[10px] text-slate-400 uppercase">Emergency Power</div>
+                <div className="p-2.5 rounded-lg bg-[#0F172A] border border-white/10">
+                  <div className="text-[10px] text-[#94A3B8] uppercase">Emergency Power</div>
                   <div className="text-base font-black text-amber-300">{campManifest.powerMicrogridsKva} kVA</div>
                 </div>
-                <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                  <div className="text-[10px] text-slate-400 uppercase">Land Area Footprint</div>
+                <div className="p-2.5 rounded-lg bg-[#0F172A] border border-white/10">
+                  <div className="text-[10px] text-[#94A3B8] uppercase">Land Area Footprint</div>
                   <div className="text-base font-black text-purple-300">{(campManifest.requiredLandAreaSqMeters / 1000).toFixed(1)}k m²</div>
                 </div>
               </div>
             </div>
 
-            {/* Hotline Strip */}
-            <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
-              <span>National Disaster Hotline: <strong className="text-white">1155</strong></span>
-              <span>Nepal Red Cross Shelter Corps: <strong className="text-white">1130</strong></span>
-              <span>Armed Police Force Rescue: <strong className="text-white">1114</strong></span>
+            {/* Directive Footer Strip */}
+            <div className="rounded-xl border border-white/10 bg-[#0F172A] p-2.5 text-[11px] font-mono text-[#94A3B8] flex items-center justify-between">
+              <span>National Operations Protocol &bull; NDRRMA Emergency Directive</span>
+              <span className="text-[#10B981] font-bold">Standard UN-SPIDER / Sphere</span>
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-white/10">
               <button
                 onClick={() => setShowDeploymentModal(false)}
-                className="rounded-xl px-4 py-2 text-xs font-bold text-slate-400 hover:text-white"
+                className="rounded-lg px-3.5 py-1.5 text-xs font-bold text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
               >
                 Close
               </button>
               <button
                 onClick={() => window.print()}
-                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs font-bold text-white shadow-md transition-all cursor-pointer"
+                className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-[#0F172A] hover:bg-white/5 px-3 py-1.5 text-xs font-bold text-[#F8FAFC] shadow-sm transition-all cursor-pointer"
               >
-                <Printer className="h-4 w-4" />
-                Print Camp Deployment Directive
+                <Printer size={14} weight="bold" />
+                <span>Print Directive</span>
+              </button>
+              <button
+                onClick={handleExportPdf}
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] px-4 py-1.5 text-xs font-bold text-white shadow-md transition-all cursor-pointer"
+              >
+                <FilePdf size={14} weight="bold" />
+                <span>Download PDF</span>
               </button>
             </div>
           </div>

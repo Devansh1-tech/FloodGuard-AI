@@ -177,18 +177,20 @@ describe('Stage 5.7: Safe Haven & Refugee Camp Proximity Detector Suite', () => 
   // 4. STAGE 5.7 UI COMPONENT RENDERING & INTERACTIONS
   // ───────────────────────────────────────────────────────────────────────────
   describe('4. Stage57SafeHavensPage Component & Interaction Tests', () => {
-    it('renders the Stage 5.7 header badge and operations headline', () => {
+    it('renders the Tactical Command headline and verifies debug badges are pruned', () => {
       render(<Stage57SafeHavensPage />);
 
       expect(
-        screen.getByText(/STAGE 5.7: SAFE HAVEN & REFUGEE CAMP PROXIMITY DETECTOR/i)
+        screen.getByText(/Terai Safe Haven & Refugee Shelter Command/i)
       ).toBeInTheDocument();
+
+      // Pruned redundant debug tags
       expect(
-        screen.getByText(/Terai Safe Haven & Refugee Shelter Engine/i)
-      ).toBeInTheDocument();
+        screen.queryByText(/STAGE 5.7: SAFE HAVEN & REFUGEE CAMP PROXIMITY DETECTOR/i)
+      ).not.toBeInTheDocument();
       expect(
-        screen.getByText(/Point 8: Nearby Safe Area Detector/i)
-      ).toBeInTheDocument();
+        screen.queryByText(/Point 8: Nearby Safe Area Detector/i)
+      ).not.toBeInTheDocument();
     });
 
     it('renders all 4 telemetry metric cards correctly', () => {
@@ -200,11 +202,13 @@ describe('Stage 5.7: Safe Haven & Refugee Camp Proximity Detector Suite', () => 
       expect(screen.getByText(/Rotary Airdrop Pads/i)).toBeInTheDocument();
     });
 
-    it('renders the Sphere refugee camp deployment planner with resource cards', () => {
+    it('renders the Sphere refugee camp deployment planner when switching to Tab 2', () => {
       render(<Stage57SafeHavensPage />);
 
-      expect(screen.getByText(/Sphere Refugee Camp Deployment Planner/i)).toBeInTheDocument();
-      expect(screen.getByText(/Standard Family Tents/i)).toBeInTheDocument();
+      const sphereTabBtn = screen.getByRole('button', { name: /UN Sphere Planner/i });
+      fireEvent.click(sphereTabBtn);
+
+      expect(screen.getByText(/Family Tents/i)).toBeInTheDocument();
       expect(screen.getByText(/Emergency Latrines/i)).toBeInTheDocument();
       expect(screen.getByText(/Daily Water Volume/i)).toBeInTheDocument();
       expect(screen.getByText(/T-11 Water Bladders/i)).toBeInTheDocument();
@@ -214,9 +218,9 @@ describe('Stage 5.7: Safe Haven & Refugee Camp Proximity Detector Suite', () => 
     it('opens and closes the Emergency Refugee Camp Deployment Directive modal', () => {
       render(<Stage57SafeHavensPage />);
 
-      const openModalBtn = screen.getByRole('button', {
-        name: /Generate Sphere Camp Deployment Sheet/i,
-      });
+      const openModalBtn = screen.getAllByRole('button', {
+        name: /Export Official Sphere Camp Layout \(PDF\)/i,
+      })[0];
       fireEvent.click(openModalBtn);
 
       expect(
@@ -227,7 +231,7 @@ describe('Stage 5.7: Safe Haven & Refugee Camp Proximity Detector Suite', () => 
       ).toBeInTheDocument();
 
       // Close modal
-      const closeBtn = screen.getByRole('button', { name: /^close$/i });
+      const closeBtn = screen.getAllByRole('button', { name: /^close$/i })[0];
       fireEvent.click(closeBtn);
 
       expect(

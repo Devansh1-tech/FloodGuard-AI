@@ -7,9 +7,14 @@
  * 3. Candidate Safe Havens with Suitability Badges (A+, A, B) & Elevations.
  * 4. Radial Egress Vectors connecting flood center to high-ground refuges.
  * 5. Helicopter Landing Zones (HLZ) suitable for Nepal Army Mi-17 rotary rescue.
+ *
+ * Adheres strictly to @SKILL.md:
+ * - Anti-Emoji Policy: Exclusively @phosphor-icons/react and clean SVGs.
+ * - WCAG AA Palette: Deep Slate (#0F172A), Dark Slate (#1E293B), Off-White (#F8FAFC).
+ * - Retains <div id="map"></div> container DOM ID intact for GIS engine compatibility.
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -29,8 +34,9 @@ import {
   Shield,
   ShieldCheck,
   Waves,
-  Zap,
-} from 'lucide-react';
+  Lightning,
+  AirplaneTilt,
+} from '@phosphor-icons/react';
 
 interface SafeHavenDetectorMapProps {
   centerSettlement: {
@@ -46,10 +52,11 @@ interface SafeHavenDetectorMapProps {
   selectedHavenId: string | null;
   onSelectHaven: (haven: SafeHavenFacility) => void;
   scanRadiusKm: number;
+  className?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CUSTOM LEAFLET DIV ICONS
+// CUSTOM LEAFLET DIV ICONS (ANTI-EMOJI ENFORCED: PURE SVGS)
 // ─────────────────────────────────────────────────────────────────────────────
 const createFloodCenterIcon = (name: string, depth: number) => {
   return L.divIcon({
@@ -62,35 +69,39 @@ const createFloodCenterIcon = (name: string, depth: number) => {
           width: 38px;
           height: 38px;
           border-radius: 50%;
-          background: rgba(225, 29, 72, 0.4);
+          background: rgba(239, 68, 68, 0.45);
           animation: ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
         "></div>
         <div style="
-          background: #E11D48;
+          background: #EF4444;
           border: 2px solid #FFFFFF;
           border-radius: 8px;
           padding: 3px 7px;
-          box-shadow: 0 4px 14px rgba(225, 29, 72, 0.6);
+          box-shadow: 0 4px 14px rgba(239, 68, 68, 0.6);
           display: flex;
           align-items: center;
-          gap: 4px;
+          gap: 5px;
           color: #FFFFFF;
           font-family: ui-sans-serif, system-ui, sans-serif;
           font-size: 10px;
           font-weight: 800;
           white-space: nowrap;
         ">
-          <span>🌊</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12c.6 0 1.2-.2 1.7-.6 1.1-.8 2.7-.8 3.8 0 1.1.8 2.7.8 3.8 0 1.1-.8 2.7-.8 3.8 0 1.1.8 2.7.8 3.8 0 .5.4 1.1.6 1.7.6"/>
+            <path d="M2 18c.6 0 1.2-.2 1.7-.6 1.1-.8 2.7-.8 3.8 0 1.1.8 2.7.8 3.8 0 1.1-.8 2.7-.8 3.8 0 1.1.8 2.7.8 3.8 0 .5.4 1.1.6 1.7.6"/>
+          </svg>
           <span>${name.split(' ')[0]} DELUGE</span>
         </div>
         <div style="
           background: #7F1D1D;
           color: #FECDD3;
-          border: 1px solid #E11D48;
+          border: 1px solid #EF4444;
           border-radius: 4px;
           padding: 1px 5px;
           font-size: 8px;
           font-weight: 800;
+          font-family: monospace;
           margin-top: 2px;
           white-space: nowrap;
         ">
@@ -98,15 +109,21 @@ const createFloodCenterIcon = (name: string, depth: number) => {
         </div>
       </div>
     `,
-    iconSize: [90, 44],
-    iconAnchor: [45, 22],
+    iconSize: [92, 44],
+    iconAnchor: [46, 22],
   });
 };
 
 const createHavenIcon = (haven: SafeHavenFacility, isSelected: boolean) => {
-  const isTopGrade = haven.suitabilityGrade === 'A+';
-  const bgColor = isTopGrade ? '#059669' : '#0284C7';
+  const isHighSuitability =
+    haven.suitabilityGrade === 'A+' || haven.suitabilityGrade === 'A' || haven.suitabilityGrade === 'B+';
+  const bgColor = isHighSuitability ? '#10B981' : '#F59E0B';
   const borderColor = isSelected ? '#FACC15' : '#FFFFFF';
+
+  // SVG badge for HLZ or shelter sanctuary
+  const iconSvg = haven.hasHelipad
+    ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M4 6h16M7 10h10a4 4 0 0 1 4 4v2H3v-2a4 4 0 0 1 4-4ZM5 20h14M12 16v4"/></svg>`
+    : `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
 
   return L.divIcon({
     className: 'custom-haven-pin',
@@ -120,7 +137,7 @@ const createHavenIcon = (haven: SafeHavenFacility, isSelected: boolean) => {
                 width: 38px;
                 height: 38px;
                 border-radius: 50%;
-                background: rgba(250, 204, 21, 0.4);
+                background: rgba(250, 204, 21, 0.45);
                 animation: ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
               "></div>`
             : ''
@@ -140,17 +157,18 @@ const createHavenIcon = (haven: SafeHavenFacility, isSelected: boolean) => {
           font-weight: 800;
           white-space: nowrap;
         ">
-          <span>${haven.hasHelipad ? '🚁' : '🛡️'}</span>
+          ${iconSvg}
           <span>${haven.suitabilityGrade} HAVEN</span>
         </div>
         <div style="
           background: #0F172A;
-          color: ${isTopGrade ? '#34D399' : '#38BDF8'};
+          color: ${isHighSuitability ? '#34D399' : '#FBBF24'};
           border: 1px solid #334155;
           border-radius: 4px;
-          padding: 1px 4px;
+          padding: 1px 5px;
           font-size: 8px;
           font-weight: 700;
+          font-family: monospace;
           margin-top: 2px;
           white-space: nowrap;
         ">
@@ -158,8 +176,8 @@ const createHavenIcon = (haven: SafeHavenFacility, isSelected: boolean) => {
         </div>
       </div>
     `,
-    iconSize: [85, 42],
-    iconAnchor: [42, 21],
+    iconSize: [88, 42],
+    iconAnchor: [44, 21],
   });
 };
 
@@ -208,9 +226,13 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
   selectedHavenId,
   onSelectHaven,
   scanRadiusKm,
+  className = '',
 }) => {
   return (
-    <div className="relative isolate z-10 w-full h-[540px] rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-950">
+    <div
+      id="map"
+      className={`relative isolate z-10 w-full h-full min-h-[500px] md:min-h-[580px] rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-[#0F172A] ${className}`}
+    >
       <MapContainer
         center={centerSettlement.coords}
         zoom={9}
@@ -232,7 +254,7 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
         />
 
         {/* ── 1. CONCENTRIC PROXIMITY BUFFER RINGS ──────────────────────────── */}
-        {/* Immediate 5km Walkable Ring */}
+        {/* Immediate 5km Walkable Ring (Emerald) */}
         <Circle
           center={centerSettlement.coords}
           radius={5000}
@@ -245,7 +267,7 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
           }}
         />
 
-        {/* Tactical 15km Transit Ring */}
+        {/* Tactical 15km Transit Ring (Amber) */}
         <Circle
           center={centerSettlement.coords}
           radius={15000}
@@ -258,7 +280,7 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
           }}
         />
 
-        {/* Active Scan Radius Ring */}
+        {/* Active Scan Radius Ring (Cyan) */}
         <Circle
           center={centerSettlement.coords}
           radius={scanRadiusKm * 1000}
@@ -271,7 +293,7 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
           }}
         />
 
-        {/* ── 2. FLOODED SETTLEMENT CENTROID PIN ────────────────────────────── */}
+        {/* ── 2. FLOODED SETTLEMENT CENTROID PIN (CRIMSON) ─────────────────── */}
         <Marker
           position={centerSettlement.coords}
           icon={createFloodCenterIcon(
@@ -280,17 +302,17 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
           )}
         >
           <Popup>
-            <div className="p-2 font-sans text-xs space-y-1.5 max-w-[260px] text-white">
-              <div className="font-bold text-rose-400 text-sm flex items-center gap-1.5 border-b border-slate-700/80 pb-1">
-                <span>🌊</span>
+            <div className="p-2 font-sans text-xs space-y-1.5 max-w-[260px] text-[#F8FAFC]">
+              <div className="font-bold text-[#EF4444] text-sm flex items-center gap-1.5 border-b border-white/10 pb-1">
+                <Waves size={15} weight="bold" className="text-[#EF4444]" />
                 <span>{centerSettlement.name}</span>
               </div>
               <div className="text-cyan-400 text-[11px] font-medium">
                 {centerSettlement.nepaliName}
               </div>
-              <div className="text-slate-300 text-[11px] space-y-0.5">
-                <div>Water Depth: <strong className="text-rose-400 font-bold">{centerSettlement.waterDepthMeters}m</strong></div>
-                <div>Elevation: <strong className="text-white font-bold">{centerSettlement.elevationMeters}m ASL</strong></div>
+              <div className="text-[#94A3B8] text-[11px] space-y-0.5">
+                <div>Water Depth: <strong className="text-[#EF4444] font-bold font-mono">{centerSettlement.waterDepthMeters}m</strong></div>
+                <div>Elevation: <strong className="text-white font-bold font-mono">{centerSettlement.elevationMeters}m ASL</strong></div>
               </div>
               <div className="font-mono text-[11px] text-rose-200 bg-rose-500/20 border border-rose-500/30 px-2 py-1.5 rounded-lg flex items-center justify-between mt-1">
                 <span className="text-rose-300 text-[10px]">Displaced Headcount:</span>
@@ -304,7 +326,9 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
         {proximityMatches.map((match) => {
           const haven = match.haven;
           const isSelected = selectedHavenId === haven.id;
-          const vectorColor = haven.suitabilityGrade === 'A+' ? '#10B981' : '#0284C7';
+          const isHighSuitability =
+            haven.suitabilityGrade === 'A+' || haven.suitabilityGrade === 'A' || haven.suitabilityGrade === 'B+';
+          const vectorColor = isHighSuitability ? '#10B981' : '#F59E0B';
 
           return (
             <React.Fragment key={haven.id}>
@@ -328,8 +352,8 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
                 }}
               >
                 <Popup>
-                  <div className="p-2 font-sans text-xs space-y-2 max-w-[280px] text-white">
-                    <div className="flex items-start justify-between gap-2 border-b border-slate-700/80 pb-1.5">
+                  <div className="p-2 font-sans text-xs space-y-2 max-w-[280px] text-[#F8FAFC]">
+                    <div className="flex items-start justify-between gap-2 border-b border-white/10 pb-1.5">
                       <div className="space-y-0.5 min-w-0">
                         <h4 className="font-bold text-sm text-white leading-tight">
                           {haven.name}
@@ -338,53 +362,59 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
                           {haven.nepaliName}
                         </div>
                       </div>
-                      <span className="rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-2 py-0.5 text-[10px] font-black shrink-0">
+                      <span
+                        className={`rounded-md border px-2 py-0.5 text-[10px] font-black shrink-0 ${
+                          isHighSuitability
+                            ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                            : 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                        }`}
+                      >
                         GRADE {haven.suitabilityGrade}
                       </span>
                     </div>
 
-                    <p className="text-slate-300 text-[11px] leading-relaxed">
+                    <p className="text-[#94A3B8] text-[11px] leading-relaxed">
                       {haven.notes}
                     </p>
 
-                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-900/90 p-2.5 rounded-lg border border-slate-700/80 font-mono">
+                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-[#0F172A] p-2.5 rounded-lg border border-white/10 font-mono">
                       <div>
-                        <span className="text-slate-400 text-[10px] block">Distance:</span>
+                        <span className="text-[#94A3B8] text-[10px] block">Distance:</span>
                         <strong className="text-white font-bold">{match.distanceKm} km</strong>{' '}
-                        <span className="text-slate-400 text-[10px]">({match.compassDirection})</span>
+                        <span className="text-[#94A3B8] text-[10px]">({match.compassDirection})</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[10px] block">Elevation:</span>
+                        <span className="text-[#94A3B8] text-[10px] block">Elevation:</span>
                         <strong className="text-cyan-400 font-bold">{haven.elevationMeters}m</strong>{' '}
                         <span className="text-emerald-400 font-bold text-[10px]">(+{match.elevationGainMeters}m)</span>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[10px] block">Capacity:</span>
+                        <span className="text-[#94A3B8] text-[10px] block">Capacity:</span>
                         <strong className="text-white font-bold">{haven.totalCapacity.toLocaleString()}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[10px] block">Vacancy:</span>
+                        <span className="text-[#94A3B8] text-[10px] block">Vacancy:</span>
                         <strong className="text-emerald-400 font-bold">{match.remainingCapacity.toLocaleString()}</strong>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1.5 border-t border-slate-700/80 text-[11px] text-slate-300">
-                      <span>
-                        Helipad:{' '}
+                    <div className="flex items-center justify-between pt-1.5 border-t border-white/10 text-[11px] text-[#94A3B8]">
+                      <span className="flex items-center gap-1">
+                        <AirplaneTilt size={13} weight="bold" className={haven.hasHelipad ? 'text-[#10B981]' : 'text-slate-500'} />
                         <strong className={haven.hasHelipad ? 'text-emerald-400' : 'text-slate-400'}>
-                          {haven.hasHelipad ? '🚁 Active HLZ' : '❌ None'}
+                          {haven.hasHelipad ? 'Active HLZ Helipad' : 'Ground Logistics Only'}
                         </strong>
                       </span>
                       <span>
-                        Warden: <strong className="text-cyan-300">{haven.wardenPhone}</strong>
+                        Marshal: <strong className="text-cyan-300">{haven.wardenPhone}</strong>
                       </span>
                     </div>
 
                     <button
                       onClick={() => onSelectHaven(haven)}
-                      className="w-full mt-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white font-bold py-2 text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      className="w-full mt-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-bold py-2 text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      <Shield className="h-3.5 w-3.5" />
+                      <ShieldCheck size={14} weight="bold" />
                       <span>Select for Camp Deployment</span>
                     </button>
                   </div>
@@ -395,55 +425,31 @@ export const SafeHavenDetectorMap: React.FC<SafeHavenDetectorMapProps> = ({
         })}
       </MapContainer>
 
-      {/* ── MAP OVERLAY BADGES ────────────────────────────────────────────── */}
-      <div className="absolute top-3 left-3 z-[1000] flex flex-col gap-2 max-w-sm">
-        <div className="rounded-xl border border-slate-700/80 bg-slate-900/90 backdrop-blur-md p-3 shadow-xl">
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-            <span className="text-[11px] font-bold uppercase tracking-wider text-white">
-              k-NN Safe Haven Proximity Scan
-            </span>
-          </div>
-          <p className="text-xs font-semibold text-slate-200 mt-0.5 truncate">
-            Origin: {centerSettlement.name} ({centerSettlement.elevationMeters}m ASL)
-          </p>
-          <div className="flex items-center gap-3 mt-2 text-[11px] font-mono">
-            <span className="text-cyan-400 font-bold">
-              Radius: {scanRadiusKm} km
-            </span>
-            <span className="text-slate-400">&bull;</span>
-            <span className="text-emerald-400 font-bold">
-              {proximityMatches.length} Havens Detected
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── MAP LEGEND ────────────────────────────────────────────────────── */}
-      <div className="absolute bottom-3 right-3 z-[1000] rounded-xl border border-slate-800 bg-slate-900/90 backdrop-blur-md px-3 py-2 text-[10px] space-y-1 text-slate-300 shadow-xl">
-        <div className="font-bold text-white flex items-center gap-1.5 pb-0.5 border-b border-slate-800">
-          <Compass className="h-3 w-3 text-cyan-400" />
-          Proximity Ring Legend
+      {/* ── MAP LEGEND (WCAG AA Standard) ─────────────────────────────────── */}
+      <div className="absolute bottom-3 right-3 z-[400] rounded-xl border border-white/10 bg-[#1E293B]/90 backdrop-blur-md px-3 py-2 text-[10px] space-y-1 text-[#F8FAFC] shadow-xl pointer-events-auto">
+        <div className="font-bold text-white flex items-center gap-1.5 pb-0.5 border-b border-white/10">
+          <Compass size={14} weight="bold" className="text-cyan-400" />
+          <span>Proximity Ring Legend</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-4 h-1 rounded border-t-2 border-dashed border-emerald-500"></span>
-          <span>5 km Walkable Ring</span>
+          <span className="w-3.5 h-0.5 rounded border-t-2 border-dashed border-[#10B981]"></span>
+          <span className="text-[#94A3B8]">5 km Walkable Ring</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-4 h-1 rounded border-t-2 border-dashed border-amber-500"></span>
-          <span>15 km Tactical Ring</span>
+          <span className="w-3.5 h-0.5 rounded border-t-2 border-dashed border-[#F59E0B]"></span>
+          <span className="text-[#94A3B8]">15 km Tactical Ring</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-          <span>A+ Grade Safe Haven</span>
+          <span className="h-2 w-2 rounded-full bg-[#10B981]"></span>
+          <span className="text-[#94A3B8]">High Suitability (Grade A/B+)</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-sky-500"></span>
-          <span>A/B+ Grade Safe Haven</span>
+          <span className="h-2 w-2 rounded-full bg-[#F59E0B]"></span>
+          <span className="text-[#94A3B8]">Moderate Suitability (Grade C)</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-rose-500"></span>
-          <span>Flooded Settlement Centroid</span>
+          <span className="h-2 w-2 rounded-full bg-[#EF4444]"></span>
+          <span className="text-[#94A3B8]">Inundated Origin Centroid</span>
         </div>
       </div>
     </div>
