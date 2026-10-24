@@ -297,7 +297,7 @@ export const Stage56RoutingPage: React.FC = () => {
               title="Select Pre-Configured Emergency Mission Preset"
             >
               <Lightning size={14} weight="bold" />
-              <span>⚡ Select Emergency Mission Preset</span>
+              <span>Select Emergency Mission Preset</span>
               <CaretDown size={12} weight="bold" />
             </button>
 
@@ -369,7 +369,7 @@ export const Stage56RoutingPage: React.FC = () => {
         <div className="flex items-center gap-2 truncate">
           <span className="text-[#94A3B8] uppercase text-[10px] tracking-wider font-bold">Active Mission Scenario:</span>
           <span className="font-bold text-cyan-300 truncate">
-            {activePreset?.name || `${activeRoute.origin.name} ➔ ${activeRoute.destination.name}`}
+            {activePreset?.name || <>{activeRoute.origin.name} &rarr; {activeRoute.destination.name}</>}
           </span>
         </div>
         <div className="text-[10px] text-[#94A3B8] hidden md:block truncate shrink-0">

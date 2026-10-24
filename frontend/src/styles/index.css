@@ -126,6 +126,10 @@
   z-index: 10;
 }
 
+.leaflet-pane { z-index: 5 !important; }
+.leaflet-top, .leaflet-bottom { z-index: 10 !important; }
+.leaflet-popup-pane { z-index: 15 !important; }
+
 .leaflet-popup-content-wrapper {
   background: #0F172A !important;
   color: #F8FAFC !important;

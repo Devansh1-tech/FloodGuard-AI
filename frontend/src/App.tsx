@@ -43,6 +43,7 @@ import CardNav, { CardNavItem, CardNavLink } from '@/components/nav/CardNav';
 import { AboutModal } from '@/components/common/AboutModal';
 import { FaqModal } from '@/components/common/FaqModal';
 import { ContactModal } from '@/components/common/ContactModal';
+import { generateLiveSitRepData, downloadSitRepPdf } from '@/services/sitrepGenerator';
 
 export type NavigationTab =
   | 'landing'
@@ -117,39 +118,41 @@ export const App: React.FC = () => {
   );
 
   // Anti-emoji cleaned navigation items
+  // Anti-emoji cleaned navigation items
   const navItems: CardNavItem[] = [
     {
       label: 'NEOC Command',
       description: 'National Emergency Operations & Terai river alerts.',
       links: [
         {
-          label: 'System Overview & Mission',
-          sublabel: 'Operational Landing & Verification',
-          href: '#landing',
-          isActive: activeTab === 'landing',
-        },
-        {
-          label: 'Executive Command Console',
-          sublabel: '3-Pane Emergency Command Center',
+          label: 'Executive SITREP Console',
+          sublabel: 'Consolidated National Situation Report',
           href: '#dashboard',
           isActive: activeTab === 'dashboard',
         },
         {
-          label: 'River Gauges & SOS (5.9)',
+          label: 'Terai Lowland Scope',
+          sublabel: '21 Districts Live Telemetry',
+          href: '#dashboard',
+          isActive: activeTab === 'dashboard',
+        },
+        {
+          label: 'River Gauges & Early Warning',
           sublabel: 'DHM Hydrology Telemetry',
           href: '#gauges',
           isActive: activeTab === 'gauges',
         },
         {
-          label: 'Official SitRep PDF (5.8)',
-          sublabel: 'UN-SPIDER Compliant Export',
-          href: '#sitrep',
-          isActive: activeTab === 'sitrep',
+          label: 'Official SITREP Document',
+          sublabel: 'UN-SPIDER Compliant Report',
+          href: '#dashboard',
+          isActive: activeTab === 'dashboard',
         },
         {
-          label: 'Terai Lowland Scope',
-          sublabel: '21 Districts Coverage',
+          label: 'System Overview & Mission',
+          sublabel: 'National Operations & Verification',
           href: '#dashboard',
+          isActive: activeTab === 'dashboard',
         },
       ],
     },
@@ -170,7 +173,7 @@ export const App: React.FC = () => {
           isActive: activeTab === 'command_map',
         },
         {
-          label: 'Optical Flood Pipeline (PS-01)',
+          label: 'Optical Flood Pipeline',
           sublabel: 'Spectral Indices & Settlements',
           href: '#satellite',
           isActive: activeTab === 'satellite',
@@ -187,47 +190,47 @@ export const App: React.FC = () => {
       description: 'Emergency convoys & civilian evacuation detours.',
       links: [
         {
-          label: 'Road Inundation (5.4)',
+          label: 'Road Inundation & Bridges',
           sublabel: 'Highways & Cut-Off Corridors',
           href: '#roads',
           isActive: activeTab === 'roads',
         },
         {
-          label: 'Emergency Routes (5.6)',
+          label: 'Emergency Routes & Convoys',
           sublabel: 'Tactical Convoys & Evacuation',
           href: '#routing',
           isActive: activeTab === 'routing',
         },
         {
-          label: 'Safe Havens (5.7)',
+          label: 'Safe Havens & Shelters',
           sublabel: 'Sphere Shelters & HLZs',
           href: '#havens',
           isActive: activeTab === 'havens',
         },
         {
-          label: 'Point 7: Convoy Router',
+          label: 'Relief Convoy Router',
           sublabel: 'Relief Staging & Dispatch',
           href: '#routing',
         },
         {
-          label: 'Point 9: Evacuation Detours',
+          label: 'Evacuation Detours',
           sublabel: 'Civilian Safe Corridors',
           href: '#routing',
         },
       ],
     },
     {
-      label: 'Demographics & Hospitals (5.5)',
+      label: 'Demographics & Healthcare',
       description: 'Grounded public data (Google, CBS & MoHP).',
       links: [
         {
-          label: 'Public Hospitals (5.5)',
+          label: 'Public Hospitals & Antivenom',
           sublabel: 'Beds, ICU & Antivenom Stock',
           href: '#hospitals',
           isActive: activeTab === 'hospitals',
         },
         {
-          label: 'Public Demographics (5.5)',
+          label: 'Public Demographics & Census',
           sublabel: 'Census 2021 & WorldPop Model',
           href: '#demographics',
           isActive: activeTab === 'demographics',
@@ -268,72 +271,72 @@ export const App: React.FC = () => {
     },
     dashboard: {
       label: 'Emergency Command Center',
-      tagline: '3-Pane Operational Intelligence Console',
+      tagline: 'Executive SITREP Command Dashboard',
       icon: Crosshair,
       badge: 'NEOC Command',
       badgeColor: 'border-rose-500/30 bg-rose-500/20 text-rose-400',
     },
     satellite: {
       label: 'Optical Satellite Flood Detection',
-      tagline: 'PS-01: Spectral Indices & 4-Tier Settlement Impact',
+      tagline: 'Spectral Indices & Settlement Impact',
       icon: Waves,
-      badge: 'PS-01 Compliant',
+      badge: 'Sentinel-1 Radar',
       badgeColor: 'border-cyan-500/30 bg-cyan-500/20 text-cyan-400',
     },
     command_map: {
       label: 'Field Command Map',
       tagline: 'Google Maps API Engine & Inundated Settlements',
       icon: MapPin,
-      badge: 'Stage 5.2/5.3 Operations',
+      badge: 'Field Intelligence',
       badgeColor: 'border-blue-500/30 bg-blue-500/20 text-blue-400',
     },
     roads: {
       label: 'Road Inundation & Bridges',
       tagline: 'Highways & Cut-Off Zones',
       icon: Truck,
-      badge: 'Stage 5.4 Disruption',
+      badge: 'Road Disruption',
       badgeColor: 'border-amber-500/30 bg-amber-500/20 text-amber-400',
     },
     routing: {
       label: 'Emergency Routes & Convoys',
       tagline: 'Convoys & Evacuation Detours',
       icon: Compass,
-      badge: 'Stage 5.6 Points 7 & 9',
+      badge: 'Evacuation Corridors',
       badgeColor: 'border-cyan-500/30 bg-cyan-500/20 text-cyan-400',
     },
     havens: {
       label: 'Safe Havens & Refugee Camps',
       tagline: 'Sphere Standards & Helicopter Landing Zones',
       icon: ShieldCheck,
-      badge: 'Stage 5.7 Point 8',
+      badge: 'Sphere Shelters',
       badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400',
     },
     sitrep: {
       label: 'Govt SitRep PDF Export',
       tagline: 'Official UN-SPIDER SitRep',
       icon: FilePdf,
-      badge: 'Stage 5.8 Point 10',
+      badge: 'Executive SitRep',
       badgeColor: 'border-rose-500/30 bg-rose-500/20 text-rose-400',
     },
     gauges: {
       label: 'DHM River Gauges & SOS',
       tagline: 'Real-Time Telemetry & Bilingual Broadcasts',
       icon: Waves,
-      badge: 'Stage 5.9 Point 11',
+      badge: 'Hydrology Telemetry',
       badgeColor: 'border-blue-500/30 bg-blue-500/20 text-blue-400',
     },
     hospitals: {
       label: 'Public Hospitals & Antivenom',
       tagline: 'Beds, ICU & Antivenom Stock',
       icon: FirstAid,
-      badge: 'Stage 5.5 MoHP Data',
+      badge: 'MoHP Healthcare',
       badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400',
     },
     demographics: {
       label: 'Public Demographics & AI',
       tagline: 'Census 2021 & WorldPop Model',
       icon: UsersThree,
-      badge: 'Stage 5.5 Points 5 & 6',
+      badge: 'Census Demographics',
       badgeColor: 'border-emerald-500/30 bg-emerald-500/20 text-emerald-400',
     },
   };
@@ -450,13 +453,13 @@ export const App: React.FC = () => {
 
       <button
         onClick={() => {
-          setActiveTab('sitrep');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          downloadSitRepPdf(generateLiveSitRepData());
         }}
         className="hidden md:inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-[#1E293B] hover:bg-[#334155] px-3 py-1.5 text-xs font-bold text-[#F8FAFC] shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+        title="Download Official Government Situation Report (PDF)"
       >
         <FilePdf size={14} weight="bold" className="text-rose-400" />
-        <span>SITREP</span>
+        <span>SITREP PDF</span>
       </button>
 
       <button
@@ -508,7 +511,7 @@ export const App: React.FC = () => {
       {/* ───────────────────────────────────────────────────────────────────────
           2. MAIN NAVIGATION BAR
       ───────────────────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-[100] w-full border-b border-white/10 bg-[#0F172A]/95 backdrop-blur-md px-2 sm:px-4 py-2">
+      <header className="sticky top-0 z-50 isolate w-full border-b border-white/10 bg-[#0F172A]/95 backdrop-blur-md px-2 sm:px-4 py-2">
         <div className="w-full max-w-7xl mx-auto">
           <CardNav
             logo={navLogo}

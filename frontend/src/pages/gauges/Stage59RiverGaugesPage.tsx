@@ -191,12 +191,21 @@ export const Stage59RiverGaugesPage: React.FC = () => {
       ─────────────────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3 pt-1">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-[#F8FAFC] tracking-tight flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <span className="rounded-md bg-rose-500/20 px-2.5 py-0.5 text-[10px] font-bold text-rose-400 border border-rose-500/30 flex items-center gap-1 font-mono uppercase">
+              <Broadcast size={12} weight="bold" />
+              STAGE 5.9: DHM RIVER GAUGES &amp; VERNACULAR SOS ALERTS
+            </span>
+            <span className="text-[10px] text-[#94A3B8] font-mono">
+              Point 11: Real-Time Early Warning &bull; Terai Lowlands
+            </span>
+          </div>
+          <h1 className="text-xl sm:text-2xl font-black text-[#F8FAFC] tracking-tight flex items-center gap-2 mt-1">
             <Broadcast size={24} weight="bold" className="text-[#EF4444] animate-pulse" />
             <span>
               {language === 'ne'
                 ? 'नदी जलसतह टेलिमेट्री तथा नेपाली आपतकालीन चेतावनी'
-                : 'Real-Time River Gauge Telemetry & Vernacular SOS'}
+                : 'Real-Time River Gauge Telemetry & Vernacular SOS Alerts'}
             </span>
           </h1>
           <p className="text-xs text-[#94A3B8] font-mono mt-0.5">
@@ -215,8 +224,10 @@ export const Stage59RiverGaugesPage: React.FC = () => {
                   ? 'bg-rose-600 text-white shadow-sm'
                   : 'text-[#94A3B8] hover:text-white'
               }`}
+              title="नेपाली (Vernacular)"
+              aria-label="नेपाली (Vernacular)"
             >
-              नेपाली
+              नेपाली (Vernacular)
             </button>
             <button
               onClick={() => setLanguage('en')}
@@ -225,8 +236,10 @@ export const Stage59RiverGaugesPage: React.FC = () => {
                   ? 'bg-cyan-600 text-white shadow-sm'
                   : 'text-[#94A3B8] hover:text-white'
               }`}
+              title="English"
+              aria-label="English"
             >
-              EN
+              English
             </button>
           </div>
 
@@ -303,7 +316,7 @@ export const Stage59RiverGaugesPage: React.FC = () => {
         {/* KPI 1: Monitored Gauges */}
         <div className="rounded-xl border border-white/10 bg-[#1E293B] p-3 text-left shadow-sm">
           <div className="flex items-center justify-between text-[#94A3B8] text-[10px] font-mono uppercase tracking-wider font-bold">
-            <span>{language === 'ne' ? 'अनुगमन केन्द्र' : 'Monitored Gauges'}</span>
+            <span>{language === 'ne' ? 'अनुगमन केन्द्र' : 'Monitored DHM Gauges'}</span>
             <Waves size={16} weight="bold" className="text-cyan-400" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-white font-mono mt-1 flex items-baseline gap-1.5">
@@ -341,7 +354,7 @@ export const Stage59RiverGaugesPage: React.FC = () => {
           }`}>
             {summary.stationsInDangerOrExtreme > 0
               ? (language === 'ne' ? 'तुरुन्त निकासी निर्देशन जारी' : 'Immediate Evacuation Active')
-              : (language === 'ne' ? 'सामान्य सुरक्षित बहाव' : 'Safe Flow • Zero Breaches')}
+              : (language === 'ne' ? 'कुनै खतरा छैन • सामान्य सुरक्षित बहाव' : 'Safe Flow • Zero Breaches')}
           </div>
         </div>
 
@@ -532,6 +545,7 @@ export const Stage59RiverGaugesPage: React.FC = () => {
             <select
               value={selectedScenario}
               onChange={(e) => handleScenarioChange(e.target.value)}
+              title="Select Real Hydrological Date & Monsoon Flood Scenario"
               className="rounded-lg border border-white/10 bg-[#0F172A] px-2.5 py-2 text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-cyan-500 cursor-pointer max-w-[150px] sm:max-w-none truncate"
             >
               {HISTORICAL_FLOOD_SCENARIOS.map((sc) => (
@@ -549,6 +563,7 @@ export const Stage59RiverGaugesPage: React.FC = () => {
                 onClick={handleResetFilters}
                 className="text-xs font-bold text-cyan-400 hover:text-cyan-300 px-2 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-950/40 transition-colors cursor-pointer"
                 title="Reset All Filters"
+                aria-label="सबै रिसेट गर्नुहोस्"
               >
                 Reset
               </button>
@@ -575,6 +590,7 @@ export const Stage59RiverGaugesPage: React.FC = () => {
               <button
                 onClick={() => setSearchQuery('')}
                 className="absolute right-2 top-2 text-[#94A3B8] hover:text-white"
+                title="Clear search query"
               >
                 <X size={12} weight="bold" />
               </button>
@@ -584,6 +600,15 @@ export const Stage59RiverGaugesPage: React.FC = () => {
             {filteredGauges.length} stations active
           </span>
         </div>
+
+        {/* Empty Search / Filter Alert State */}
+        {filteredGauges.length === 0 && (
+          <div className="p-3 text-center text-xs text-amber-300 bg-amber-950/30 border border-amber-500/30 rounded-lg mt-1 font-mono">
+            {language === 'ne'
+              ? 'कुनै केन्द्र फेला परेन • कृपया खोज शब्द वा फिल्टर परिवर्तन गर्नुहोस्'
+              : 'No stations found • Please adjust search query or filter'}
+          </div>
+        )}
       </div>
 
       {/* ─────────────────────────────────────────────────────────────────────

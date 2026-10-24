@@ -257,7 +257,7 @@ describe('Stage 5.9: DHM River Gauge Telemetry & Vernacular SOS Alerts Suite', (
       const englishBtn = screen.getByRole('button', { name: /^English$/i });
       fireEvent.click(englishBtn);
 
-      expect(screen.getByText(/Real-Time River Gauge Telemetry & Vernacular Alerts/i)).toBeDefined();
+      expect(screen.getByText(/Real-Time River Gauge Telemetry & Vernacular.*Alerts/i)).toBeDefined();
       expect(screen.getByText(/Monitored DHM Gauges/i)).toBeDefined();
       expect(screen.getAllByText(/Danger Level Breached/i).length).toBeGreaterThan(0);
     });
