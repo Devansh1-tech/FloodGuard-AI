@@ -9,7 +9,7 @@
  * - Fully bilingual (Nepali / English) with one-click SOS broadcast launcher.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Activity,
   AlertOctagon,
@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { RiverGaugeStation } from '@/data/teraiRiverGauges';
 import { BILINGUAL_GAUGE_LABELS } from '@/services/riverGaugeService';
+import { fetchGaugeForecast, GaugeForecast } from '@/services/riverForecastService';
 
 interface WaterGaugeVisualizerProps {
   gauge: RiverGaugeStation;
@@ -50,6 +51,20 @@ export const WaterGaugeVisualizer: React.FC<WaterGaugeVisualizerProps> = ({
   // Hydrograph view mode: Stage height in meters vs Discharge in cusecs
   const [hydroViewMode, setHydroViewMode] = useState<'stage' | 'discharge'>('stage');
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
+  const [forecast, setForecast] = useState<GaugeForecast | null>(null);
+  const [forecastError, setForecastError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setForecast(null);
+    setForecastError(false);
+    fetchGaugeForecast(gauge.id).then((value) => {
+      if (active) setForecast(value);
+    }).catch(() => {
+      if (active) setForecastError(true);
+    });
+    return () => { active = false; };
+  }, [gauge.id]);
 
   // Maximum scale height for gauge bar: 110% of highest historical or danger level
   const maxScale = Math.max(
@@ -607,7 +622,43 @@ export const WaterGaugeVisualizer: React.FC<WaterGaugeVisualizerProps> = ({
           )}
         </div>
 
-        {/* 4. DOWNSTREAM RIPARIAN IMPACT ZONES (SYMMETRICAL 2-COLUMN GRID) */}
+        {/* 4. SHORT-LEAD STAGE FORECAST */}
+        <div className="border-y border-slate-800 py-2" aria-live="polite">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">
+                {language === 'ne' ? '२४ घण्टाको जलसतह अनुमान' : '24-hour stage projection'}
+              </p>
+              {forecast ? (
+                <p className="mt-1 text-xs text-slate-200">
+                  {language === 'ne' ? '२४ घण्टामा अनुमानित' : 'Projected in 24 hours'}{' '}
+                  <strong className="font-mono text-cyan-300">
+                    {forecast.stage_forecast.find((point) => point.hours_ahead === 24)?.stage_m.toFixed(2) ?? '—'}m
+                  </strong>
+                  <span className="ml-2 text-[10px] text-slate-500">
+                    {language === 'ne' ? 'रैखिक प्रवृत्ति अनुमान' : 'linear trend estimate'}
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-1 text-[10px] text-slate-500">
+                  {forecastError
+                    ? (language === 'ne' ? 'अनुमान सेवा उपलब्ध छैन' : 'Forecast service unavailable')
+                    : (language === 'ne' ? 'अनुमान लोड हुँदैछ' : 'Loading forecast')}
+                </p>
+              )}
+            </div>
+            {forecast?.critical_rising_alert && (
+              <span className="rounded border border-rose-500/50 bg-rose-950/50 px-2 py-1 text-[9px] font-bold text-rose-300">
+                {language === 'ne' ? 'तीव्र वृद्धि' : 'CRITICAL RISE'}
+              </span>
+            )}
+          </div>
+          {forecast?.assumptions[1] && (
+            <p className="mt-1 text-[9px] leading-snug text-slate-500">{forecast.assumptions[1]}</p>
+          )}
+        </div>
+
+        {/* 5. DOWNSTREAM RIPARIAN IMPACT ZONES (SYMMETRICAL 2-COLUMN GRID) */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-[9px] font-extrabold uppercase tracking-wider text-slate-400">
             <span>

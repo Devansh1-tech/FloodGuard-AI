@@ -60,12 +60,18 @@ class RiverGaugeStationSchema(BaseModel):
 
 
 class VernacularAlertChannelsSchema(BaseModel):
-    sms_nepali_compact: str = Field(..., description="Compact <=160 character GSM compatible text")
+    sms_nepali_compact: str = Field(..., description="Compact text kept to 160 Unicode code points; Unicode SMS may be segmented by carriers")
     sms_english_compact: str
     whatsapp_nepali_rich: str = Field(..., description="Rich emoji formatted messaging payload")
     whatsapp_english_rich: str
     community_radio_script_nepali: str = Field(..., description="Official spoken announcement for FM radio")
     community_radio_script_english: str
+    sms_maithili_compact: str
+    sms_bhojpuri_compact: str
+    whatsapp_maithili_rich: str
+    whatsapp_bhojpuri_rich: str
+    community_radio_script_maithili: str
+    community_radio_script_bhojpuri: str
     shareable_whatsapp_url: str
 
 

@@ -16,6 +16,15 @@ from FloodDetectionEngine.detection.otsu import otsu_threshold
 from FloodDetectionEngine.detection.morphology import MorphologyCleaner
 from FloodDetectionEngine.detection.flood_mask import FloodMaskGenerator
 from FloodDetectionEngine.detection.vectorization import Vectorizer
+from FloodDetectionEngine.detection.topographic_filter import (
+    TopographicFilter,
+    TopographicFilterMetrics,
+)
+from FloodDetectionEngine.detection.flood_segmentation_engine import (
+    FloodSegmentationEngine,
+    FloodSegmentationResult,
+    LandCoverImpact,
+)
 from FloodDetectionEngine.detection.spectral_indices import (
     compute_mndwi,
     compute_ndwi,
@@ -29,6 +38,11 @@ __all__ = [
     "MorphologyCleaner",
     "FloodMaskGenerator",
     "Vectorizer",
+    "TopographicFilter",
+    "TopographicFilterMetrics",
+    "FloodSegmentationEngine",
+    "FloodSegmentationResult",
+    "LandCoverImpact",
     "compute_mndwi",
     "compute_ndwi",
     "compute_aweinsh",

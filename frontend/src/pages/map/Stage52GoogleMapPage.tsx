@@ -8,7 +8,7 @@
  * - All 21 Terai district hubs with color hazard pins and village dossiers.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Globe,
   MapPin,
@@ -20,8 +20,10 @@ import {
   Crosshair,
 } from '@phosphor-icons/react';
 import { GoogleMapsViewer } from '@/components/map/GoogleMapsViewer';
+import { DigitalTwinTimeline } from '@/components/map/DigitalTwinTimeline';
 
 export const Stage52GoogleMapPage: React.FC = () => {
+  const [scenarioHour, setScenarioHour] = useState(0);
   return (
     <div className="space-y-6 pb-12 font-sans text-[#F8FAFC]">
       {/* Top Header */}
@@ -47,8 +49,9 @@ export const Stage52GoogleMapPage: React.FC = () => {
       </div>
 
       {/* Main Google Maps Viewer Component */}
+      <DigitalTwinTimeline value={scenarioHour} onChange={setScenarioHour} />
       <div id="map" className="w-full">
-        <GoogleMapsViewer />
+        <GoogleMapsViewer digitalTwinOffsetHours={scenarioHour} />
       </div>
 
       {/* Technical Architecture Cards */}

@@ -25,15 +25,15 @@ describe('Nepal Terai Google Maps Platform Suite — Stage 5.3', () => {
       <GoogleMapsViewer apiKey="AIzaSyCYKKkl1C613n508xjv25SNSDFKO9Og0rw" />
     );
     expect(container).toBeDefined();
-    expect(screen.getByText(/STAGE 5.3: FLOOD EXTENT & SETTLEMENT OVERLAY/i)).toBeDefined();
+    expect(screen.getByText(/FLOOD EXTENT & SETTLEMENT OVERLAY/i)).toBeDefined();
     expect(screen.getByText(/11 RIVER CORRIDORS • 21 TERAI DISTRICTS/i)).toBeDefined();
     expect(screen.getByPlaceholderText(/Find any Terai village/i)).toBeDefined();
   });
 
   it('renders Stage52GoogleMapPage and displays dual provider controls', () => {
     render(<Stage52GoogleMapPage />);
-    expect(screen.getByText(/Terai Disaster Command Map/i)).toBeDefined();
-    expect(screen.getAllByText(/STAGE 5.3: FLOOD EXTENT & SETTLEMENT OVERLAY/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Terai Disaster.*Command Map/i)).toBeDefined();
+    expect(screen.getAllByText(/FLOOD EXTENT & SETTLEMENT OVERLAY/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Sentinel-1 SAR Vector Flood Polygons/i)).toBeDefined();
     expect(screen.getByText(/21 Terai Cities & Village Dossiers/i)).toBeDefined();
   });
@@ -80,29 +80,33 @@ describe('Nepal Terai Google Maps Platform Suite — Stage 5.3', () => {
   });
 
   it('renders all 13 layer toggle checkboxes and allows toggling them smoothly', () => {
-    render(<GoogleMapsViewer />);
+    const { container } = render(<GoogleMapsViewer />);
 
-    const nepalCheckbox = screen.getByLabelText(/Nepal Sovereign Map/i) as HTMLInputElement;
-    const teraiCheckbox = screen.getByLabelText(/Terai Lowland Region/i) as HTMLInputElement;
-    const trafficBtn = screen.getByRole('button', { name: /Live Traffic/i });
-    const dottedFloodCheckbox = screen.getByLabelText(/Dotted Flood Lines/i) as HTMLInputElement;
-    const dottedBasinsCheckbox = screen.getByLabelText(/Dotted Basins/i) as HTMLInputElement;
-    const dottedRiversCheckbox = screen.getByLabelText(/Dotted Rivers/i) as HTMLInputElement;
-    const floodCorridorsCheckbox = screen.getByLabelText(/11 Flood Corridors/i) as HTMLInputElement;
-    const citiesCheckbox = screen.getByLabelText(/All 21 Terai Cities/i) as HTMLInputElement;
-    const villageCheckbox = screen.getByLabelText(/Village Hazard Pins/i) as HTMLInputElement;
+    // Open the Feature Layers dropdown popover
+    const layersBtn = container.querySelector('#btn-feature-layers') || screen.getByText(/Feature Layers/i);
+    fireEvent.click(layersBtn);
+
+    const nepalCheckbox = screen.getByLabelText(/Nepal Border/i) as HTMLInputElement;
+    const teraiCheckbox = screen.getByLabelText(/Terai Belt/i) as HTMLInputElement;
+    const trafficCheckbox = screen.getByLabelText(/Live Highway Traffic/i) as HTMLInputElement;
+    const floodExtentCheckbox = screen.getByLabelText(/Flood Extent/i) as HTMLInputElement;
+    const basinsCheckbox = screen.getByLabelText(/Basin Lines/i) as HTMLInputElement;
+    const riversCheckbox = screen.getByLabelText(/Live Rivers/i) as HTMLInputElement;
+    const corridorsCheckbox = screen.getByLabelText(/11 Corridors/i) as HTMLInputElement;
+    const citiesCheckbox = screen.getByLabelText(/21 Cities/i) as HTMLInputElement;
+    const villageCheckbox = screen.getByLabelText(/Village Pins/i) as HTMLInputElement;
     const hospitalsCheckbox = screen.getByLabelText(/Hospitals/i) as HTMLInputElement;
-    const safeZonesCheckbox = screen.getByLabelText(/Safe Shelters/i) as HTMLInputElement;
-    const roadCheckbox = screen.getByLabelText(/Stage 5.4 Road Inundation/i) as HTMLInputElement;
+    const safeZonesCheckbox = screen.getByLabelText(/Safe Havens/i) as HTMLInputElement;
+    const roadCheckbox = screen.getByLabelText(/Roads Network/i) as HTMLInputElement;
     const bridgesCheckbox = screen.getByLabelText(/Critical Bridges/i) as HTMLInputElement;
 
     // Verify initial checked states
     expect(nepalCheckbox.checked).toBe(true);
     expect(teraiCheckbox.checked).toBe(true);
-    expect(dottedFloodCheckbox.checked).toBe(true);
-    expect(dottedBasinsCheckbox.checked).toBe(true);
-    expect(dottedRiversCheckbox.checked).toBe(true);
-    expect(floodCorridorsCheckbox.checked).toBe(true);
+    expect(floodExtentCheckbox.checked).toBe(true);
+    expect(basinsCheckbox.checked).toBe(true);
+    expect(riversCheckbox.checked).toBe(true);
+    expect(corridorsCheckbox.checked).toBe(true);
     expect(citiesCheckbox.checked).toBe(true);
     expect(villageCheckbox.checked).toBe(true);
     expect(hospitalsCheckbox.checked).toBe(true);
@@ -117,19 +121,19 @@ describe('Nepal Terai Google Maps Platform Suite — Stage 5.3', () => {
     fireEvent.click(safeZonesCheckbox);
     expect(safeZonesCheckbox.checked).toBe(false);
 
-    fireEvent.click(dottedFloodCheckbox);
-    expect(dottedFloodCheckbox.checked).toBe(false);
+    fireEvent.click(floodExtentCheckbox);
+    expect(floodExtentCheckbox.checked).toBe(false);
 
-    fireEvent.click(floodCorridorsCheckbox);
-    expect(floodCorridorsCheckbox.checked).toBe(false);
+    fireEvent.click(corridorsCheckbox);
+    expect(corridorsCheckbox.checked).toBe(false);
 
-    fireEvent.click(dottedBasinsCheckbox);
-    expect(dottedBasinsCheckbox.checked).toBe(false);
+    fireEvent.click(basinsCheckbox);
+    expect(basinsCheckbox.checked).toBe(false);
 
-    fireEvent.click(dottedRiversCheckbox);
-    expect(dottedRiversCheckbox.checked).toBe(false);
+    fireEvent.click(riversCheckbox);
+    expect(riversCheckbox.checked).toBe(false);
 
-    fireEvent.click(trafficBtn);
-    expect(trafficBtn).toBeDefined();
+    fireEvent.click(trafficCheckbox);
+    expect(trafficCheckbox.checked).toBe(true);
   });
 });

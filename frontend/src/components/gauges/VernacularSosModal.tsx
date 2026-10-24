@@ -10,7 +10,7 @@
  * - Instant Copy-to-Clipboard with visual confirmation.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertOctagon,
   Check,
@@ -30,6 +30,7 @@ import {
   generateClientVernacularAlert,
   VernacularAlertData,
 } from '@/services/riverGaugeService';
+import { AlertLanguage, buildLocalizedAlert } from '@/services/vernacularAlertService';
 
 interface VernacularSosModalProps {
   gauge: RiverGaugeStation | null;
@@ -46,11 +47,21 @@ export const VernacularSosModal: React.FC<VernacularSosModalProps> = ({
 }) => {
   const [activeChannel, setActiveChannel] = useState<'sms' | 'whatsapp' | 'radio'>('sms');
   const [copiedChannel, setCopiedChannel] = useState<string | null>(null);
+  const [alertLanguage, setAlertLanguage] = useState<AlertLanguage>(language);
+
+  useEffect(() => setAlertLanguage(language), [language]);
 
   if (!isOpen || !gauge) return null;
 
   const alertData: VernacularAlertData = generateClientVernacularAlert(gauge);
-  const ch = alertData.channels;
+  const localized = buildLocalizedAlert(gauge, alertLanguage);
+  const ch = {
+    ...alertData.channels,
+    smsNepaliCompact: localized.sms,
+    whatsappNepaliRich: localized.whatsapp,
+    communityRadioScriptNepali: localized.radio,
+    shareableWhatsappUrl: `https://wa.me/?text=${encodeURIComponent(localized.whatsapp)}`,
+  };
 
   const handleCopy = (text: string, channelKey: string) => {
     navigator.clipboard.writeText(text);
@@ -77,9 +88,7 @@ export const VernacularSosModal: React.FC<VernacularSosModalProps> = ({
                 </span>
               </div>
               <h2 className="text-lg sm:text-xl font-black text-white mt-0.5">
-                {language === 'ne'
-                  ? `${gauge.nepaliRiver} - संकटकालीन सूचना`
-                  : `Vernacular SOS Alert: ${gauge.river}`}
+                {alertLanguage === 'ne' ? `${gauge.nepaliRiver} - संकटकालीन सूचना` : `${localized.label} flood alert: ${gauge.river}`}
               </h2>
             </div>
           </div>
@@ -90,6 +99,23 @@ export const VernacularSosModal: React.FC<VernacularSosModalProps> = ({
           >
             <X className="h-5 w-5" />
           </button>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 bg-slate-950 px-6 py-2 border-b border-slate-800/80">
+          <label htmlFor="sos-language" className="text-xs font-semibold text-slate-300">
+            {language === 'ne' ? 'सूचनाको भाषा' : 'Alert language'}
+          </label>
+          <select
+            id="sos-language"
+            value={alertLanguage}
+            onChange={(event) => setAlertLanguage(event.target.value as AlertLanguage)}
+            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-500"
+          >
+            <option value="ne">नेपाली</option>
+            <option value="mai">मैथिली</option>
+            <option value="bho">भोजपुरी</option>
+            <option value="en">English</option>
+          </select>
         </div>
 
         {/* Telemetry Snapshot Strip */}
@@ -153,10 +179,10 @@ export const VernacularSosModal: React.FC<VernacularSosModalProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between text-xs text-slate-400">
                 <span className="font-semibold text-slate-300">
-                  {language === 'ne' ? 'नेपाली मोबाइल सन्देश (SMS):' : 'Nepali Cellular SMS (Bulk Broadcast):'}
+                    {language === 'ne' ? `${localized.label} मोबाइल सन्देश (SMS):` : `${localized.label} SMS broadcast:`}
                 </span>
                 <span className="font-mono text-[11px] text-cyan-400">
-                  Length: {ch.smsNepaliCompact.length} / 160 GSM Chars
+                  Length: {Array.from(ch.smsNepaliCompact).length} / 160 characters
                 </span>
               </div>
 
@@ -196,7 +222,7 @@ export const VernacularSosModal: React.FC<VernacularSosModalProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-slate-300">
-                  {language === 'ne' ? 'व्हाट्सएप / फेसबुक विस्तृत सूचना:' : 'WhatsApp & Social Media Markdown Notice:'}
+                    {language === 'ne' ? `${localized.label} व्हाट्सएप विस्तृत सूचना:` : `${localized.label} WhatsApp bulletin:`}
                 </span>
                 <a
                   href={ch.shareableWhatsappUrl}
@@ -229,8 +255,8 @@ export const VernacularSosModal: React.FC<VernacularSosModalProps> = ({
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-slate-300">
                   {language === 'ne'
-                    ? 'सामुदायिक रेडियो (FM) प्रत्यक्ष प्रसारण वाचन पाठ:'
-                    : 'Official Community FM Radio Broadcast Announcer Script:'}
+                    ? `${localized.label} सामुदायिक रेडियो (FM) सूचना:`
+                    : `${localized.label} community FM radio script:`}
                 </span>
                 <span className="font-mono text-[11px] text-amber-400 bg-amber-950/70 px-2 py-0.5 rounded border border-amber-800/60">
                   Est. Spoken Time: ~45 sec

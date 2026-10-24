@@ -354,6 +354,7 @@ export interface GoogleMapsViewerProps {
   afterDate?: string;
   initialRouteId?: string;
   selectedRouteId?: string;
+  digitalTwinOffsetHours?: number;
   hideHeader?: boolean;
   provider?: 'google_maps' | 'leaflet';
   onProviderChange?: (provider: 'google_maps' | 'leaflet') => void;
@@ -384,6 +385,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   afterDate: propAfterDate,
   initialRouteId = 'none',
   selectedRouteId: propSelectedRouteId,
+  digitalTwinOffsetHours = 0,
   hideHeader = false,
   provider: propProvider,
   onProviderChange,
@@ -431,6 +433,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
   );
   const [mapRenderTrigger, setMapRenderTrigger] = useState<number>(0);
   const activeRegion: TeraiRegionData = TERAI_REGIONS[selectedRegionKey] || TERAI_REGIONS.full_terai;
+  const scenarioFloodOpacity = ({ [-24]: 0, [-12]: 0.14, [-4]: 0.26, [0]: 0.35, [12]: 0.2, [24]: 0.08 } as Record<number, number>)[digitalTwinOffsetHours] ?? 0.35;
 
   // Stage 5.3 Settlement Filter & Search State
   const [settlementFilter, setSettlementFilter] = useState<'all' | 'flooded_only' | 'safe_only'>('all');
@@ -1002,7 +1005,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
     }
 
     // 3. Draw High-Resolution Sentinel-1 SAR Flood Corridors (Filled Deluge Extent)
-    if (showFloodPolygons) {
+    if (showFloodPolygons && scenarioFloodOpacity > 0) {
       TERAI_FLOOD_CORRIDORS.forEach((corridor) => {
         if (selectedRegionKey !== 'full_terai') {
           const hasCommonDistrict = corridor.districts.some((d) =>
@@ -1028,7 +1031,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
           strokeOpacity: highlightFloodedDotted ? 0 : 0.85,
           strokeWeight: highlightFloodedDotted ? 0 : 2.5,
           fillColor: fillCol,
-          fillOpacity: 0.35,
+          fillOpacity: scenarioFloodOpacity,
           map,
           zIndex: 4,
         });
@@ -1710,6 +1713,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
     propSelectedDatePreset,
     propBeforeDate,
     propAfterDate,
+    digitalTwinOffsetHours,
     highlightFloodedDotted,
     showDottedBasins,
     showDottedRivers,
@@ -2501,7 +2505,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
               )}
 
               {/* 3. High-Resolution Sentinel-1 Flood Corridors (Filled Water Polygon Layer) */}
-              {showFloodPolygons &&
+              {showFloodPolygons && scenarioFloodOpacity > 0 &&
                 TERAI_FLOOD_CORRIDORS.map((corridor) => {
                   if (selectedRegionKey !== 'full_terai') {
                     const hasCommonDistrict = corridor.districts.some((d) =>
@@ -2526,7 +2530,7 @@ export const GoogleMapsViewer: React.FC<GoogleMapsViewerProps> = ({
                         color: isCritical ? '#00F2FE' : '#38BDF8',
                         weight: highlightFloodedDotted ? 1 : 2.5,
                         fillColor: isCritical ? '#0284C7' : '#0369A1',
-                        fillOpacity: 0.35,
+                        fillOpacity: scenarioFloodOpacity,
                       }}
                     >
                       <Popup>

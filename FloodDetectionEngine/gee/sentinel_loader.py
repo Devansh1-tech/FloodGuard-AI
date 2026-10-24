@@ -62,7 +62,10 @@ class SentinelLoader:
     def __init__(self, config: EngineConfig) -> None:
         self.config = config
         coords = config.get_aoi_coordinates()
-        self.aoi: ee.Geometry = ee.Geometry.Polygon([coords])
+        try:
+            self.aoi: Optional[ee.Geometry] = ee.Geometry.Polygon([coords])
+        except Exception:
+            self.aoi = None
         logger.info(
             "SentinelLoader initialised - AOI: %s, Before: %s -> %s, After: %s -> %s",
             config.aoi_name,

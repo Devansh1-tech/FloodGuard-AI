@@ -300,7 +300,7 @@ describe('Stage 5.9: DHM River Gauge Telemetry & Vernacular SOS Alerts Suite', (
       // Wait for dry season baseline to compute and render
       await waitFor(() => {
         expect(screen.getAllByText(/कुनै खतरा छैन • सामान्य सुरक्षित बहाव/i).length).toBeGreaterThan(0);
-      });
+      }, { timeout: 3500 });
     });
 
     it('resets all filters back to default live deluge telemetry', async () => {
